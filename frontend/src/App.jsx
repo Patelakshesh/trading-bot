@@ -10,18 +10,30 @@ import Backtest from './pages/Backtest';
 import Login from './pages/Login';
 import './index.css';
 
-// Global Fetch Interceptor for Authentication
+// Global Fetch Interceptor to attach JWT Token to ALL requests and handle Live API Routing
 const originalFetch = window.fetch;
-window.fetch = async (url, options = {}) => {
-  if (url.toString().startsWith('http://localhost:5000/api/') && !url.toString().includes('/login')) {
-    const token = localStorage.getItem('adminToken');
-    options.headers = {
-      ...options.headers,
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-    };
+window.fetch = async (...args) => {
+  let [url, config] = args;
+  
+  // Dynamically rewrite localhost to the Live Render Backend URL from .env
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  if (typeof url === 'string' && url.startsWith('http://localhost:5000/api')) {
+      url = url.replace('http://localhost:5000/api', API_BASE);
   }
-  const response = await originalFetch(url, options);
+
+  // Attach token
+  if (url.toString().startsWith(API_BASE) && !url.toString().includes('/login')) {
+    const token = localStorage.getItem('adminToken');
+    if (token) {
+      config = config || {};
+      config.headers = {
+        ...config.headers,
+        'Authorization': `Bearer ${token}`
+      };
+    }
+  }
+  
+  const response = await originalFetch(url, config);
   if (response.status === 401 && !url.toString().includes('/login')) {
     localStorage.removeItem('adminToken');
     window.location.href = '/';
