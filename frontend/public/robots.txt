@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /logs
+Disallow: /backtest
+
+Sitemap: https://ai-guardian-trade.vercel.app/sitemap.xml
