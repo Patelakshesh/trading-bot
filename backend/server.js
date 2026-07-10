@@ -178,7 +178,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             });
             bot.sendMessage(chatId, moverMsg, {parse_mode: 'Markdown'});
         } catch(err) {
-            bot.sendMessage(chatId, `❌ Error fetching market movers.`);
+            console.error("TELEGRAM MOVERS ERROR:", err);
+            bot.sendMessage(chatId, `❌ Error fetching market movers: ${err.message}`);
         }
     });
 }

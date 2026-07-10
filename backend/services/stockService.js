@@ -17,7 +17,12 @@ const getStockPrice = async (symbol) => {
             }
         }
 
-        const quote = await yahooFinance.quote(querySymbol);
+        // Add .catch() to prevent Unhandled Promise Rejections from crashing the server
+        // if Yahoo responds with a 429 after the timeout has already moved on
+        const fetchQuote = yahooFinance.quote(querySymbol).catch(e => null);
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Yahoo Quote Timeout')), 2000));
+        
+        const quote = await Promise.race([fetchQuote, timeout]);
         const price = quote ? quote.regularMarketPrice : null;
         
         if (price) {
@@ -94,8 +99,9 @@ const searchSymbol = async (query) => {
 const getMarketMovers = async () => {
     try {
         // Enforce a strict 3-second timeout to prevent Yahoo from hanging the server
-        const fetchScreener = yahooFinance.screener({ scrIds: 'day_gainers', count: 5 });
-        const fetchLosers = yahooFinance.screener({ scrIds: 'day_losers', count: 5 });
+        // Add .catch() to prevent background Unhandled Rejection crashes when the abandoned promise finally fails
+        const fetchScreener = yahooFinance.screener({ scrIds: 'day_gainers', count: 5 }).catch(e => null);
+        const fetchLosers = yahooFinance.screener({ scrIds: 'day_losers', count: 5 }).catch(e => null);
         
         const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
         
@@ -131,20 +137,23 @@ const getMarketMovers = async () => {
             { symbol: 'BAJFINANCE.NS', name: 'Bajaj Finance Ltd' }
         ];
         
-        let simulatedMovers = [];
-        for (let item of fallbackData) {
+        const pricePromises = fallbackData.map(async (item) => {
             const price = await getStockPrice(item.symbol);
             if(price) {
                 // Simulate a small random daily change for the UI fallback
                 const pseudoChange = (Math.random() * 6) - 2; 
-                simulatedMovers.push({
+                return {
                     symbol: item.symbol,
                     name: item.name,
                     price: price,
                     changePercent: pseudoChange.toFixed(2)
-                });
+                };
             }
-        }
+            return null;
+        });
+        
+        const results = await Promise.all(pricePromises);
+        let simulatedMovers = results.filter(r => r !== null);
         
         simulatedMovers.sort((a,b) => b.changePercent - a.changePercent);
         
