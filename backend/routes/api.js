@@ -253,4 +253,42 @@ router.post('/backtest', async (req, res) => {
     }
 });
 
+// --- HISTORICAL DATA (NO CHARTS) ---
+router.get('/stock/history', async (req, res) => {
+    try {
+        const { symbol, period } = req.query; // '7d', '1mo', '3mo'
+        const endDate = new Date();
+        const startDate = new Date();
+        
+        if (period === '7d') startDate.setDate(startDate.getDate() - 7);
+        else if (period === '1mo') startDate.setMonth(startDate.getMonth() - 1);
+        else if (period === '3mo') startDate.setMonth(startDate.getMonth() - 3);
+        else startDate.setDate(startDate.getDate() - 7);
+        
+        const history = await yahooFinance.historical(symbol, {
+            period1: startDate,
+            period2: endDate,
+            interval: '1d'
+        });
+        
+        const quote = await yahooFinance.quote(symbol);
+        
+        res.json({
+            quote: {
+                price: quote.regularMarketPrice,
+                open: quote.regularMarketOpen,
+                high: quote.regularMarketDayHigh,
+                low: quote.regularMarketDayLow,
+                close: quote.regularMarketPreviousClose,
+                change: quote.regularMarketChange,
+                changePercent: quote.regularMarketChangePercent
+            },
+            history: history.reverse()
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error fetching historical data' });
+    }
+});
+
 module.exports = router;

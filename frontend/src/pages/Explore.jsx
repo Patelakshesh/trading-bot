@@ -9,6 +9,10 @@ const Explore = () => {
   
   const [aiPicks, setAiPicks] = useState([]);
   const [loadingAi, setLoadingAi] = useState(true);
+  
+  const [historyPeriod, setHistoryPeriod] = useState('7d');
+  const [historyData, setHistoryData] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const [alertConfig, setAlertConfig] = useState({ isOpen: false, message: '', title: '' });
 
@@ -62,14 +66,23 @@ const Explore = () => {
     }
   };
 
-  // Note: NSE restricts third-party iframe embedding on TradingView. 
-  // We map .NS to BSE: to bypass this restriction, as BSE data is free to embed.
-  const getTradingViewSymbol = (sym) => {
-    if(!sym) return 'AAPL';
-    if(sym.endsWith('.NS')) return 'BSE:' + sym.replace('.NS', '');
-    if(sym.endsWith('.BO')) return 'BSE:' + sym.replace('.BO', '');
-    return sym; 
-  };
+  useEffect(() => {
+    if (!activeChartSymbol) {
+      setHistoryData(null);
+      return;
+    }
+    setHistoryLoading(true);
+    fetch(`http://localhost:5000/api/stock/history?symbol=${encodeURIComponent(activeChartSymbol)}&period=${historyPeriod}`)
+      .then(res => res.json())
+      .then(data => {
+        setHistoryData(data);
+        setHistoryLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setHistoryLoading(false);
+      });
+  }, [activeChartSymbol, historyPeriod]);
 
   return (
     <>
@@ -126,7 +139,7 @@ const Explore = () => {
                 </button>
               </div>
               <div style={{marginTop: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem', fontStyle: 'italic'}}>
-                Click card to view live market price, today's change, and 5-year graph.
+                Click card to view detailed historical prices (Open/Close/High/Low) and table data.
               </div>
             </div>
           ))}
@@ -184,22 +197,78 @@ const Explore = () => {
         )}
       </div>
 
-      {/* Advanced TradingView Chart Modal */}
+      {/* Advanced Historical Data Modal (Replaced Chart) */}
       {activeChartSymbol && (
         <div className="modal-overlay">
-          <div className="modal-content animate-fade-in" style={{ maxWidth: '1000px', width: '95%', height: '80vh', display: 'flex', flexDirection: 'column', padding: '16px', margin: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ margin: 0, color: 'var(--accent-blue)' }}>{activeChartSymbol} Live Market</h2>
+          <div className="modal-content animate-fade-in" style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', padding: '24px', margin: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ margin: 0, color: 'var(--accent-blue)', fontSize: '1.8rem' }}>{activeChartSymbol} - Detailed Analysis</h2>
               <button className="btn-close" style={{position: 'static'}} onClick={() => setActiveChartSymbol(null)}>×</button>
             </div>
-            {/* Embed TradingView Widget via Iframe */}
-            <iframe 
-              key={activeChartSymbol}
-              src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_1&symbol=${encodeURIComponent(getTradingViewSymbol(activeChartSymbol))}&interval=D&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=Asia%2FKolkata&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=en&utm_source=localhost&utm_medium=widget&utm_campaign=chart&utm_term=${encodeURIComponent(getTradingViewSymbol(activeChartSymbol))}`}
-              style={{ width: '100%', flex: 1, border: 'none', borderRadius: '8px' }}
-              title="TradingView Chart"
-              allowFullScreen
-            ></iframe>
+
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+              <button className={`btn ${historyPeriod === '7d' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setHistoryPeriod('7d')}>Last 7 Days</button>
+              <button className={`btn ${historyPeriod === '1mo' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setHistoryPeriod('1mo')}>1 Month</button>
+              <button className={`btn ${historyPeriod === '3mo' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setHistoryPeriod('3mo')}>3 Months</button>
+            </div>
+
+            {historyLoading || !historyData ? (
+              <div style={{textAlign: 'center', padding: '40px', color: 'var(--text-secondary)'}}>
+                <div className="loader" style={{margin: '0 auto 16px'}}></div>
+                Fetching historical data and today's metrics...
+              </div>
+            ) : (
+              <>
+                <div className="dashboard-grid" style={{ marginBottom: '24px' }}>
+                  <div className="glass-card" style={{ textAlign: 'center', padding: '16px' }}>
+                    <h4 style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>Current Price</h4>
+                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff', margin: 0 }}>₹{historyData.quote?.price?.toFixed(2) || 'N/A'}</p>
+                    {historyData.quote?.change !== undefined && (
+                      <span style={{ color: historyData.quote.change >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: '0.9rem' }}>
+                        {historyData.quote.change >= 0 ? '+' : ''}{historyData.quote.change.toFixed(2)} ({historyData.quote.changePercent?.toFixed(2)}%)
+                      </span>
+                    )}
+                  </div>
+                  <div className="glass-card" style={{ textAlign: 'center', padding: '16px' }}>
+                    <h4 style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>Today's High</h4>
+                    <p style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--success)', margin: 0 }}>₹{historyData.quote?.high?.toFixed(2) || 'N/A'}</p>
+                  </div>
+                  <div className="glass-card" style={{ textAlign: 'center', padding: '16px' }}>
+                    <h4 style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>Today's Low</h4>
+                    <p style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--danger)', margin: 0 }}>₹{historyData.quote?.low?.toFixed(2) || 'N/A'}</p>
+                  </div>
+                </div>
+
+                <div className="glass-card" style={{ overflowX: 'auto', padding: 0 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--glass-border)' }}>
+                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>Date</th>
+                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>Open</th>
+                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>Close</th>
+                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>High</th>
+                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>Low</th>
+                        <th style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>Volume</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historyData.history && historyData.history.length > 0 ? historyData.history.map((row, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <td style={{ padding: '12px 16px' }}>{new Date(row.date).toLocaleDateString()}</td>
+                          <td style={{ padding: '12px 16px' }}>₹{row.open?.toFixed(2)}</td>
+                          <td style={{ padding: '12px 16px' }}>₹{row.close?.toFixed(2)}</td>
+                          <td style={{ padding: '12px 16px', color: 'var(--success)' }}>₹{row.high?.toFixed(2)}</td>
+                          <td style={{ padding: '12px 16px', color: 'var(--danger)' }}>₹{row.low?.toFixed(2)}</td>
+                          <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{row.volume?.toLocaleString()}</td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan="6" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No historical data available.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
