@@ -4,10 +4,13 @@ import SymbolSearch from '../components/SymbolSearch';
 
 const Dashboard = () => {
   const [portfolio, setPortfolio] = useState([]);
+  const [history, setHistory] = useState([]);
   const [movers, setMovers] = useState({ gainers: [], losers: [] });
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSellModalOpen, setIsSellModalOpen] = useState(false);
   const [formData, setFormData] = useState({ symbol: '', buyPrice: '', quantity: '' });
+  const [sellData, setSellData] = useState({ id: '', symbol: '', sellPrice: '', quantity: '', maxQty: 1 });
   
   // State for TradingView Chart Modal
   const [activeChartSymbol, setActiveChartSymbol] = useState(null);
@@ -27,6 +30,14 @@ const Dashboard = () => {
       })
       .catch(err => console.error("Error fetching portfolio:", err))
       .finally(() => setLoading(false));
+      
+    fetch('http://localhost:5000/api/portfolio/history')
+      .then(res => res.json())
+      .then(data => {
+        if(Array.isArray(data)) setHistory(data);
+        else setHistory([]);
+      })
+      .catch(err => console.error("Error fetching history:", err));
   };
 
   const fetchMovers = () => {
@@ -67,6 +78,30 @@ const Dashboard = () => {
       fetchPortfolio(); 
     } catch (err) {
       console.error("Error adding trade", err);
+    }
+  };
+
+  const openSellModal = (e, item) => {
+    e.stopPropagation();
+    setSellData({ id: item._id, symbol: item.symbol, sellPrice: item.currentPrice || item.buyPrice, quantity: item.quantity, maxQty: item.quantity });
+    setIsSellModalOpen(true);
+  };
+
+  const handleSellTrade = async (e) => {
+    e.preventDefault();
+    try {
+      await fetch(`http://localhost:5000/api/portfolio/${sellData.id}/sell`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sellPrice: Number(sellData.sellPrice),
+          quantity: Number(sellData.quantity) || sellData.maxQty
+        })
+      });
+      setIsSellModalOpen(false);
+      fetchPortfolio(); 
+    } catch (err) {
+      console.error("Error selling trade", err);
     }
   };
 
@@ -121,9 +156,16 @@ const Dashboard = () => {
     totalCurrentValue += (currentPrice * item.quantity);
   });
   
-  const totalProfitLoss = totalCurrentValue - totalInvested;
-  const totalIsProfit = totalProfitLoss >= 0;
-  const totalPLPercentage = totalInvested > 0 ? ((totalProfitLoss / totalInvested) * 100).toFixed(2) : 0;
+  let totalRealizedProfit = 0;
+  history.forEach(item => {
+    totalRealizedProfit += item.realizedProfit;
+  });
+  
+  const totalUnrealizedProfitLoss = totalCurrentValue - totalInvested;
+  const totalIsProfit = totalUnrealizedProfitLoss >= 0;
+  const totalPLPercentage = totalInvested > 0 ? ((totalUnrealizedProfitLoss / totalInvested) * 100).toFixed(2) : 0;
+
+  const totalNetGains = totalUnrealizedProfitLoss + totalRealizedProfit;
 
   if (loading) return <div className="loader-container"><div className="loader"></div></div>;
 
@@ -145,23 +187,30 @@ const Dashboard = () => {
         </div>
 
         {/* Global Portfolio Summary */}
-        {portfolio.length > 0 && (
-          <div className="glass-card" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <div>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Total Invested</p>
-              <h2 style={{ margin: 0 }}>₹{totalInvested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</h2>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Current Value</p>
-              <h2 style={{ margin: 0, color: totalIsProfit ? 'var(--success)' : 'var(--danger)' }}>
-                ₹{totalCurrentValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-              </h2>
-              <span style={{ color: totalIsProfit ? 'var(--success)' : 'var(--danger)', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                {totalIsProfit ? '+' : ''}₹{totalProfitLoss.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} ({totalIsProfit ? '+' : ''}{totalPLPercentage}%)
-              </span>
-            </div>
+        <div className="glass-card" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Active Invested</p>
+            <h2 style={{ margin: 0 }}>₹{totalInvested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</h2>
           </div>
-        )}
+          <div>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Live Value (Unrealized)</p>
+            <h2 style={{ margin: 0, color: totalIsProfit ? 'var(--success)' : 'var(--danger)' }}>
+              ₹{totalCurrentValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </h2>
+            <span style={{ color: totalIsProfit ? 'var(--success)' : 'var(--danger)', fontSize: '0.9rem', fontWeight: 'bold' }}>
+              {totalIsProfit ? '+' : ''}₹{totalUnrealizedProfitLoss.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} ({totalIsProfit ? '+' : ''}{totalPLPercentage}%)
+            </span>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Banked History (Realized)</p>
+            <h2 style={{ margin: 0, color: totalRealizedProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+              {totalRealizedProfit >= 0 ? '+' : ''}₹{totalRealizedProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </h2>
+            <span style={{ color: 'var(--text-primary)', fontSize: '0.9rem', fontWeight: 'bold' }}>
+              Net Gains: <span style={{ color: totalNetGains >= 0 ? 'var(--success)' : 'var(--danger)' }}>{totalNetGains >= 0 ? '+' : ''}₹{totalNetGains.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            </span>
+          </div>
+        </div>
 
         {portfolio.length === 0 ? (
           <div className="glass-card" style={{textAlign: 'center', padding: '40px'}}>
@@ -188,9 +237,16 @@ const Dashboard = () => {
                       <h2 style={{margin: 0, display: 'flex', alignItems: 'center', gap: '8px'}}>
                         {item.symbol}
                         <button 
+                          onClick={(e) => openSellModal(e, item)} 
+                          style={{background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', color: 'var(--success)', cursor: 'pointer', fontSize: '0.8rem', padding: '4px 8px', borderRadius: '4px', fontWeight: '600'}}
+                          title="Sell Stock"
+                        >
+                          Sell
+                        </button>
+                        <button 
                           onClick={(e) => triggerDelete(e, item._id)} 
                           style={{background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '1rem', padding: '4px'}}
-                          title="Remove Stock"
+                          title="Remove Stock Without Selling"
                         >
                           🗑️
                         </button>
@@ -358,6 +414,46 @@ const Dashboard = () => {
         isAlert={true}
         onConfirm={() => setAlertConfig({ isOpen: false, title: '', message: '' })}
       />
+      {isSellModalOpen && (
+        <div className="modal-overlay animate-fade-in" onClick={() => setIsSellModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+              <h2 style={{margin: 0}}>Log Sale: {sellData.symbol}</h2>
+              <button style={{background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '1.2rem'}} onClick={() => setIsSellModalOpen(false)}>✕</button>
+            </div>
+            
+            <form onSubmit={handleSellTrade} style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+              <div className="form-group">
+                <label>Sell Price (₹)</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  required 
+                  className="form-input" 
+                  value={sellData.sellPrice}
+                  onChange={e => setSellData({...sellData, sellPrice: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Quantity to Sell (Max: {sellData.maxQty})</label>
+                <input 
+                  type="number" 
+                  min="1"
+                  max={sellData.maxQty}
+                  required 
+                  className="form-input" 
+                  value={sellData.quantity}
+                  onChange={e => setSellData({...sellData, quantity: e.target.value})}
+                />
+              </div>
+              <div style={{display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px'}}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsSellModalOpen(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{background: 'var(--danger)', borderColor: 'var(--danger)'}}>Confirm Sell</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 };

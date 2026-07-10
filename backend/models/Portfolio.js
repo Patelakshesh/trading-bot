@@ -22,6 +22,12 @@ const portfolioSchema = new mongoose.Schema({
         type: String,
         enum: ['HOLDING', 'SOLD'],
         default: 'HOLDING',
+    },
+    sellPrice: {
+        type: Number
+    },
+    realizedProfit: {
+        type: Number
     }
 }, { timestamps: true });
 

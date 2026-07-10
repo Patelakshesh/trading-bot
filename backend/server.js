@@ -59,6 +59,63 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         }
     });
 
+    // 1.5 New /sold command
+    bot.onText(/\/sold ([A-Za-z0-9.]+) (\d+\.?\d*)(?: (\d+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        let symbol = match[1].toUpperCase();
+        if (!symbol.includes('.')) {
+            symbol = symbol + '.NS';
+        }
+        const sellPrice = parseFloat(match[2]);
+        const quantity = match[3] ? parseInt(match[3]) : 1;
+        
+        try {
+            // Find the oldest HOLDING position for this symbol
+            const position = await Portfolio.findOne({ chatId: chatId.toString(), symbol: symbol, status: 'HOLDING' }).sort({ createdAt: 1 });
+            
+            if (!position) {
+                return bot.sendMessage(chatId, `❌ You don't have any open (HOLDING) positions for ${symbol}.`);
+            }
+            
+            // If they are selling fewer shares than they own, split the position
+            if (quantity < position.quantity) {
+                // Reduce the current holding
+                position.quantity -= quantity;
+                await position.save();
+                
+                // Create a new sold entry for the realized profit
+                const realizedProfit = (sellPrice - position.buyPrice) * quantity;
+                await Portfolio.create({
+                    chatId: chatId.toString(),
+                    symbol: symbol,
+                    buyPrice: position.buyPrice,
+                    quantity: quantity,
+                    status: 'SOLD',
+                    sellPrice: sellPrice,
+                    realizedProfit: realizedProfit
+                });
+                
+                const sign = realizedProfit >= 0 ? '+' : '';
+                const emoji = realizedProfit >= 0 ? '🤑' : '🩸';
+                bot.sendMessage(chatId, `✅ **Partial Sale Logged!**\n\n📉 **Stock:** ${symbol}\n📦 **Sold:** ${quantity} shares\n💰 **Sell Price:** ₹${sellPrice}\n${emoji} **Realized Profit:** ${sign}₹${realizedProfit.toFixed(2)}\n\n(You still hold ${position.quantity} shares).`, {parse_mode: 'Markdown'});
+            } else {
+                // Selling the whole position
+                const realizedProfit = (sellPrice - position.buyPrice) * position.quantity;
+                position.status = 'SOLD';
+                position.sellPrice = sellPrice;
+                position.realizedProfit = realizedProfit;
+                await position.save();
+                
+                const sign = realizedProfit >= 0 ? '+' : '';
+                const emoji = realizedProfit >= 0 ? '🤑' : '🩸';
+                bot.sendMessage(chatId, `✅ **Full Position Sold!**\n\n📉 **Stock:** ${symbol}\n📦 **Sold:** ${position.quantity} shares\n💰 **Sell Price:** ₹${sellPrice}\n${emoji} **Realized Profit:** ${sign}₹${realizedProfit.toFixed(2)}`, {parse_mode: 'Markdown'});
+            }
+        } catch(err) {
+            console.error(err);
+            bot.sendMessage(chatId, '❌ Failed to update portfolio database. Please check connection.');
+        }
+    });
+
     // 2. New /price command
     bot.onText(/\/price (.+)/, async (msg, match) => {
         const chatId = msg.chat.id;
@@ -157,7 +214,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     let msgText = `🎯 <b>TOP 5 ELITE SWING TRADES</b> (98% Algorithmic Conviction)\n\n`;
                     top5.forEach((t, i) => {
                         const icon = t.action.includes('BUY') ? '🟢' : '🔴';
-                        msgText += `${i+1}. <b>${t.symbol}</b> ${icon} <b>${t.action}</b>\n`;
+                        const companyStr = t.companyName ? ` (${t.companyName})` : '';
+                        msgText += `${i+1}. <b>${t.symbol}</b>${companyStr} ${icon} <b>${t.action}</b>\n`;
                         if (t.currentPrice) {
                             msgText += `💸 Current Price: <b>${t.currentPrice}</b>\n`;
                         }
@@ -188,7 +246,9 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         
         try {
             const holdings = await Portfolio.find({ status: 'HOLDING' });
-            if (holdings.length === 0) {
+            const soldTrades = await Portfolio.find({ status: 'SOLD' });
+            
+            if (holdings.length === 0 && soldTrades.length === 0) {
                 return bot.sendMessage(chatId, `Your portfolio is empty! Buy some stocks to see your profit.`);
             }
 
@@ -203,17 +263,28 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 totalInvested += invested;
                 totalCurrentValue += current;
             }
-
-            const totalProfitAmount = totalCurrentValue - totalInvested;
-            const totalProfitPercent = ((totalProfitAmount / totalInvested) * 100).toFixed(2);
             
-            const sign = totalProfitAmount >= 0 ? '+' : '';
-            const emoji = totalProfitAmount >= 0 ? '🟢' : '🔴';
+            let totalRealizedProfit = 0;
+            for (let trade of soldTrades) {
+                totalRealizedProfit += trade.realizedProfit;
+            }
+
+            const totalUnrealizedProfit = totalCurrentValue - totalInvested;
+            const totalProfitPercent = totalInvested > 0 ? ((totalUnrealizedProfit / totalInvested) * 100).toFixed(2) : 0;
+            
+            const unrealizedSign = totalUnrealizedProfit >= 0 ? '+' : '';
+            const unrealizedEmoji = totalUnrealizedProfit >= 0 ? '🟢' : '🔴';
+            
+            const realizedSign = totalRealizedProfit >= 0 ? '+' : '';
+            const realizedEmoji = totalRealizedProfit >= 0 ? '🤑' : '🩸';
 
             bot.sendMessage(chatId, `🏆 **PORTFOLIO SUMMARY** 🏆\n\n` +
-                                    `💰 **Total Invested:** ₹${totalInvested.toFixed(2)}\n` +
-                                    `📈 **Current Value:** ₹${totalCurrentValue.toFixed(2)}\n` +
-                                    `${emoji} **Total Profit:** ${sign}₹${totalProfitAmount.toFixed(2)} (${sign}${totalProfitPercent}%)`, {parse_mode: 'Markdown'});
+                                    `💰 **Active Invested:** ₹${totalInvested.toFixed(2)}\n` +
+                                    `📈 **Live Value:** ₹${totalCurrentValue.toFixed(2)}\n` +
+                                    `${unrealizedEmoji} **Unrealized Profit:** ${unrealizedSign}₹${totalUnrealizedProfit.toFixed(2)} (${unrealizedSign}${totalProfitPercent}%)\n\n` +
+                                    `🏦 **BANKED HISTORY**\n` +
+                                    `${realizedEmoji} **Realized Profit (SOLD):** ${realizedSign}₹${totalRealizedProfit.toFixed(2)}\n\n` +
+                                    `💎 **NET GAINS:** ${totalUnrealizedProfit + totalRealizedProfit >= 0 ? '+' : ''}₹${(totalUnrealizedProfit + totalRealizedProfit).toFixed(2)}`, {parse_mode: 'Markdown'});
         } catch (error) {
             console.error('Error calculating profit:', error);
             bot.sendMessage(chatId, `❌ Error calculating portfolio profit.`);
@@ -229,6 +300,9 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                            `🛒 \`/bought <SYMBOL> <PRICE> <QTY>\`\n` +
                            `↳ *Example: /bought ZOMATO 250 100*\n` +
                            `↳ Adds a stock to your live Web Dashboard.\n\n` +
+                           `🤝 \`/sold <SYMBOL> <PRICE> <QTY>\`\n` +
+                           `↳ *Example: /sold ZOMATO 260 100*\n` +
+                           `↳ Sells the stock and stores your earned profit in history.\n\n` +
                            `🏆 \`/profit\` or \`/portfolio\`\n` +
                            `↳ Scans your entire portfolio and shows your total profit in rupees.\n\n` +
                            `🧠 \`/tip <SYMBOL>\`\n` +

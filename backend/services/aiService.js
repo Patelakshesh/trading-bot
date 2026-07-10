@@ -159,10 +159,10 @@ LATEST NEWS:
 ${news.slice(0, 5).map(n => `- ${n.title}`).join('\n')}
 
 TOP GAINERS TODAY (Includes Live Prices):
-${movers.gainers.map(g => `- ${g.symbol}: ₹${g.price} (+${g.changePercent}%)`).join('\n')}
+${movers.gainers.map(g => `- ${g.symbol} (${g.name}): ₹${g.price} (+${g.changePercent}%)`).join('\n')}
 
 TOP LOSERS TODAY (Includes Live Prices):
-${movers.losers.map(l => `- ${l.symbol}: ₹${l.price} (${l.changePercent}%)`).join('\n')}
+${movers.losers.map(l => `- ${l.symbol} (${l.name}): ₹${l.price} (${l.changePercent}%)`).join('\n')}
 
 CRITICAL INSTRUCTIONS:
 1. Analyze the news and movers to pick the ABSOLUTE BEST TOP 5 STOCKS to trade right now.
@@ -176,6 +176,7 @@ Return ONLY a JSON array of exactly 5 objects. Do NOT use markdown code blocks l
 [
   {
     "symbol": "TICKER.NS",
+    "companyName": "Full Company Name Ltd",
     "action": "BUY" | "SELL SHORT",
     "duration": "1 Day" | "2 Days" | "3 Days",
     "rationale": "Short highly persuasive 1-sentence reason",

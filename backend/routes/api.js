@@ -60,6 +60,17 @@ router.get('/portfolio', async (req, res) => {
     }
 });
 
+// Get portfolio sold history (Realized Profits)
+router.get('/portfolio/history', async (req, res) => {
+    try {
+        const soldTrades = await Portfolio.find({ status: 'SOLD' }).sort({ updatedAt: -1 });
+        res.json(soldTrades);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error fetching history' });
+    }
+});
+
 // Get Latest Trending News
 router.get('/news', async (req, res) => {
     try {
@@ -99,6 +110,47 @@ router.delete('/portfolio/:id', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error deleting stock' });
+    }
+});
+
+// Sell a stock
+router.post('/portfolio/:id/sell', async (req, res) => {
+    try {
+        const { sellPrice, quantity } = req.body;
+        const position = await Portfolio.findById(req.params.id);
+        
+        if (!position || position.status !== 'HOLDING') {
+            return res.status(404).json({ error: 'Position not found or already sold' });
+        }
+        
+        const sellQty = quantity ? parseInt(quantity) : position.quantity;
+        
+        if (sellQty < position.quantity) {
+            position.quantity -= sellQty;
+            await position.save();
+            
+            const realizedProfit = (sellPrice - position.buyPrice) * sellQty;
+            await Portfolio.create({
+                chatId: position.chatId,
+                symbol: position.symbol,
+                buyPrice: position.buyPrice,
+                quantity: sellQty,
+                status: 'SOLD',
+                sellPrice: sellPrice,
+                realizedProfit: realizedProfit
+            });
+            res.json({ message: 'Partial sale logged successfully' });
+        } else {
+            const realizedProfit = (sellPrice - position.buyPrice) * position.quantity;
+            position.status = 'SOLD';
+            position.sellPrice = sellPrice;
+            position.realizedProfit = realizedProfit;
+            await position.save();
+            res.json({ message: 'Full position sold successfully' });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error selling stock' });
     }
 });
 
