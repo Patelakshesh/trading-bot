@@ -53,7 +53,7 @@ Respond in a strict JSON format exactly like this array:
 ]
 Only return valid JSON array without markdown formatting.`;
 
-        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const response = await model.generateContent(prompt);
 
         let aiText = response.response.text();
@@ -111,7 +111,7 @@ Return your response in STRICT JSON format:
   "rationale": "<your combined explanation>"
 }
 `;
-        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const response = await model.generateContent(prompt);
         let aiText = response.response.text();
         aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -158,7 +158,7 @@ Respond in a strict JSON format exactly like this array:
 Only return valid JSON array without markdown formatting.`;
         }
 
-        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const response = await model.generateContent(prompt);
 
         let aiText = response.response.text();
