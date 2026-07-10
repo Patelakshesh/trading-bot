@@ -28,6 +28,8 @@ const getStockPrice = async (symbol) => {
         if (price) {
             priceCache.set(querySymbol, { price, timestamp: Date.now() });
             return price;
+        } else {
+            throw new Error("Yahoo Quote returned null - Forcing Fallback");
         }
         
     } catch (error) {
@@ -107,6 +109,10 @@ const getMarketMovers = async () => {
         
         const gainersResult = await Promise.race([fetchScreener, timeout]);
         const losersResult = await Promise.race([fetchLosers, timeout]);
+        
+        if (!gainersResult || !losersResult) {
+            throw new Error("Yahoo Rate Limited - Booting Fallback");
+        }
 
         const mapQuote = (q) => ({
             symbol: q.symbol,
