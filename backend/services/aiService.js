@@ -136,8 +136,21 @@ Return your response in STRICT JSON format:
     }
 };
 
-const getGlobalTop5TradingTips = async (news, movers) => {
+const getGlobalTop5TradingTips = async (news, movers, budget = null, priceRange = null) => {
     try {
+        let budgetPrompt = "";
+        let jsonFields = "";
+        if (budget) {
+            budgetPrompt = `The user has a total investment budget of ₹${budget}. You MUST strategically allocate this budget across the 5 chosen stocks. Calculate EXACTLY how many shares the user should buy for each stock, and how much of the budget is allocated to it. Ensure the total allocated funds equal approximately ₹${budget}.`;
+            jsonFields = `\n    "allocatedFunds": "₹XX,XXX",\n    "sharesToBuy": 150`;
+        }
+        
+        let rangePrompt = "";
+        if (priceRange) {
+            rangePrompt = `CRITICAL: The user has specifically requested stocks priced strictly between ₹${priceRange.min} and ₹${priceRange.max}. You MUST ONLY recommend stocks that currently trade within this exact price range. If the provided movers do not fit this range, you must use your elite quantitative knowledge to recommend 5 other highly explosive stocks (e.g., penny stocks or mid-caps) that fit this price bracket. You must estimate and provide their current price in the JSON.`;
+            jsonFields += `,\n    "currentPrice": "₹XXX"`;
+        }
+
         const prompt = `
 You are an elite quantitative hedge fund manager with a verified 98% success rate in short-term swing trading.
 I am providing you with the latest breaking market news and today's top market gainers and losers.
@@ -145,17 +158,19 @@ I am providing you with the latest breaking market news and today's top market g
 LATEST NEWS:
 ${news.slice(0, 5).map(n => `- ${n.title}`).join('\n')}
 
-TOP GAINERS TODAY:
-${movers.gainers.map(g => `- ${g.symbol} (+${g.changePercent}%)`).join('\n')}
+TOP GAINERS TODAY (Includes Live Prices):
+${movers.gainers.map(g => `- ${g.symbol}: ₹${g.price} (+${g.changePercent}%)`).join('\n')}
 
-TOP LOSERS TODAY:
-${movers.losers.map(l => `- ${l.symbol} (${l.changePercent}%)`).join('\n')}
+TOP LOSERS TODAY (Includes Live Prices):
+${movers.losers.map(l => `- ${l.symbol}: ₹${l.price} (${l.changePercent}%)`).join('\n')}
 
 CRITICAL INSTRUCTIONS:
 1. Analyze the news and movers to pick the ABSOLUTE BEST TOP 5 STOCKS to trade right now.
 2. For each stock, you MUST provide a strict short-term trading plan (e.g., "Hold for 1 Day", "Hold for 3 Days").
 3. You must provide clear entry and exit targets.
 4. Guarantee maximum high-conviction logic.
+${budgetPrompt}
+${rangePrompt}
 
 Return ONLY a JSON array of exactly 5 objects. Do NOT use markdown code blocks like \`\`\`json.
 [
@@ -165,7 +180,7 @@ Return ONLY a JSON array of exactly 5 objects. Do NOT use markdown code blocks l
     "duration": "1 Day" | "2 Days" | "3 Days",
     "rationale": "Short highly persuasive 1-sentence reason",
     "target": "+5%",
-    "stopLoss": "-2%"
+    "stopLoss": "-2%"${jsonFields}
   }
 ]
 `;
