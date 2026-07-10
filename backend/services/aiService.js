@@ -124,7 +124,10 @@ Return your response in STRICT JSON format:
 
 const getTop10Recommendations = async (news) => {
     try {
-        const prompt = `You are an elite AI Trading Assistant. Based on the following global breaking news:
+        let prompt = "";
+        
+        if (news && news.length > 0) {
+            prompt = `You are an elite AI Trading Assistant. Based on the following global breaking news:
 ${JSON.stringify(news, null, 2)}
 
 Identify exactly 10 publicly traded stocks (use valid ticker symbols, prioritize large/mid-cap Indian .NS or global stocks) that are highly likely to be impacted (either positively or negatively) by this news today.
@@ -139,6 +142,21 @@ Respond in a strict JSON format exactly like this array:
   }
 ]
 Only return valid JSON array without markdown formatting.`;
+        } else {
+            prompt = `You are an elite AI Trading Assistant.
+Identify exactly 10 publicly traded stocks (use valid ticker symbols, prioritize large/mid-cap Indian .NS stocks) that are currently experiencing high market volatility, strong momentum, or interesting technical setups right now.
+I want to add these to my Watchlist to monitor them.
+
+Respond in a strict JSON format exactly like this array:
+[
+  {
+    "symbol": "ZOMATO.NS",
+    "name": "Zomato Ltd",
+    "reason": "Short reason explaining why this stock is a good technical or momentum watch."
+  }
+]
+Only return valid JSON array without markdown formatting.`;
+        }
 
         const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const response = await model.generateContent(prompt);
