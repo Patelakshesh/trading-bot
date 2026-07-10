@@ -166,8 +166,11 @@ const runDailyAnalysis = async () => {
     }
 };
 
-// Internal Cron Job (Will only run if the server is awake at 9:30 AM)
-cron.schedule('30 9 * * *', runDailyAnalysis);
+// Internal Cron Job (Will only run if the server is awake at 9:30 AM IST)
+cron.schedule('30 9 * * *', runDailyAnalysis, {
+    scheduled: true,
+    timezone: "Asia/Kolkata"
+});
 
 // External Webhook to trigger the AI manually or via external free Cron service (cron-job.org)
 app.get('/api/cron/trigger-analysis', async (req, res) => {
