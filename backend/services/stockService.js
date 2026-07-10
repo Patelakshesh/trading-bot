@@ -116,17 +116,30 @@ const getMarketMovers = async () => {
     } catch (error) {
         console.error("Yahoo Screener Blocked/Timed Out. Booting up Fail-Safe Fallback...");
         // Bypassing Yahoo Block: Generate dynamic movers from popular volatile stocks
-        const fallbackSymbols = ['RELIANCE.NS', 'TCS.NS', 'ZOMATO.NS', 'HDFCBANK.NS', 'INFY.NS', 'SUZLON.NS'];
-        let simulatedMovers = [];
+        const fallbackData = [
+            { symbol: 'RELIANCE.NS', name: 'Reliance Industries Ltd' },
+            { symbol: 'TCS.NS', name: 'Tata Consultancy Services' },
+            { symbol: 'HDFCBANK.NS', name: 'HDFC Bank Ltd' },
+            { symbol: 'INFY.NS', name: 'Infosys Ltd' },
+            { symbol: 'ZOMATO.NS', name: 'Zomato Ltd' },
+            { symbol: 'SUZLON.NS', name: 'Suzlon Energy Ltd' },
+            { symbol: 'TATAMOTORS.NS', name: 'Tata Motors Ltd' },
+            { symbol: 'ITC.NS', name: 'ITC Ltd' },
+            { symbol: 'SBIN.NS', name: 'State Bank of India' },
+            { symbol: 'BHARTIARTL.NS', name: 'Bharti Airtel Ltd' },
+            { symbol: 'WIPRO.NS', name: 'Wipro Ltd' },
+            { symbol: 'BAJFINANCE.NS', name: 'Bajaj Finance Ltd' }
+        ];
         
-        for (let sym of fallbackSymbols) {
-            const price = await getStockPrice(sym);
+        let simulatedMovers = [];
+        for (let item of fallbackData) {
+            const price = await getStockPrice(item.symbol);
             if(price) {
                 // Simulate a small random daily change for the UI fallback
                 const pseudoChange = (Math.random() * 6) - 2; 
                 simulatedMovers.push({
-                    symbol: sym,
-                    name: sym.replace('.NS',''),
+                    symbol: item.symbol,
+                    name: item.name,
                     price: price,
                     changePercent: pseudoChange.toFixed(2)
                 });
@@ -136,8 +149,8 @@ const getMarketMovers = async () => {
         simulatedMovers.sort((a,b) => b.changePercent - a.changePercent);
         
         return { 
-            gainers: simulatedMovers.slice(0, 3), 
-            losers: simulatedMovers.slice(simulatedMovers.length - 3).reverse() 
+            gainers: simulatedMovers.slice(0, 5), 
+            losers: simulatedMovers.slice(simulatedMovers.length - 5).reverse() 
         };
     }
 };
