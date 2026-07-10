@@ -59,9 +59,8 @@ Only return valid JSON array without markdown formatting.`;
         let aiText = response.response.text();
         
         // Remove markdown formatting if Gemini adds it
-        if(aiText.startsWith('```json')) {
-            aiText = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
-        }
+        // Remove markdown formatting robustly
+        aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
 
         return JSON.parse(aiText);
     } catch (error) {
@@ -115,9 +114,7 @@ Return your response in STRICT JSON format:
         const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const response = await model.generateContent(prompt);
         let aiText = response.response.text();
-        if(aiText.startsWith('```json')) {
-            aiText = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
-        }
+        aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
         return JSON.parse(aiText);
     } catch (error) {
         console.error('Error in getStockAnalysis:', error);
@@ -147,9 +144,7 @@ Only return valid JSON array without markdown formatting.`;
         const response = await model.generateContent(prompt);
 
         let aiText = response.response.text();
-        if(aiText.startsWith('```json')) {
-            aiText = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
-        }
+        aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
         return JSON.parse(aiText);
     } catch (error) {
         console.error('Error generating AI top 10:', error);

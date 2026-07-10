@@ -8,7 +8,7 @@ const TelegramBot = require('node-telegram-bot-api').default || require('node-te
 const Portfolio = require('./models/Portfolio');
 const AnalysisLog = require('./models/AnalysisLog');
 const { getLatestNews } = require('./services/newsService');
-const { getStockPrice } = require('./services/stockService');
+const { getStockPrice, searchSymbol } = require('./services/stockService');
 const { analyzePortfolio, getStockAnalysis } = require('./services/aiService');
 const { getTechnicalIndicators } = require('./services/technicalService');
 const advancedDataService = require('./services/advancedDataService');
@@ -30,18 +30,12 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/bought <SYMBOL> <PRICE>` - Track a stock\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation', {parse_mode: 'Markdown'});
     });
 
-    // Helper to format symbols (handles raw names like "Zomato" -> "ZOMATO.NS")
-    const formatSymbol = (input) => {
-        let sym = input.trim().toUpperCase().replace(/\s+/g, '');
-        if (!sym.endsWith('.NS') && !sym.endsWith('.BO')) sym += '.NS';
-        return sym;
-    };
-
     // 1. Upgraded /bought command to show live price
     bot.onText(/\/bought (.+) (.+)/, async (msg, match) => {
         const chatId = msg.chat.id;
         const rawSymbol = match[1];
-        const symbol = formatSymbol(rawSymbol);
+        bot.sendMessage(chatId, `🔍 Finding correct ticker for "${rawSymbol}"...`);
+        const symbol = await searchSymbol(rawSymbol);
         const price = parseFloat(match[2]);
         
         try {
@@ -65,7 +59,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     // 2. New /price command
     bot.onText(/\/price (.+)/, async (msg, match) => {
         const chatId = msg.chat.id;
-        const symbol = formatSymbol(match[1]);
+        const rawSymbol = match[1];
+        const symbol = await searchSymbol(rawSymbol);
         bot.sendMessage(chatId, `🔍 Fetching live price for ${symbol}...`);
         
         const livePrice = await getStockPrice(symbol);
@@ -79,7 +74,10 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     // 3. New /tip command (Instant AI Recommendation)
     bot.onText(/\/tip (.+)/, async (msg, match) => {
         const chatId = msg.chat.id;
-        const symbol = formatSymbol(match[1]);
+        const rawSymbol = match[1];
+        bot.sendMessage(chatId, `🔍 Identifying ticker for "${rawSymbol}"...`);
+        const symbol = await searchSymbol(rawSymbol);
+        
         bot.sendMessage(chatId, `🧠 Connecting to Wall Street Data for ${symbol}... please wait 10 seconds.`);
         
         try {
@@ -87,13 +85,12 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             const technicals = await getTechnicalIndicators(symbol);
             const analysis = await getStockAnalysis(symbol, news, technicals);
             
-            if (analysis) {
+            if (analysis && analysis.action) {
                 bot.sendMessage(chatId, `🚨 **INSTANT AI TIP: ${symbol}** 🚨\n\n` +
-                                        `📈 **Trend:** ${analysis.trend}\n` +
-                                        `💰 **Recommendation:** ${analysis.recommendation}\n` +
-                                        `🧠 **AI Logic:** ${analysis.reasoning}`, {parse_mode: 'Markdown'});
+                                        `📈 **Action:** ${analysis.action} (Confidence: ${analysis.confidence}%)\n` +
+                                        `🧠 **AI Logic:** ${analysis.rationale}`, {parse_mode: 'Markdown'});
             } else {
-                bot.sendMessage(chatId, `❌ AI failed to generate a tip for ${symbol} right now.`);
+                bot.sendMessage(chatId, `❌ AI failed to generate a tip for ${symbol} right now. Data might be unavailable.`);
             }
         } catch (error) {
             bot.sendMessage(chatId, `❌ Error analyzing ${symbol}.`);
