@@ -65,6 +65,9 @@ const Backtest = () => {
                 onChange={(e) => setDays(Number(e.target.value))}
                 className="timeframe-select"
               >
+                <option value={1}>Last 1 Day</option>
+                <option value={3}>Last 3 Days</option>
+                <option value={7}>Last 7 Days</option>
                 <option value={30}>Last 1 Month (Swing Trade)</option>
                 <option value={90}>Last 3 Months (Swing Trade)</option>
                 <option value={180}>Last 6 Months</option>
@@ -119,22 +122,14 @@ const Backtest = () => {
           {/* BEGINNER FRIENDLY AI VERDICT */}
           <div className="glass-card" style={{ 
             marginBottom: '32px', 
-            background: result.profitPercent > 10 ? 'rgba(16, 185, 129, 0.05)' : result.profitPercent > 0 ? 'rgba(245, 158, 11, 0.05)' : 'rgba(239, 68, 68, 0.05)',
-            borderLeft: `4px solid ${result.profitPercent > 10 ? 'var(--success)' : result.profitPercent > 0 ? 'var(--warning)' : 'var(--danger)'}`
+            background: 'rgba(59, 130, 246, 0.05)',
+            borderLeft: '4px solid var(--accent-blue)'
           }}>
             <h2 style={{ fontSize: '1.2rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              🤖 AI Final Verdict for Beginners:
+              🤖 AI Mentor Tip for Beginners:
             </h2>
-            <div style={{ fontSize: '1.1rem', fontWeight: '500' }}>
-              {result.profitPercent > 20 ? (
-                <span style={{ color: 'var(--success)' }}>🔥 HIGHLY RECOMMENDED: This is a highly profitable and safe strategy. The AI strongly recommends you invest in this. (95% Success Rating)</span>
-              ) : result.profitPercent > 5 ? (
-                <span style={{ color: 'var(--success)' }}>✅ RECOMMENDED: This is a consistently profitable stock to trade. It is safe to invest. (80% Success Rating)</span>
-              ) : result.profitPercent > 0 ? (
-                <span style={{ color: 'var(--warning)' }}>⚠️ NEUTRAL: This strategy barely makes money. It is risky and you might want to find a better stock. (50% Success Rating)</span>
-              ) : (
-                <span style={{ color: 'var(--danger)' }}>❌ DO NOT INVEST: The AI proved that trading this stock will make you lose money. Stay away! (0% Success Rating)</span>
-              )}
+            <div style={{ fontSize: '1.1rem', fontWeight: '500', color: 'var(--text-primary)', lineHeight: '1.5' }}>
+              {result.aiSuggestion ? result.aiSuggestion : "Analyzing results..."}
             </div>
           </div>
 

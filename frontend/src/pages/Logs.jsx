@@ -24,7 +24,7 @@ const Logs = () => {
 
   useEffect(() => {
     fetchLogs();
-    const intervalId = setInterval(fetchLogs, 120000);
+    const intervalId = setInterval(fetchLogs, 30000); // 30 seconds
     return () => clearInterval(intervalId);
   }, []);
 

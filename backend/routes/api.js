@@ -247,6 +247,12 @@ router.post('/backtest', async (req, res) => {
         if (result.error) {
             return res.status(400).json(result);
         }
+        
+        // Generate Beginner AI Suggestion based on the result
+        const { getBacktestAISuggestion } = require('../services/aiService');
+        const aiSuggestion = await getBacktestAISuggestion(symbol, days || 365, result.profitPercent, result.totalTrades);
+        result.aiSuggestion = aiSuggestion;
+        
         res.json(result);
     } catch (error) {
         console.error(error);

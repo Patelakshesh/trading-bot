@@ -137,6 +137,50 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             bot.sendMessage(chatId, `❌ Error calculating portfolio profit.`);
         }
     });
+
+    // 5. Beautiful Welcome / Help Menu
+    bot.onText(/\/(start|help)/, (msg) => {
+        const chatId = msg.chat.id;
+        const welcomeMsg = `🤖 **Welcome to the AI Hedge Fund Bot!** 🤖\n\n` +
+                           `I am your 24/7 personal trading assistant. I monitor the markets, read the news, and execute mathematical strategies for you.\n\n` +
+                           `📌 **AVAILABLE COMMANDS:**\n\n` +
+                           `🛒 \`/bought <SYMBOL> <PRICE> <QTY>\`\n` +
+                           `↳ *Example: /bought ZOMATO 250 100*\n` +
+                           `↳ Adds a stock to your live Web Dashboard.\n\n` +
+                           `🏆 \`/profit\` or \`/portfolio\`\n` +
+                           `↳ Scans your entire portfolio and shows your total profit in rupees.\n\n` +
+                           `🧠 \`/tip <SYMBOL>\`\n` +
+                           `↳ *Example: /tip RELIANCE*\n` +
+                           `↳ Uses Gemini AI, Math, and Breaking News to give you an instant BUY/SELL/HOLD recommendation.\n\n` +
+                           `📊 \`/price <SYMBOL>\`\n` +
+                           `↳ Instantly fetches the exact live market price.\n\n` +
+                           `🚀 \`/movers\`\n` +
+                           `↳ Shows today's top Market Gainers and Losers.\n\n` +
+                           `*(Remember: If I detect a +5% profit or Bad Breaking News on your stocks, I will automatically alert you here!)*`;
+                           
+        bot.sendMessage(chatId, welcomeMsg, {parse_mode: 'Markdown'});
+    });
+
+    // 6. Market Movers Command
+    bot.onText(/\/movers/, async (msg) => {
+        const chatId = msg.chat.id;
+        bot.sendMessage(chatId, `🚀 Scanning Wall Street for Top Movers...`);
+        try {
+            const { getMarketMovers } = require('./services/stockService');
+            const movers = await getMarketMovers();
+            let moverMsg = `📈 **TOP GAINERS:**\n`;
+            movers.gainers.slice(0, 3).forEach(g => {
+                moverMsg += `🟢 ${g.symbol}: ₹${g.price} (+${g.changePercent}%)\n`;
+            });
+            moverMsg += `\n📉 **TOP LOSERS:**\n`;
+            movers.losers.slice(0, 3).forEach(l => {
+                moverMsg += `🔴 ${l.symbol}: ₹${l.price} (${l.changePercent}%)\n`;
+            });
+            bot.sendMessage(chatId, moverMsg, {parse_mode: 'Markdown'});
+        } catch(err) {
+            bot.sendMessage(chatId, `❌ Error fetching market movers.`);
+        }
+    });
 }
 
 // Connect to MongoDB
@@ -274,34 +318,61 @@ cron.schedule('0 * * * *', runDailyAnalysis, {
 });
 
 
-// MATHEMATICAL STOP-LOSS CRON JOB (Runs every 15 minutes)
+// MATHEMATICAL STOP-LOSS, TAKE-PROFIT, AND NEWS ALERT CRON JOB (Runs every 15 minutes)
 cron.schedule('*/15 * * * *', async () => {
-    console.log('Running Stop-Loss Check...');
+    console.log('Running Auto-Alert Check...');
     if(!bot) return;
 
     try {
         const holdings = await Portfolio.find({ status: 'HOLDING' });
+        const { getLatestNews } = require('./services/newsService');
+        const news = await getLatestNews();
+
         for(let item of holdings) {
             const currentPrice = await getStockPrice(item.symbol);
             if(currentPrice) {
-                const dropPercentage = ((item.buyPrice - currentPrice) / item.buyPrice) * 100;
+                const profitPercentage = ((currentPrice - item.buyPrice) / item.buyPrice) * 100;
                 
-                // If it drops exactly 5% or more, send an emergency alert
-                if(dropPercentage >= 5) {
+                // 1. Take-Profit Alert (+5%)
+                if (profitPercentage >= 5) {
+                    const alertMsg = `🎯 **TAKE PROFIT ALERT** 🎯\n\n` +
+                                     `🚀 **Stock:** ${item.symbol}\n` +
+                                     `💰 **Buy Price:** ₹${item.buyPrice}\n` +
+                                     `🤑 **Current Price:** ₹${currentPrice} (Up +${profitPercentage.toFixed(2)}%)\n\n` +
+                                     `You have reached your +5% target! Sell now to lock in profits!`;
+                    
+                    if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
+                }
+                
+                // 2. Stop-Loss Alert (-5%)
+                if(profitPercentage <= -5) {
                     const alertMsg = `⚠️ **EMERGENCY STOP-LOSS TRIGGERED** ⚠️\n\n` +
                                      `📉 **Stock:** ${item.symbol}\n` +
                                      `💰 **Buy Price:** ₹${item.buyPrice}\n` +
-                                     `🚨 **Current Price:** ₹${currentPrice} (Dropped ${dropPercentage.toFixed(2)}%)\n\n` +
+                                     `🚨 **Current Price:** ₹${currentPrice} (Dropped ${profitPercentage.toFixed(2)}%)\n\n` +
                                      `Mathematical Safety Net activated. Consider cutting your losses!`;
                     
-                    if(item.chatId !== 'UI_USER') {
-                        bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
-                    }
+                    if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
+                }
+
+                // 3. Bad Breaking News Alert
+                // Check if any news explicitly mentions this symbol and has words like crash, fall, drop, warning
+                const badNews = news.find(n => 
+                    (n.title.includes(item.symbol.replace('.NS', '')) || n.description.includes(item.symbol.replace('.NS', ''))) &&
+                    /(crash|fall|drop|warning|fraud|loss|sell|downgrade)/i.test(n.title + n.description)
+                );
+
+                if (badNews) {
+                    const newsMsg = `📰 **BREAKING BAD NEWS ALERT** 📰\n\n` +
+                                    `🚨 **Stock:** ${item.symbol}\n` +
+                                    `⚠️ **Headline:** ${badNews.title}\n\n` +
+                                    `This negative news might impact your holdings. Consider selling immediately!`;
+                    if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, newsMsg, {parse_mode: 'Markdown'});
                 }
             }
         }
     } catch(err) {
-        console.error('Error in Stop-Loss CRON:', err);
+        console.error('Error in Auto-Alert CRON:', err);
     }
 });
 

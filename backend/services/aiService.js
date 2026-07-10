@@ -53,18 +53,23 @@ Respond in a strict JSON format exactly like this array:
 ]
 Only return valid JSON array without markdown formatting.`;
 
-        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const response = await model.generateContent(prompt);
 
         let aiText = response.response.text();
         
-        // Remove markdown formatting if Gemini adds it
-        // Remove markdown formatting robustly
-        aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        // Bulletproof JSON parsing
+        const jsonStart = aiText.indexOf('[');
+        const jsonEnd = aiText.lastIndexOf(']');
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+            aiText = aiText.substring(jsonStart, jsonEnd + 1);
+        } else {
+            aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        }
 
         return JSON.parse(aiText);
     } catch (error) {
-        console.error('Error generating AI analysis:', error);
+        console.error('Error generating AI analysis:', error.message);
         return [];
     }
 };
@@ -111,13 +116,22 @@ Return your response in STRICT JSON format:
   "rationale": "<your combined explanation>"
 }
 `;
-        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const response = await model.generateContent(prompt);
         let aiText = response.response.text();
-        aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        
+        // Bulletproof JSON parsing for Object
+        const jsonStart = aiText.indexOf('{');
+        const jsonEnd = aiText.lastIndexOf('}');
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+            aiText = aiText.substring(jsonStart, jsonEnd + 1);
+        } else {
+            aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        }
+        
         return JSON.parse(aiText);
     } catch (error) {
-        console.error('Error in getStockAnalysis:', error);
+        console.error('Error in getStockAnalysis:', error.message);
         return null;
     }
 };
@@ -158,16 +172,48 @@ Respond in a strict JSON format exactly like this array:
 Only return valid JSON array without markdown formatting.`;
         }
 
-        const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const response = await model.generateContent(prompt);
 
         let aiText = response.response.text();
-        aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        
+        // Bulletproof JSON parsing for Array
+        const jsonStart = aiText.indexOf('[');
+        const jsonEnd = aiText.lastIndexOf(']');
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+            aiText = aiText.substring(jsonStart, jsonEnd + 1);
+        } else {
+            aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        }
+        
         return JSON.parse(aiText);
     } catch (error) {
-        console.error('Error generating AI top 10:', error);
+        console.error('Error generating AI top 10:', error.message);
         return [];
     }
 };
 
-module.exports = { analyzePortfolio, getStockAnalysis, getTop10Recommendations };
+const getBacktestAISuggestion = async (symbol, days, profitPercent, totalTrades) => {
+    try {
+        const prompt = `You are a friendly, encouraging AI Trading Mentor for a beginner trader.
+The user just ran a Technical Analysis Backtest (simulated trading) for the stock ${symbol} over the last ${days} days.
+The strategy executed ${totalTrades} trades and resulted in a total return of ${profitPercent}%.
+
+Analyze this result specifically for a beginner. 
+- If the timeframe (${days} days) is very short (like 1, 3, or 7 days) and there are 0 trades, explain to the beginner that technical indicators (like RSI) need at least 14 days of data to even start generating signals, so short timeframes often result in 0 trades.
+- If it's a longer timeframe and made profit, congratulate them and explain why this is a good sign.
+- If it lost money, warn them clearly.
+
+Provide a 2-3 sentence beginner-friendly suggestion.
+Respond with plain text only, no JSON.`;
+
+        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const response = await model.generateContent(prompt);
+        return response.response.text().trim();
+    } catch (error) {
+        console.error('Error generating AI backtest suggestion:', error.message);
+        return null;
+    }
+};
+
+module.exports = { analyzePortfolio, getStockAnalysis, getTop10Recommendations, getBacktestAISuggestion };

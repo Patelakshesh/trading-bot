@@ -20,8 +20,8 @@ const News = () => {
   useEffect(() => {
     fetchNews(); // Initial fetch
     
-    // Auto-refresh every 2 minutes (120,000 milliseconds)
-    const intervalId = setInterval(fetchNews, 120000);
+    // Auto-refresh every 30 seconds (30,000 milliseconds)
+    const intervalId = setInterval(fetchNews, 30000);
     
     // Cleanup interval on component unmount
     return () => clearInterval(intervalId);
