@@ -73,6 +73,14 @@ app.get('/', (req, res) => {
     res.send('AI Trading Bot Backend is running!');
 });
 
+// External Webhook to trigger the AI manually or via external free Cron service (cron-job.org)
+// (Must be above /api so it doesn't get blocked by JWT Auth)
+app.get('/api/cron/trigger-analysis', async (req, res) => {
+    console.log("External trigger received! Starting analysis...");
+    runDailyAnalysis(); 
+    res.json({ success: true, message: 'AI Analysis Workflow triggered successfully!' });
+});
+
 // API Routes for React Frontend
 app.use('/api', require('./routes/api'));
 
@@ -175,13 +183,6 @@ cron.schedule('0 * * * *', runDailyAnalysis, {
     timezone: "Asia/Kolkata"
 });
 
-// External Webhook to trigger the AI manually or via external free Cron service (cron-job.org)
-app.get('/api/cron/trigger-analysis', async (req, res) => {
-    console.log("External trigger received! Starting analysis...");
-    // Run it asynchronously so we don't block the HTTP response
-    runDailyAnalysis(); 
-    res.json({ success: true, message: 'AI Analysis Workflow triggered successfully!' });
-});
 
 // MATHEMATICAL STOP-LOSS CRON JOB (Runs every 15 minutes)
 cron.schedule('*/15 * * * *', async () => {
