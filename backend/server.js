@@ -177,11 +177,16 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 const { getStockAnalysis } = require('./services/aiService');
                 const analysis = await getStockAnalysis(symbol, news, technicals);
                 
+                // Fetch the live price for the single stock tip
+                const currentPrice = await getStockPrice(symbol);
+                const priceText = currentPrice ? `₹${currentPrice}` : 'N/A';
+                
                 if (analysis && analysis.action) {
                     const finalMsg = `🚨 <b>INSTANT AI TIP: ${symbol}</b> 🚨\n\n` +
+                                     `💰 <b>Live Price:</b> ${priceText}\n` +
                                      `📈 <b>Action:</b> ${analysis.action} (Confidence: ${analysis.confidence}%)\n` +
                                      `🧠 <b>AI Logic:</b> ${analysis.rationale}`;
-                    await bot.editMessageText(finalMsg, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                    bot.editMessageText(finalMsg, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 } else {
                     await bot.editMessageText(`❌ AI failed to generate a tip for ${symbol} right now. Data might be unavailable.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 }
