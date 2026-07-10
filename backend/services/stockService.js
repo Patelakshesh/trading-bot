@@ -1,16 +1,39 @@
 const YahooFinance = require('yahoo-finance2').default;
-const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+
+// In-memory cache to prevent Yahoo Finance rate-limiting (HTTP 429)
+const priceCache = new Map();
+const CACHE_DURATION_MS = 30000; // 30 seconds
 
 const getStockPrice = async (symbol) => {
     try {
-        // Appending .NS for Indian stocks (NSE) by default for this example.
-        // You can remove it or handle it dynamically if you trade US stocks.
         const querySymbol = symbol.endsWith('.NS') || symbol.endsWith('.BO') ? symbol : `${symbol}.NS`;
         
+        // Check Cache first
+        if (priceCache.has(querySymbol)) {
+            const cached = priceCache.get(querySymbol);
+            if (Date.now() - cached.timestamp < CACHE_DURATION_MS) {
+                return cached.price;
+            }
+        }
+
         const quote = await yahooFinance.quote(querySymbol);
-        return quote ? quote.regularMarketPrice : null;
+        const price = quote ? quote.regularMarketPrice : null;
+        
+        if (price) {
+            priceCache.set(querySymbol, { price, timestamp: Date.now() });
+        }
+        
+        return price;
     } catch (error) {
-        console.error(`Error fetching price for ${symbol}:`, error);
+        console.error(`Error fetching price for ${symbol}:`, error.message);
+        
+        // Fallback to stale cache if available when rate-limited
+        const querySymbol = symbol.endsWith('.NS') || symbol.endsWith('.BO') ? symbol : `${symbol}.NS`;
+        if (priceCache.has(querySymbol)) {
+            return priceCache.get(querySymbol).price;
+        }
+        
         return null;
     }
 };
