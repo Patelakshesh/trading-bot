@@ -168,15 +168,15 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         try {
             const { getMarketMovers } = require('./services/stockService');
             const movers = await getMarketMovers();
-            let moverMsg = `📈 **TOP 5 GAINERS:**\n`;
+            let moverMsg = `📈 <b>TOP 5 GAINERS:</b>\n`;
             movers.gainers.slice(0, 5).forEach(g => {
                 moverMsg += `🟢 ${g.symbol} (${g.name}): ₹${g.price} (+${g.changePercent}%)\n`;
             });
-            moverMsg += `\n📉 **TOP 5 LOSERS:**\n`;
+            moverMsg += `\n📉 <b>TOP 5 LOSERS:</b>\n`;
             movers.losers.slice(0, 5).forEach(l => {
                 moverMsg += `🔴 ${l.symbol} (${l.name}): ₹${l.price} (${l.changePercent}%)\n`;
             });
-            bot.sendMessage(chatId, moverMsg, {parse_mode: 'Markdown'});
+            await bot.sendMessage(chatId, moverMsg, {parse_mode: 'HTML'});
         } catch(err) {
             console.error("TELEGRAM MOVERS ERROR:", err);
             bot.sendMessage(chatId, `❌ Error fetching market movers: ${err.message}`);
