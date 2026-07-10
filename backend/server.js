@@ -27,7 +27,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
-        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/bought <SYMBOL> <PRICE>` - Track a stock\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation', {parse_mode: 'Markdown'});
+        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/bought <SYMBOL> <PRICE>` - Track a stock\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
     });
 
     // 1. Upgraded /bought command to show live price
@@ -94,6 +94,44 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             }
         } catch (error) {
             bot.sendMessage(chatId, `❌ Error analyzing ${symbol}.`);
+        }
+    });
+    // 4. New /profit command (Total Portfolio Summary)
+    bot.onText(/\/(profit|portfolio)/, async (msg) => {
+        const chatId = msg.chat.id;
+        bot.sendMessage(chatId, `📊 Calculating your total Hedge Fund profit...`);
+        
+        try {
+            const holdings = await Portfolio.find({ status: 'HOLDING' });
+            if (holdings.length === 0) {
+                return bot.sendMessage(chatId, `Your portfolio is empty! Buy some stocks to see your profit.`);
+            }
+
+            let totalInvested = 0;
+            let totalCurrentValue = 0;
+
+            for (let item of holdings) {
+                const currentPrice = await getStockPrice(item.symbol);
+                const invested = item.buyPrice * item.quantity;
+                const current = currentPrice ? currentPrice * item.quantity : invested; // fallback to invested if price fails
+                
+                totalInvested += invested;
+                totalCurrentValue += current;
+            }
+
+            const totalProfitAmount = totalCurrentValue - totalInvested;
+            const totalProfitPercent = ((totalProfitAmount / totalInvested) * 100).toFixed(2);
+            
+            const sign = totalProfitAmount >= 0 ? '+' : '';
+            const emoji = totalProfitAmount >= 0 ? '🟢' : '🔴';
+
+            bot.sendMessage(chatId, `🏆 **PORTFOLIO SUMMARY** 🏆\n\n` +
+                                    `💰 **Total Invested:** ₹${totalInvested.toFixed(2)}\n` +
+                                    `📈 **Current Value:** ₹${totalCurrentValue.toFixed(2)}\n` +
+                                    `${emoji} **Total Profit:** ${sign}₹${totalProfitAmount.toFixed(2)} (${sign}${totalProfitPercent}%)`, {parse_mode: 'Markdown'});
+        } catch (error) {
+            console.error('Error calculating profit:', error);
+            bot.sendMessage(chatId, `❌ Error calculating portfolio profit.`);
         }
     });
 }
