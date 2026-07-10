@@ -9,8 +9,9 @@ const Portfolio = require('./models/Portfolio');
 const AnalysisLog = require('./models/AnalysisLog');
 const { getLatestNews } = require('./services/newsService');
 const { getStockPrice } = require('./services/stockService');
-const { analyzePortfolio } = require('./services/aiService');
+const { analyzePortfolio, getStockAnalysis } = require('./services/aiService');
 const { getTechnicalIndicators } = require('./services/technicalService');
+const advancedDataService = require('./services/advancedDataService');
 
 const app = express();
 app.use(cors());
@@ -26,12 +27,21 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
-        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\nSend me:\n`/bought <SYMBOL> <PRICE>` to track a stock.');
+        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/bought <SYMBOL> <PRICE>` - Track a stock\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation', {parse_mode: 'Markdown'});
     });
 
+    // Helper to format symbols (handles raw names like "Zomato" -> "ZOMATO.NS")
+    const formatSymbol = (input) => {
+        let sym = input.trim().toUpperCase().replace(/\s+/g, '');
+        if (!sym.endsWith('.NS') && !sym.endsWith('.BO')) sym += '.NS';
+        return sym;
+    };
+
+    // 1. Upgraded /bought command to show live price
     bot.onText(/\/bought (.+) (.+)/, async (msg, match) => {
         const chatId = msg.chat.id;
-        const symbol = match[1].toUpperCase();
+        const rawSymbol = match[1];
+        const symbol = formatSymbol(rawSymbol);
         const price = parseFloat(match[2]);
         
         try {
@@ -41,10 +51,52 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 buyPrice: price,
                 quantity: 1
             });
-            bot.sendMessage(chatId, `✅ Saved! I am now tracking ${symbol} bought at ₹${price}. I will monitor the news and alert you!`);
+            
+            const livePrice = await getStockPrice(symbol);
+            const profit = livePrice ? (((livePrice - price) / price) * 100).toFixed(2) : 'N/A';
+            
+            bot.sendMessage(chatId, `✅ **Saved to Portfolio!**\n\n📈 **Stock:** ${symbol}\n💰 **Your Buy Price:** ₹${price}\n📊 **Live Market Price:** ₹${livePrice || 'N/A'}\n💸 **Current Profit:** ${profit}%\n\nI will now monitor this 24/7 and alert you when to sell!`, {parse_mode: 'Markdown'});
         } catch(err) {
             console.error(err);
             bot.sendMessage(chatId, '❌ Failed to save to database. Please check connection.');
+        }
+    });
+
+    // 2. New /price command
+    bot.onText(/\/price (.+)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const symbol = formatSymbol(match[1]);
+        bot.sendMessage(chatId, `🔍 Fetching live price for ${symbol}...`);
+        
+        const livePrice = await getStockPrice(symbol);
+        if (livePrice) {
+            bot.sendMessage(chatId, `📊 **${symbol}** Live Price: **₹${livePrice}**`, {parse_mode: 'Markdown'});
+        } else {
+            bot.sendMessage(chatId, `❌ Could not find live price for ${symbol}. Make sure the company name or symbol is valid.`);
+        }
+    });
+
+    // 3. New /tip command (Instant AI Recommendation)
+    bot.onText(/\/tip (.+)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const symbol = formatSymbol(match[1]);
+        bot.sendMessage(chatId, `🧠 Connecting to Wall Street Data for ${symbol}... please wait 10 seconds.`);
+        
+        try {
+            const news = await getLatestNews();
+            const technicals = await getTechnicalIndicators(symbol);
+            const analysis = await getStockAnalysis(symbol, news, technicals);
+            
+            if (analysis) {
+                bot.sendMessage(chatId, `🚨 **INSTANT AI TIP: ${symbol}** 🚨\n\n` +
+                                        `📈 **Trend:** ${analysis.trend}\n` +
+                                        `💰 **Recommendation:** ${analysis.recommendation}\n` +
+                                        `🧠 **AI Logic:** ${analysis.reasoning}`, {parse_mode: 'Markdown'});
+            } else {
+                bot.sendMessage(chatId, `❌ AI failed to generate a tip for ${symbol} right now.`);
+            }
+        } catch (error) {
+            bot.sendMessage(chatId, `❌ Error analyzing ${symbol}.`);
         }
     });
 }

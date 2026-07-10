@@ -28,6 +28,23 @@ const Logs = () => {
     return () => clearInterval(intervalId);
   }, []);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const logsPerPage = 5;
+
+  // Pagination logic
+  const indexOfLastLog = currentPage * logsPerPage;
+  const indexOfFirstLog = indexOfLastLog - logsPerPage;
+  const currentLogs = logs.slice(indexOfFirstLog, indexOfLastLog);
+  const totalPages = Math.ceil(logs.length / logsPerPage);
+
+  const nextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
+  const prevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
   if (loading) return <div className="loader-container"><div className="loader"></div></div>;
 
   return (
@@ -41,20 +58,49 @@ const Logs = () => {
           <p style={{marginTop: '12px'}}>The AI runs at 9:30 AM every day to generate decisions.</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '24px' }}>
-          {logs.map((log) => (
-            <div key={log._id} className="glass-card" style={{borderLeft: `4px solid ${log.action === 'BUY' ? 'var(--success)' : log.action === 'SELL' ? 'var(--danger)' : 'var(--warning)'}`}}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ margin: 0 }}>{log.symbol}</h3>
-                <span className={`badge ${log.action.toLowerCase()}`}>{log.action}</span>
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '24px' }}>
+            {currentLogs.map((log) => (
+              <div key={log._id} className="glass-card" style={{borderLeft: `4px solid ${log.action === 'BUY' ? 'var(--success)' : log.action === 'SELL' ? 'var(--danger)' : 'var(--warning)'}`}}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ margin: 0 }}>{log.symbol}</h3>
+                  <span className={`badge ${log.action.toLowerCase()}`}>{log.action}</span>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>{log.reasoning}</p>
+                <div style={{ marginTop: '16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Analyzed on: {new Date(log.createdAt).toLocaleString()}
+                </div>
               </div>
-              <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>{log.reasoning}</p>
-              <div style={{ marginTop: '16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                Analyzed on: {new Date(log.createdAt).toLocaleString()}
-              </div>
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '30px' }}>
+              <button 
+                onClick={prevPage} 
+                disabled={currentPage === 1}
+                className="btn btn-secondary"
+                style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+              >
+                ← Previous
+              </button>
+              
+              <span style={{ color: 'var(--text-secondary)' }}>
+                Page {currentPage} of {totalPages}
+              </span>
+              
+              <button 
+                onClick={nextPage} 
+                disabled={currentPage === totalPages}
+                className="btn btn-secondary"
+                style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+              >
+                Next →
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );
