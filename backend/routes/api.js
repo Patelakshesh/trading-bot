@@ -202,12 +202,13 @@ router.get('/market/movers', async (req, res) => {
         });
 
         res.json({
-            gainers: gainersResult.quotes.map(mapQuote),
-            losers: losersResult.quotes.map(mapQuote)
+            gainers: (gainersResult && gainersResult.quotes) ? gainersResult.quotes.map(mapQuote) : [],
+            losers: (losersResult && losersResult.quotes) ? losersResult.quotes.map(mapQuote) : []
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error fetching market movers' });
+        console.error("Error fetching market movers (likely IP blocked by Yahoo):", error.message);
+        // Fallback: return empty lists so the Dashboard doesn't crash
+        res.json({ gainers: [], losers: [] });
     }
 });
 
