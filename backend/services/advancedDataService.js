@@ -50,7 +50,7 @@ const getSocialSentiment = async (symbol) => {
         const cleanSymbol = symbol.replace('.NS', '').replace('.BO', '');
         // We use native fetch to hit Reddit's free JSON API
         const response = await fetch(`https://www.reddit.com/search.json?q=${cleanSymbol}+stock&sort=new&limit=5`);
-        if (!response.ok) return { hypeLevel: "Unknown", posts: [] };
+        if (!response.ok) return { hypeLevel: "Unknown", recentPosts: [] };
         
         const data = await response.json();
         const posts = data.data.children.map(child => child.data.title);
@@ -65,7 +65,7 @@ const getSocialSentiment = async (symbol) => {
         };
     } catch (err) {
         console.error(`Social fetch failed for ${symbol}:`, err.message);
-        return { hypeLevel: "Unknown", posts: [] };
+        return { hypeLevel: "Unknown", recentPosts: [] };
     }
 };
 

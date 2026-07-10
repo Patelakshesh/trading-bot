@@ -91,4 +91,28 @@ const searchSymbol = async (query) => {
     }
 };
 
-module.exports = { getStockPrice, searchSymbol };
+const getMarketMovers = async () => {
+    try {
+        const [gainersResult, losersResult] = await Promise.all([
+            yahooFinance.screener({ scrIds: 'day_gainers', count: 5 }),
+            yahooFinance.screener({ scrIds: 'day_losers', count: 5 })
+        ]);
+
+        const mapQuote = (q) => ({
+            symbol: q.symbol,
+            name: q.shortName || q.longName,
+            price: q.regularMarketPrice,
+            changePercent: q.regularMarketChangePercent
+        });
+
+        return {
+            gainers: (gainersResult && gainersResult.quotes) ? gainersResult.quotes.map(mapQuote) : [],
+            losers: (losersResult && losersResult.quotes) ? losersResult.quotes.map(mapQuote) : []
+        };
+    } catch (error) {
+        console.error("Error fetching market movers (likely IP blocked by Yahoo):", error.message);
+        return { gainers: [], losers: [] };
+    }
+};
+
+module.exports = { getStockPrice, searchSymbol, getMarketMovers };

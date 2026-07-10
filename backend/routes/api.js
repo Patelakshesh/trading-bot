@@ -189,25 +189,11 @@ router.get('/search', async (req, res) => {
 // --- MARKET MOVERS (GAINERS/LOSERS) ---
 router.get('/market/movers', async (req, res) => {
     try {
-        const [gainersResult, losersResult] = await Promise.all([
-            yahooFinance.screener({ scrIds: 'day_gainers', count: 5 }),
-            yahooFinance.screener({ scrIds: 'day_losers', count: 5 })
-        ]);
-
-        const mapQuote = (q) => ({
-            symbol: q.symbol,
-            name: q.shortName || q.longName,
-            price: q.regularMarketPrice,
-            changePercent: q.regularMarketChangePercent
-        });
-
-        res.json({
-            gainers: (gainersResult && gainersResult.quotes) ? gainersResult.quotes.map(mapQuote) : [],
-            losers: (losersResult && losersResult.quotes) ? losersResult.quotes.map(mapQuote) : []
-        });
+        const { getMarketMovers } = require('../services/stockService');
+        const movers = await getMarketMovers();
+        res.json(movers);
     } catch (error) {
-        console.error("Error fetching market movers (likely IP blocked by Yahoo):", error.message);
-        // Fallback: return empty lists so the Dashboard doesn't crash
+        console.error("Error in /market/movers route:", error.message);
         res.json({ gainers: [], losers: [] });
     }
 });
