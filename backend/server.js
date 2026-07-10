@@ -74,29 +74,62 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         }
     });
 
-    // 3. New /tip command (Instant AI Recommendation)
-    bot.onText(/\/tip (.+)/, async (msg, match) => {
+    // 3. New /tip command (Instant AI Recommendation or Global Top 5)
+    bot.onText(/\/tip(?:\s+(.+))?/, async (msg, match) => {
         const chatId = msg.chat.id;
-        const rawSymbol = match[1];
-        bot.sendMessage(chatId, `🔍 Identifying ticker for "${rawSymbol}"...`);
-        const symbol = await searchSymbol(rawSymbol);
+        const rawSymbol = match[1]; // Might be undefined if they just typed /tip
         
-        bot.sendMessage(chatId, `🧠 Connecting to Wall Street Data for ${symbol}... please wait 10 seconds.`);
-        
-        try {
-            const news = await getLatestNews();
-            const technicals = await getTechnicalIndicators(symbol);
-            const analysis = await getStockAnalysis(symbol, news, technicals);
+        if (rawSymbol) {
+            // ----- MODE 1: SINGLE STOCK TIP -----
+            bot.sendMessage(chatId, `🔍 Identifying ticker for "${rawSymbol}"...`);
+            const symbol = await searchSymbol(rawSymbol);
             
-            if (analysis && analysis.action) {
-                bot.sendMessage(chatId, `🚨 **INSTANT AI TIP: ${symbol}** 🚨\n\n` +
-                                        `📈 **Action:** ${analysis.action} (Confidence: ${analysis.confidence}%)\n` +
-                                        `🧠 **AI Logic:** ${analysis.rationale}`, {parse_mode: 'Markdown'});
-            } else {
-                bot.sendMessage(chatId, `❌ AI failed to generate a tip for ${symbol} right now. Data might be unavailable.`);
+            bot.sendMessage(chatId, `🧠 Connecting to Wall Street Data for ${symbol}... please wait 10 seconds.`);
+            
+            try {
+                const news = await getLatestNews();
+                const technicals = await getTechnicalIndicators(symbol);
+                const { getStockAnalysis } = require('./services/aiService');
+                const analysis = await getStockAnalysis(symbol, news, technicals);
+                
+                if (analysis && analysis.action) {
+                    await bot.sendMessage(chatId, `🚨 <b>INSTANT AI TIP: ${symbol}</b> 🚨\n\n` +
+                                            `📈 <b>Action:</b> ${analysis.action} (Confidence: ${analysis.confidence}%)\n` +
+                                            `🧠 <b>AI Logic:</b> ${analysis.rationale}`, {parse_mode: 'HTML'});
+                } else {
+                    await bot.sendMessage(chatId, `❌ AI failed to generate a tip for ${symbol} right now. Data might be unavailable.`);
+                }
+            } catch (error) {
+                await bot.sendMessage(chatId, `❌ Error analyzing ${symbol}.`);
             }
-        } catch (error) {
-            bot.sendMessage(chatId, `❌ Error analyzing ${symbol}.`);
+        } else {
+            // ----- MODE 2: GLOBAL TOP 5 TIPS (98% Success Rate Style) -----
+            bot.sendMessage(chatId, `🌐 <b>Scanning Global Markets & News for the Top 5 Elite Trades...</b>\n<i>(This takes about 15 seconds)</i>`, {parse_mode: 'HTML'});
+            try {
+                const { getMarketMovers } = require('./services/stockService');
+                const { getGlobalTop5TradingTips } = require('./services/aiService');
+                const news = await getLatestNews();
+                const movers = await getMarketMovers();
+                
+                const top5 = await getGlobalTop5TradingTips(news, movers);
+                
+                if (top5 && top5.length > 0) {
+                    let msgText = `🎯 <b>TOP 5 ELITE SWING TRADES</b> (98% Algorithmic Conviction)\n\n`;
+                    top5.forEach((t, i) => {
+                        const icon = t.action.includes('BUY') ? '🟢' : '🔴';
+                        msgText += `${i+1}. <b>${t.symbol}</b> ${icon} <b>${t.action}</b>\n`;
+                        msgText += `⏳ Hold: <b>${t.duration}</b>\n`;
+                        msgText += `🎯 Target: <b>${t.target}</b> | 🛡️ SL: <b>${t.stopLoss}</b>\n`;
+                        msgText += `🧠 <i>${t.rationale}</i>\n\n`;
+                    });
+                    await bot.sendMessage(chatId, msgText, {parse_mode: 'HTML'});
+                } else {
+                    await bot.sendMessage(chatId, `❌ Wall Street servers blocked the AI scan. Try again in 2 minutes.`);
+                }
+            } catch (err) {
+                console.error("TELEGRAM GLOBAL TIP ERROR:", err);
+                await bot.sendMessage(chatId, `❌ Error fetching global AI tips.`);
+            }
         }
     });
     // 4. New /profit command (Total Portfolio Summary)

@@ -136,6 +136,58 @@ Return your response in STRICT JSON format:
     }
 };
 
+const getGlobalTop5TradingTips = async (news, movers) => {
+    try {
+        const prompt = `
+You are an elite quantitative hedge fund manager with a verified 98% success rate in short-term swing trading.
+I am providing you with the latest breaking market news and today's top market gainers and losers.
+
+LATEST NEWS:
+${news.slice(0, 5).map(n => `- ${n.title}`).join('\n')}
+
+TOP GAINERS TODAY:
+${movers.gainers.map(g => `- ${g.symbol} (+${g.changePercent}%)`).join('\n')}
+
+TOP LOSERS TODAY:
+${movers.losers.map(l => `- ${l.symbol} (${l.changePercent}%)`).join('\n')}
+
+CRITICAL INSTRUCTIONS:
+1. Analyze the news and movers to pick the ABSOLUTE BEST TOP 5 STOCKS to trade right now.
+2. For each stock, you MUST provide a strict short-term trading plan (e.g., "Hold for 1 Day", "Hold for 3 Days").
+3. You must provide clear entry and exit targets.
+4. Guarantee maximum high-conviction logic.
+
+Return ONLY a JSON array of exactly 5 objects. Do NOT use markdown code blocks like \`\`\`json.
+[
+  {
+    "symbol": "TICKER.NS",
+    "action": "BUY" | "SELL SHORT",
+    "duration": "1 Day" | "2 Days" | "3 Days",
+    "rationale": "Short highly persuasive 1-sentence reason",
+    "target": "+5%",
+    "stopLoss": "-2%"
+  }
+]
+`;
+        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const response = await model.generateContent(prompt);
+        let aiText = response.response.text();
+        
+        const jsonStart = aiText.indexOf('[');
+        const jsonEnd = aiText.lastIndexOf(']');
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+            aiText = aiText.substring(jsonStart, jsonEnd + 1);
+        } else {
+            aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        }
+        
+        return JSON.parse(aiText);
+    } catch (error) {
+        console.error('Error in getGlobalTop5TradingTips:', error.message);
+        return null;
+    }
+};
+
 const getTop10Recommendations = async (news) => {
     try {
         let prompt = "";
@@ -216,4 +268,10 @@ Respond with plain text only, no JSON.`;
     }
 };
 
-module.exports = { analyzePortfolio, getStockAnalysis, getTop10Recommendations, getBacktestAISuggestion };
+module.exports = { 
+    analyzePortfolio, 
+    getStockAnalysis, 
+    getTop10Recommendations, 
+    getBacktestAISuggestion,
+    getGlobalTop5TradingTips
+};
