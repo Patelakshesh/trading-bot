@@ -44,7 +44,7 @@ const Dashboard = () => {
     const intervalId = setInterval(() => {
       fetchPortfolio();
       fetchMovers();
-    }, 60000); // Auto-refresh every 60 seconds
+    }, 30000); // Auto-refresh every 30 seconds
     return () => clearInterval(intervalId);
   }, []);
 

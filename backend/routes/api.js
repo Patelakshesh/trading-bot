@@ -8,7 +8,7 @@ const { getStockPrice } = require('../services/stockService');
 const { getTop10Recommendations } = require('../services/aiService');
 const { runBacktest } = require('../services/technicalService');
 const YahooFinance = require('yahoo-finance2').default;
-const yahooFinance = new YahooFinance();
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const authMiddleware = require('../middleware/auth');
@@ -260,7 +260,9 @@ router.get('/stock/history', async (req, res) => {
         const endDate = new Date();
         const startDate = new Date();
         
-        if (period === '7d') startDate.setDate(startDate.getDate() - 7);
+        if (period === '1d') startDate.setDate(startDate.getDate() - 1);
+        else if (period === '3d') startDate.setDate(startDate.getDate() - 3);
+        else if (period === '7d') startDate.setDate(startDate.getDate() - 7);
         else if (period === '1mo') startDate.setMonth(startDate.getMonth() - 1);
         else if (period === '3mo') startDate.setMonth(startDate.getMonth() - 3);
         else startDate.setDate(startDate.getDate() - 7);

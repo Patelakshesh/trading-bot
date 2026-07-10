@@ -71,17 +71,27 @@ const Explore = () => {
       setHistoryData(null);
       return;
     }
-    setHistoryLoading(true);
-    fetch(`http://localhost:5000/api/stock/history?symbol=${encodeURIComponent(activeChartSymbol)}&period=${historyPeriod}`)
-      .then(res => res.json())
-      .then(data => {
-        setHistoryData(data);
-        setHistoryLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setHistoryLoading(false);
-      });
+    
+    const fetchHistory = () => {
+      // Don't show loading on background refetches
+      if (!historyData) setHistoryLoading(true);
+      
+      fetch(`http://localhost:5000/api/stock/history?symbol=${encodeURIComponent(activeChartSymbol)}&period=${historyPeriod}`)
+        .then(res => res.json())
+        .then(data => {
+          setHistoryData(data);
+          setHistoryLoading(false);
+        })
+        .catch(err => {
+          console.error(err);
+          setHistoryLoading(false);
+        });
+    };
+
+    fetchHistory();
+    // Live update every 30 seconds
+    const interval = setInterval(fetchHistory, 30000);
+    return () => clearInterval(interval);
   }, [activeChartSymbol, historyPeriod]);
 
   return (
@@ -207,6 +217,8 @@ const Explore = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+              <button className={`btn ${historyPeriod === '1d' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setHistoryPeriod('1d')}>1 Day</button>
+              <button className={`btn ${historyPeriod === '3d' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setHistoryPeriod('3d')}>3 Days</button>
               <button className={`btn ${historyPeriod === '7d' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setHistoryPeriod('7d')}>Last 7 Days</button>
               <button className={`btn ${historyPeriod === '1mo' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setHistoryPeriod('1mo')}>1 Month</button>
               <button className={`btn ${historyPeriod === '3mo' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setHistoryPeriod('3mo')}>3 Months</button>

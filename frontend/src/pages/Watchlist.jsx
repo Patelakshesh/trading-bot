@@ -33,7 +33,7 @@ const Watchlist = () => {
 
   useEffect(() => {
     fetchWatchlist();
-    const intervalId = setInterval(fetchWatchlist, 60000); // 60s live update
+    const intervalId = setInterval(fetchWatchlist, 30000); // 30s live update
     return () => clearInterval(intervalId);
   }, []);
 
