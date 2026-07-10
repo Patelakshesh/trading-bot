@@ -30,26 +30,29 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/bought <SYMBOL> <PRICE>` - Track a stock\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
     });
 
-    // 1. Upgraded /bought command to show live price
-    bot.onText(/\/bought (.+) (.+)/, async (msg, match) => {
+    // 1. Upgraded /bought command to show live price and support quantity
+    bot.onText(/\/bought ([^\s]+)\s+([\d.]+)(?:\s+(\d+))?/, async (msg, match) => {
         const chatId = msg.chat.id;
         const rawSymbol = match[1];
         bot.sendMessage(chatId, `🔍 Finding correct ticker for "${rawSymbol}"...`);
         const symbol = await searchSymbol(rawSymbol);
         const price = parseFloat(match[2]);
+        const quantity = match[3] ? parseInt(match[3]) : 1;
         
         try {
             await Portfolio.create({
                 chatId: chatId.toString(),
                 symbol: symbol,
                 buyPrice: price,
-                quantity: 1
+                quantity: quantity
             });
             
             const livePrice = await getStockPrice(symbol);
             const profit = livePrice ? (((livePrice - price) / price) * 100).toFixed(2) : 'N/A';
+            const totalInvested = price * quantity;
+            const liveValue = livePrice ? livePrice * quantity : 'N/A';
             
-            bot.sendMessage(chatId, `✅ **Saved to Portfolio!**\n\n📈 **Stock:** ${symbol}\n💰 **Your Buy Price:** ₹${price}\n📊 **Live Market Price:** ₹${livePrice || 'N/A'}\n💸 **Current Profit:** ${profit}%\n\nI will now monitor this 24/7 and alert you when to sell!`, {parse_mode: 'Markdown'});
+            bot.sendMessage(chatId, `✅ **Saved to Portfolio!**\n\n📈 **Stock:** ${symbol}\n📦 **Quantity:** ${quantity}\n💰 **Your Buy Price:** ₹${price} (Total: ₹${totalInvested})\n📊 **Live Market Price:** ₹${livePrice || 'N/A'} (Total: ₹${liveValue})\n💸 **Current Profit:** ${profit}%\n\nI will now monitor this 24/7 and alert you when to sell!`, {parse_mode: 'Markdown'});
         } catch(err) {
             console.error(err);
             bot.sendMessage(chatId, '❌ Failed to save to database. Please check connection.');
