@@ -22,13 +22,38 @@ const getStockPrice = async (symbol) => {
         
         if (price) {
             priceCache.set(querySymbol, { price, timestamp: Date.now() });
+            return price;
         }
         
-        return price;
     } catch (error) {
-        console.error(`Error fetching price for ${symbol}:`, error.message);
+        console.error(`Yahoo Finance failed for ${symbol}, attempting Google Finance Fallback...`);
         
-        // Fallback to stale cache if available when rate-limited
+        try {
+            // Google Finance Fallback Scraper
+            let gfExchange = 'NASDAQ';
+            let gfSymbol = symbol.split('.')[0];
+            if (symbol.endsWith('.NS')) gfExchange = 'NSE';
+            else if (symbol.endsWith('.BO')) gfExchange = 'BOM';
+
+            const response = await fetch(`https://www.google.com/finance/quote/${gfSymbol}:${gfExchange}`);
+            const html = await response.text();
+            
+            // Extract the main price using Regex
+            const match = html.match(/class="YMlKec fxKbKc">([^<]+)<\/div>/);
+            if (match && match[1]) {
+                // Remove currency symbols and commas (e.g. ₹670.90 -> 670.90)
+                const parsedPrice = parseFloat(match[1].replace(/[^0-9.]/g, ''));
+                if (!isNaN(parsedPrice)) {
+                    const querySymbol = symbol.endsWith('.NS') || symbol.endsWith('.BO') ? symbol : `${symbol}.NS`;
+                    priceCache.set(querySymbol, { price: parsedPrice, timestamp: Date.now() });
+                    return parsedPrice;
+                }
+            }
+        } catch (gfError) {
+            console.error(`Google Finance fallback also failed for ${symbol}`);
+        }
+        
+        // Final Fallback: Use stale cache if absolutely everything is blocked
         const querySymbol = symbol.endsWith('.NS') || symbol.endsWith('.BO') ? symbol : `${symbol}.NS`;
         if (priceCache.has(querySymbol)) {
             return priceCache.get(querySymbol).price;
