@@ -90,8 +90,6 @@ setInterval(async () => {
 // Extract AI Workflow so it can be triggered by external cron services (cron-job.org)
 const runDailyAnalysis = async () => {
     console.log('Running daily AI portfolio analysis...');
-    
-    if(!bot) return;
 
     try {
         const holdings = await Portfolio.find({ status: 'HOLDING' });
@@ -145,18 +143,23 @@ const runDailyAnalysis = async () => {
                 reasoning: rec.reasoning
             });
 
-            // Find who owns this stock
-            const owners = holdings.filter(h => h.symbol === rec.symbol);
-            
-            for(let owner of owners) {
-                const alertMsg = `🚨 **AI TRADING ALERT** 🚨\n\n` +
-                                 `📈 **Stock:** ${rec.symbol}\n` +
-                                 `💰 **Your Buy Price:** ₹${owner.buyPrice}\n` +
-                                 `📊 **Current Price:** ₹${currentPrices[rec.symbol] || 'N/A'}\n` +
-                                 `🟢 **Action:** ${rec.action}\n\n` +
-                                 `🧠 **AI Thoughts:** ${rec.reasoning}`;
+            // If Telegram is configured, send alerts
+            if (bot) {
+                // Find who owns this stock
+                const owners = holdings.filter(h => h.symbol === rec.symbol);
                 
-                bot.sendMessage(owner.chatId, alertMsg, {parse_mode: 'Markdown'});
+                for(let owner of owners) {
+                    if (owner.chatId !== 'UI_USER') {
+                        const alertMsg = `🚨 **AI TRADING ALERT** 🚨\n\n` +
+                                         `📈 **Stock:** ${rec.symbol}\n` +
+                                         `💰 **Your Buy Price:** ₹${owner.buyPrice}\n` +
+                                         `📊 **Current Price:** ₹${currentPrices[rec.symbol] || 'N/A'}\n` +
+                                         `🟢 **Action:** ${rec.action}\n\n` +
+                                         `🧠 **AI Thoughts:** ${rec.reasoning}`;
+                        
+                        bot.sendMessage(owner.chatId, alertMsg, {parse_mode: 'Markdown'});
+                    }
+                }
             }
         }
         
@@ -166,8 +169,8 @@ const runDailyAnalysis = async () => {
     }
 };
 
-// Internal Cron Job (Will only run if the server is awake at 9:30 AM IST)
-cron.schedule('30 9 * * *', runDailyAnalysis, {
+// Internal Cron Job (Will run every single hour on the hour)
+cron.schedule('0 * * * *', runDailyAnalysis, {
     scheduled: true,
     timezone: "Asia/Kolkata"
 });
