@@ -88,13 +88,15 @@ const searchSymbol = async (query) => {
         
         // If search completely fails, fallback to formatting it manually
         let sym = query.trim().toUpperCase().replace(/\s+/g, '');
-        if (!sym.endsWith('.NS') && !sym.endsWith('.BO')) sym += '.NS';
+        sym = sym.replace('.BO', '.NS');
+        if (!sym.endsWith('.NS')) sym += '.NS';
         return sym;
     } catch (error) {
         console.error(`Search failed for ${query}:`, error);
         // Fallback manually
         let sym = query.trim().toUpperCase().replace(/\s+/g, '');
-        if (!sym.endsWith('.NS') && !sym.endsWith('.BO')) sym += '.NS';
+        sym = sym.replace('.BO', '.NS');
+        if (!sym.endsWith('.NS')) sym += '.NS';
         return sym;
     }
 };
