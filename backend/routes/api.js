@@ -86,7 +86,9 @@ router.get('/news', async (req, res) => {
 router.post('/portfolio', async (req, res) => {
     try {
         const { symbol, buyPrice, quantity } = req.body;
-        const cleanSymbol = symbol.trim().toUpperCase().replace(/\s+/g, '');
+        const { searchSymbol } = require('../services/stockService');
+        const rawSymbol = symbol.trim().toUpperCase().replace(/\s+/g, '');
+        const cleanSymbol = await searchSymbol(rawSymbol);
         
         let finalPrice = buyPrice;
         if (!finalPrice) {

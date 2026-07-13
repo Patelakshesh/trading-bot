@@ -220,7 +220,8 @@ const Dashboard = () => {
         ) : (
           <div className="dashboard-grid">
             {portfolio.map((item) => {
-              const currentPrice = item.currentPrice || item.buyPrice;
+              const hasLivePrice = item.currentPrice !== null && item.currentPrice !== undefined;
+              const currentPrice = hasLivePrice ? item.currentPrice : item.buyPrice;
               const profitLoss = (currentPrice - item.buyPrice) * item.quantity;
               const isProfit = profitLoss >= 0;
               const plPercentage = ((currentPrice - item.buyPrice) / item.buyPrice) * 100;
@@ -253,8 +254,8 @@ const Dashboard = () => {
                       </h2>
                       <span style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Qty: {item.quantity}</span>
                     </div>
-                    <span className={`badge ${isProfit ? 'buy' : 'sell'}`}>
-                      {isProfit ? '+' : ''}{plPercentage.toFixed(2)}%
+                    <span className={`badge ${!hasLivePrice ? 'hold' : isProfit ? 'buy' : 'sell'}`}>
+                      {!hasLivePrice ? 'API Blocked' : `${isProfit ? '+' : ''}${plPercentage.toFixed(2)}%`}
                     </span>
                   </div>
                   
@@ -265,8 +266,8 @@ const Dashboard = () => {
                     </div>
                     <div style={{display: 'flex', justifyContent: 'space-between'}}>
                       <span style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Current Price</span>
-                      <strong style={{fontSize: '0.9rem', color: isProfit ? 'var(--success)' : 'var(--danger)'}}>
-                        ₹{currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                      <strong style={{fontSize: '0.9rem', color: !hasLivePrice ? 'var(--text-secondary)' : isProfit ? 'var(--success)' : 'var(--danger)'}}>
+                        {!hasLivePrice ? 'Unavailable' : `₹${currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2})}`}
                       </strong>
                     </div>
                     <hr style={{border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', margin: '8px 0'}} />
@@ -276,14 +277,14 @@ const Dashboard = () => {
                     </div>
                     <div style={{display: 'flex', justifyContent: 'space-between'}}>
                       <span style={{color: 'var(--text-secondary)'}}>Current Value</span>
-                      <strong style={{color: isProfit ? 'var(--success)' : 'var(--danger)'}}>
-                        ₹{(currentPrice * item.quantity).toLocaleString(undefined, {minimumFractionDigits: 2})}
+                      <strong style={{color: !hasLivePrice ? 'var(--text-secondary)' : isProfit ? 'var(--success)' : 'var(--danger)'}}>
+                        {!hasLivePrice ? 'Unavailable' : `₹${(currentPrice * item.quantity).toLocaleString(undefined, {minimumFractionDigits: 2})}`}
                       </strong>
                     </div>
                     <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '4px'}}>
                       <span style={{color: 'var(--text-secondary)'}}>Total Return</span>
-                      <strong style={{color: isProfit ? 'var(--success)' : 'var(--danger)'}}>
-                        {isProfit ? '+' : ''}₹{profitLoss.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                      <strong style={{color: !hasLivePrice ? 'var(--text-secondary)' : isProfit ? 'var(--success)' : 'var(--danger)'}}>
+                        {!hasLivePrice ? 'Unavailable' : `${isProfit ? '+' : '-'}₹${Math.abs(profitLoss).toLocaleString(undefined, {minimumFractionDigits: 2})}`}
                       </strong>
                     </div>
                   </div>
