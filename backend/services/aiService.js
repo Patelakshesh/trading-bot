@@ -60,9 +60,11 @@ If the news is great, but the RSI is > 65 (overbought), DO NOT recommend a BUY. 
 If a stock is going viral on Reddit but Fundamentals (Revenue/Profit) are crashing, warn the user it is a bubble.
 
 STRICT TIME-STOP RULES:
-- You MUST calculate how many days we have held the stock based on its purchase date.
-- MAX HOLD TIME IS 1 WEEK (5 trading days). If we have held a stock for 5 days or more, you MUST recommend a SELL immediately, regardless of profit or loss, to free up capital.
+- You MUST check the 'daysHeld' and 'timeLimit' fields for each stock in the PORTFOLIO.
+- If we have held a stock for 'timeLimit' days or more (e.g. daysHeld >= timeLimit), you MUST recommend a SELL immediately, regardless of profit or loss, to free up capital. This is a non-negotiable risk management rule.
 - QUICK PROFITS: If we have held the stock for only 1 or 2 days and it has reached a +3% to +5% profit, you MUST recommend an instant SELL to lock in the money. Do not be greedy. Cut losses immediately if the setup breaks.
+
+You must output exactly ONE recommendation per stock in the portfolio, formatting your response strictly as a JSON array of objects:
 
 Based on these global events and mathematical indicators, tell me exactly what I should BUY, SELL, or HOLD today for a 1-to-7 day swing trade.
 Respond in a strict JSON format exactly like this array:

@@ -251,17 +251,18 @@ const Dashboard = () => {
                       <span style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Qty: {item.quantity}</span>
                       <div style={{marginTop: '6px', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', padding: '6px 8px', borderRadius: '6px', display: 'inline-block'}}>
                         {(() => {
+                           const limit = item.timeLimit || 5;
                            const msHeld = Date.now() - new Date(item.createdAt).getTime();
                            const daysHeld = Math.floor(msHeld / (1000 * 60 * 60 * 24));
                            const hoursHeld = Math.floor(msHeld / (1000 * 60 * 60));
-                           const daysLeft = 5 - daysHeld;
+                           const daysLeft = limit - daysHeld;
                            const heldStr = daysHeld === 0 ? `Today (${hoursHeld}h ago)` : `${daysHeld} days ago`;
                            
                            return (
                              <>
                                <div style={{color: 'var(--text-secondary)'}}>🛒 Bought: <strong>{heldStr}</strong></div>
                                <div style={{marginTop: '4px', color: daysLeft <= 1 ? 'var(--danger)' : 'var(--warning)', fontWeight: daysLeft <= 1 ? 'bold' : 'normal'}}>
-                                 ⏳ Auto-Sell in: {daysLeft > 0 ? `${daysLeft} days` : '⚠️ EXPIRED'}
+                                 ⏳ Auto-Sell in: {daysLeft > 0 ? `${daysLeft} days (Limit: ${limit})` : '⚠️ EXPIRED'}
                                </div>
                              </>
                            );

@@ -18,6 +18,10 @@ const portfolioSchema = new mongoose.Schema({
         type: Number,
         default: 1, // Assuming 1 if not provided via quick telegram command
     },
+    timeLimit: {
+        type: Number,
+        default: 5, // Default 5 days time-stop
+    },
     status: {
         type: String,
         enum: ['HOLDING', 'SOLD'],

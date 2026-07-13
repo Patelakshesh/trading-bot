@@ -34,7 +34,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     });
 
     // 1. Upgraded /bought command to automatically fetch live price if omitted
-    bot.onText(/\/bought ([^\s]+)(?:\s+([\d.]+))?(?:\s+(\d+))?/, async (msg, match) => {
+    bot.onText(/\/bought ([^\s]+)(?:\s+([\d.]+))?(?:\s+(\d+))?(?:\s+(\d+))?/, async (msg, match) => {
         const chatId = msg.chat.id;
         const rawSymbol = match[1];
         bot.sendMessage(chatId, `🔍 Finding correct ticker for "${rawSymbol}"...`);
@@ -42,6 +42,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         
         let arg1 = match[2] ? parseFloat(match[2]) : null;
         let arg2 = match[3] ? parseInt(match[3]) : null;
+        let arg3 = match[4] ? parseInt(match[4]) : null;
         
         try {
             const livePrice = await getStockPrice(symbol);
@@ -52,12 +53,26 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
 
             let price = livePrice;
             let quantity = 1;
+            let timeLimit = 5;
 
             // SMART DETECTION:
-            if (arg1 !== null && arg2 !== null) {
-                // User provided both Price and Quantity: /bought ZOMATO 240 100
+            if (arg1 !== null && arg2 !== null && arg3 !== null) {
+                // User provided Price, Quantity, AND TimeLimit: /bought ZOMATO 240 100 3
                 price = arg1;
                 quantity = arg2;
+                timeLimit = arg3;
+            } else if (arg1 !== null && arg2 !== null) {
+                // User provided both Price and Quantity, OR Invested Value and TimeLimit
+                // E.g. /bought ZOMATO 240 100  --> Price=240, Qty=100
+                // E.g. /bought ZOMATO 10000 3  --> Invested=10000, TimeLimit=3
+                if (arg1 > livePrice * 1.5) {
+                    quantity = Math.floor(arg1 / livePrice);
+                    if (quantity < 1) quantity = 1;
+                    timeLimit = arg2; // The second argument is actually the time limit!
+                } else {
+                    price = arg1;
+                    quantity = arg2;
+                }
             } else if (arg1 !== null) {
                 // User provided only ONE number. Is it the Price, or the Invested Value?
                 // If the number is vastly larger than the current live price (e.g. > 50% larger), 
@@ -76,13 +91,14 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 chatId: chatId.toString(),
                 symbol: symbol,
                 buyPrice: price,
-                quantity: quantity
+                quantity: quantity,
+                timeLimit: timeLimit
             });
             
             const totalInvested = price * quantity;
             const liveValue = livePrice * quantity;
             
-            bot.sendMessage(chatId, `✅ **Saved to Portfolio!**\n\n📈 **Stock:** ${symbol}\n💰 **Invested:** ₹${totalInvested.toFixed(2)}\n📦 **Shares Bought:** ${quantity} (at ₹${price.toFixed(2)}/share)\n📊 **Live Market Price:** ₹${livePrice.toFixed(2)}\n\nI will now monitor this 24/7 and alert you when to sell!`, {parse_mode: 'Markdown'});
+            bot.sendMessage(chatId, `✅ **Saved to Portfolio!**\n\n📈 **Stock:** ${symbol}\n💰 **Invested:** ₹${totalInvested.toFixed(2)}\n📦 **Shares Bought:** ${quantity} (at ₹${price.toFixed(2)}/share)\n⏳ **Time-Stop Limit:** ${timeLimit} Days\n📊 **Live Market Price:** ₹${livePrice.toFixed(2)}\n\nI will now monitor this 24/7 and alert you when to sell!`, {parse_mode: 'Markdown'});
         } catch(err) {
             console.error(err);
             bot.sendMessage(chatId, '❌ Failed to save to database. Please check connection.');
