@@ -33,16 +33,19 @@ const getStockPrice = async (symbol) => {
 
     // --- FALLBACK: Google Finance ---
     try {
-        const gfExchange = symbol.endsWith('.BO') ? 'BOM' : 'NSE';
+        let gfExchange = 'NSE';
+        if (symbol.endsWith('.BO')) gfExchange = 'BOM';
+        else if (!symbol.endsWith('.NS') && !symbol.endsWith('.BO')) gfExchange = 'NASDAQ';
+        
         const gfSymbol = symbol.split('.')[0];
         const controller = new AbortController();
         const gfTimeout = setTimeout(() => controller.abort(), 5000);
         const response = await fetch(`https://www.google.com/finance/quote/${gfSymbol}:${gfExchange}`, { signal: controller.signal });
         clearTimeout(gfTimeout);
         const html = await response.text();
-        // Match the ₹-prefixed price (first rupee value on the stock's own page)
-        const match = html.match(/class="YMlKec">&#x20B9;([0-9,]+(?:\.[0-9]+)?)<\/div>/) ||
-                      html.match(/class="YMlKec">₹([0-9,]+(?:\.[0-9]+)?)<\/div>/);
+        
+        // Match any currency symbol (₹, $, &#x20B9;, etc) before the number
+        const match = html.match(/class="YMlKec">[^0-9>]*([0-9,]+(?:\.[0-9]+)?)<\/div>/);
         if (match && match[1]) {
             const parsedPrice = parseFloat(match[1].replace(/,/g, ''));
             if (!isNaN(parsedPrice) && parsedPrice > 0) {

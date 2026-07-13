@@ -232,8 +232,7 @@ Return ONLY a JSON array of exactly 5 objects. Do NOT use markdown code blocks l
         for (let attempt = 0; attempt < 2; attempt++) {
             try {
                 const usePrompt = attempt === 0 ? prompt : 
-                    // Simpler fallback prompt if the first attempt fails to parse
-                    `Give me exactly 5 Indian NSE stocks to BUY today as short-term swing trades. For each, provide: symbol (.NS), companyName, action (BUY), currentPrice (in ₹), duration (1-3 Days), target price (in ₹), stopLoss price (in ₹), rationale (1 sentence). Return ONLY a valid JSON array. No markdown.`;
+                    `Give exactly 5 Indian NSE stocks to BUY today as short-term swing trades. Return ONLY a valid JSON array. No markdown. Format EXACTLY like this:\n[{"symbol": "RELIANCE.NS", "companyName": "Reliance", "action": "BUY", "currentPrice": "₹2500.00", "duration": "1-3 Days", "target": "₹2600.00", "stopLoss": "₹2400.00", "rationale": "Strong breakout."}]`;
                 
                 const response = await generateWithFallback(usePrompt);
                 let aiText = response.response.text();
