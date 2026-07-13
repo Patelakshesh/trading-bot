@@ -6,8 +6,8 @@ const priceCache = new Map();
 const CACHE_DURATION_MS = 2 * 60 * 1000; // 2 minutes — prevents Yahoo Finance 429 rate-limit block
 
 const getStockPrice = async (symbol) => {
-    const querySymbol = symbol && (symbol.endsWith('.NS') || symbol.endsWith('.BO')) ? symbol : `${symbol}.NS`;
     if (!symbol) return null;
+    const querySymbol = symbol; // Trust the symbol exactly as passed
     
     // Check Cache first (30 second cache to prevent rate-limiting)
     if (priceCache.has(querySymbol)) {

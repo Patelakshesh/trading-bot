@@ -187,9 +187,6 @@ const getGlobalTop5TradingTips = async (news, movers, budget = null, priceRange 
         if (priceRange) {
             rangePrompt = `CRITICAL: The user has specifically requested stocks priced strictly between ₹${priceRange.min} and ₹${priceRange.max}. You MUST ONLY recommend stocks that currently trade within this exact price range. If the provided movers do not fit this range, you must use your elite quantitative knowledge to recommend 5 other highly explosive stocks (e.g., penny stocks or mid-caps) that fit this price bracket. You must estimate and provide their current price in the JSON.`;
         }
-        
-        // Always require the AI to provide the current (entry/buy) price
-        jsonFields += `,\n    "currentPrice": "₹XXX.XX"`;
 
         const prompt = `
 You are an elite quantitative hedge fund manager with a verified 98% success rate in short-term swing trading.

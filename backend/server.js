@@ -293,16 +293,18 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     let msgText = `🎯 <b>TOP 5 AI SWING TRADES</b>\n\n`;
                     top5.forEach((t, i) => {
                         const companyStr = t.companyName ? ` — ${t.companyName}` : '';
+                        const formatPrice = (p) => (p && typeof p === 'number') ? `₹${p.toFixed(2)}` : (p && !p.toString().includes('₹') ? `₹${p}` : p);
+                        
                         msgText += `${i+1}\ufe0f\u20e3 <b>${t.symbol}</b>${companyStr}\n`;
                         msgText += `   🟢 <b>Action: ${t.action}</b> | ⏳ Hold: <b>${t.duration}</b>\n`;
                         if (t.currentPrice) {
-                            msgText += `   💰 <b>Buy At:</b> ${t.currentPrice}\n`;
+                            msgText += `   💰 <b>Buy At:</b> ${formatPrice(t.currentPrice)}\n`;
                         }
                         if (t.allocatedFunds && t.sharesToBuy) {
                             msgText += `   💵 Invest: <b>${t.allocatedFunds}</b> → Buy <b>${t.sharesToBuy} shares</b>\n`;
                         }
-                        msgText += `   🎯 <b>Sell At (Target):</b> ${t.target || 'N/A'}\n`;
-                        msgText += `   🛡️ <b>Stop-Loss (Exit if):</b> ${t.stopLoss || 'N/A'}\n`;
+                        msgText += `   🎯 <b>Sell At (Target):</b> ${formatPrice(t.target) || 'N/A'}\n`;
+                        msgText += `   🛡️ <b>Stop-Loss (Exit if):</b> ${formatPrice(t.stopLoss) || 'N/A'}\n`;
                         msgText += `   🧠 <i>${t.rationale}</i>\n\n`;
                     });
                     
