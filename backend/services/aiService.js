@@ -6,6 +6,28 @@ const advancedDataService = require('./advancedDataService');
 // Initialize Gemini using the correct standard SDK
 const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+const AI_MODELS = [
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+    'gemini-1.5-flash-8b'
+];
+
+async function generateWithFallback(prompt) {
+    let lastError;
+    for (const modelName of AI_MODELS) {
+        try {
+            const model = ai.getGenerativeModel({ model: modelName });
+            return await model.generateContent(prompt);
+        } catch (error) {
+            console.warn(`[AI Fallback] Model ${modelName} failed: ${error.message}. Trying next...`);
+            lastError = error;
+        }
+    }
+    throw new Error(`All AI models failed. Last error: ${lastError.message}`);
+}
+
 const analyzePortfolio = async (portfolio, watchlist, news, currentPrices, technicalData, advancedData) => {
     try {
         const prompt = `You are an elite, highly intelligent algorithmic Short-Term Swing Trader. 
@@ -53,8 +75,7 @@ Respond in a strict JSON format exactly like this array:
 ]
 Only return valid JSON array without markdown formatting.`;
 
-        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const response = await model.generateContent(prompt);
+        const response = await generateWithFallback(prompt);
 
         let aiText = response.response.text();
         
@@ -122,8 +143,7 @@ Return your response in STRICT JSON format:
   "stopLoss": "₹XXX.XX" (or null if not buying)
 }
 `;
-        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const response = await model.generateContent(prompt);
+        const response = await generateWithFallback(prompt);
         let aiText = response.response.text();
         
         // Bulletproof JSON parsing for Object
@@ -195,8 +215,7 @@ Return ONLY a JSON array of exactly 5 objects. Do NOT use markdown code blocks l
   }
 ]
 `;
-        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const response = await model.generateContent(prompt);
+        const response = await generateWithFallback(prompt);
         let aiText = response.response.text();
         
         const jsonStart = aiText.indexOf('[');
@@ -250,8 +269,7 @@ Respond in a strict JSON format exactly like this array:
 Only return valid JSON array without markdown formatting.`;
         }
 
-        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const response = await model.generateContent(prompt);
+        const response = await generateWithFallback(prompt);
 
         let aiText = response.response.text();
         
@@ -285,8 +303,7 @@ Analyze this result specifically for a beginner.
 Provide a 2-3 sentence beginner-friendly suggestion.
 Respond with plain text only, no JSON.`;
 
-        const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const response = await model.generateContent(prompt);
+        const response = await generateWithFallback(prompt);
         return response.response.text().trim();
     } catch (error) {
         console.error('Error generating AI backtest suggestion:', error.message);
