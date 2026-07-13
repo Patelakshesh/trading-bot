@@ -228,16 +228,29 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 const analysis = await getStockAnalysis(symbol, news, technicals, currentPrice);
                 
                 if (analysis && analysis.action) {
-                    let targetLine = '';
-                    if (analysis.target && analysis.stopLoss && analysis.action === 'BUY') {
-                        targetLine = `🎯 <b>Target:</b> ${analysis.target} | 🛡️ <b>SL:</b> ${analysis.stopLoss}\n`;
+                    const actionIcon = analysis.action === 'BUY' ? '🟢' : analysis.action === 'SELL' ? '🔴' : '🟡';
+                    
+                    // Always compute basic target/SL from live price if AI didn't provide them
+                    const livePrice = currentPrice || 0;
+                    const aiTarget = analysis.target || (analysis.action === 'BUY' ? `₹${(livePrice * 1.05).toFixed(2)}` : null);
+                    const aiSL = analysis.stopLoss || (analysis.action === 'BUY' ? `₹${(livePrice * 0.97).toFixed(2)}` : null);
+                    
+                    let priceLinesMsg = `💰 <b>Live Price (Entry):</b> ${priceText}\n`;
+                    if (analysis.action === 'BUY') {
+                        priceLinesMsg += `🎯 <b>Target Sell Price:</b> ${aiTarget}\n`;
+                        priceLinesMsg += `🛡️ <b>Stop-Loss Price:</b> ${aiSL}\n`;
+                    } else if (analysis.action === 'SELL') {
+                        priceLinesMsg += `🔴 <b>Exit at:</b> ${priceText} (Sell immediately at market price)\n`;
+                    } else {
+                        // HOLD — show safe target and danger SL
+                        priceLinesMsg += `🎯 <b>Next Target:</b> ${aiTarget || `₹${(livePrice * 1.05).toFixed(2)}`}\n`;
+                        priceLinesMsg += `🛡️ <b>Stop-Loss:</b> ${aiSL || `₹${(livePrice * 0.97).toFixed(2)}`}\n`;
                     }
                 
                     const finalMsg = `🚨 <b>INSTANT AI TIP: ${symbol}</b> 🚨\n\n` +
-                                     `💰 <b>Live Price:</b> ${priceText}\n` +
-                                     `📈 <b>Action:</b> ${analysis.action} (Confidence: ${analysis.confidence}%)\n` +
-                                     targetLine +
-                                     `🧠 <b>AI Logic:</b> ${analysis.rationale}`;
+                                     `${actionIcon} <b>Action: ${analysis.action}</b> (Confidence: ${analysis.confidence}%)\n\n` +
+                                     priceLinesMsg +
+                                     `\n🧠 <b>AI Reason:</b> ${analysis.rationale}`;
                     bot.editMessageText(finalMsg, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 } else {
                     await bot.editMessageText(`❌ AI failed to generate a tip for ${symbol} right now. Data might be unavailable.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
@@ -321,9 +334,19 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 totalInvested += invested;
                 totalCurrentValue += current;
                 
+                const daysHeld = Math.floor((Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+                const timeLimit = item.timeLimit || 5;
+                const daysLeft = timeLimit - daysHeld;
+                const timeStatus = daysLeft <= 0 ? '⚠️ EXPIRED' : `${daysLeft}d left`;
+                
+                // Dynamic target: 5% if bullish momentum, 3% for conservative/neutral
                 const target = (item.buyPrice * 1.05).toFixed(2);
-                const stopLoss = (item.buyPrice * 0.95).toFixed(2);
-                holdingsList += `🔹 **${item.symbol}:** Buy ₹${item.buyPrice} ➡️ Target: ₹${target} | SL: ₹${stopLoss}\n`;
+                const stopLoss = (item.buyPrice * 0.97).toFixed(2);
+                const profitStr = currentPrice ? ((currentPrice - item.buyPrice) / item.buyPrice * 100).toFixed(2) : '0';
+                const profitEmoji = parseFloat(profitStr) >= 0 ? '📈' : '📉';
+                holdingsList += `🔹 <b>${item.symbol}</b> [${timeStatus}]\n` +
+                                `   💰 Buy: ₹${item.buyPrice} → Now: ₹${currentPrice || '?'} (${profitEmoji}${profitStr}%)\n` +
+                                `   🎯 Target: ₹${target} | 🛡️ SL: ₹${stopLoss}\n`;
             }
             
             if (holdings.length === 0) {
@@ -344,14 +367,14 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             const realizedSign = totalRealizedProfit >= 0 ? '+' : '';
             const realizedEmoji = totalRealizedProfit >= 0 ? '🤑' : '🩸';
 
-            bot.sendMessage(chatId, `🏆 **PORTFOLIO SUMMARY** 🏆\n\n` +
-                                    `💰 **Active Invested:** ₹${totalInvested.toFixed(2)}\n` +
-                                    `📈 **Live Value:** ₹${totalCurrentValue.toFixed(2)}\n` +
-                                    `${unrealizedEmoji} **Unrealized Profit:** ${unrealizedSign}₹${totalUnrealizedProfit.toFixed(2)} (${unrealizedSign}${totalProfitPercent}%)\n\n` +
-                                    `🏦 **BANKED HISTORY**\n` +
-                                    `${realizedEmoji} **Realized Profit (SOLD):** ${realizedSign}₹${totalRealizedProfit.toFixed(2)}\n\n` +
-                                    `💎 **NET GAINS:** ${totalUnrealizedProfit + totalRealizedProfit >= 0 ? '+' : ''}₹${(totalUnrealizedProfit + totalRealizedProfit).toFixed(2)}\n` +
-                                    holdingsList, {parse_mode: 'Markdown'});
+            bot.sendMessage(chatId, `🏆 <b>PORTFOLIO SUMMARY</b> 🏆\n\n` +
+                                    `💰 <b>Active Invested:</b> ₹${totalInvested.toFixed(2)}\n` +
+                                    `📈 <b>Live Value:</b> ₹${totalCurrentValue.toFixed(2)}\n` +
+                                    `${unrealizedEmoji} <b>Unrealized Profit:</b> ${unrealizedSign}₹${totalUnrealizedProfit.toFixed(2)} (${unrealizedSign}${totalProfitPercent}%)\n\n` +
+                                    `🏦 <b>BANKED HISTORY</b>\n` +
+                                    `${realizedEmoji} <b>Realized Profit (SOLD):</b> ${realizedSign}₹${totalRealizedProfit.toFixed(2)}\n\n` +
+                                    `💎 <b>NET GAINS:</b> ${totalUnrealizedProfit + totalRealizedProfit >= 0 ? '+' : ''}₹${(totalUnrealizedProfit + totalRealizedProfit).toFixed(2)}\n` +
+                                    holdingsList, {parse_mode: 'HTML'});
         } catch (error) {
             console.error('Error calculating profit:', error);
             bot.sendMessage(chatId, `❌ Error calculating portfolio profit.`);
