@@ -69,10 +69,14 @@ const getStockPrice = async (symbol) => {
 
 const searchSymbol = async (query) => {
     try {
-        // Automatically append .NS if they just typed a raw symbol to speed up search
-        const searchQuery = query.includes('.') ? query : `${query} India`;
+        // Strip extensions to force a fuzzy search on the base company name/ticker
+        const cleanQuery = query.trim().toUpperCase().replace('.NS', '').replace('.BO', '');
         
-        const results = await yahooFinance.search(searchQuery);
+        let results = await yahooFinance.search(cleanQuery);
+        if (!results.quotes || results.quotes.length === 0) {
+            results = await yahooFinance.search(`${cleanQuery} India`);
+        }
+        
         if (results.quotes && results.quotes.length > 0) {
             // Prioritize Indian stock exchanges (.NS or .BO)
             const indianStock = results.quotes.find(q => q.symbol.endsWith('.NS') || q.symbol.endsWith('.BO'));
