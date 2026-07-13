@@ -289,25 +289,37 @@ Only return valid JSON array without markdown formatting.`;
     }
 };
 
-const getBacktestAISuggestion = async (symbol, days, profitPercent, totalTrades) => {
+const getBacktestAISuggestion = async (symbol, days, profitPercent, totalTrades, holdingStatus, technicals) => {
     try {
+        let techMsg = "";
+        if (technicals && technicals.RSI && technicals.MACD) {
+            const macdValue = technicals.MACD.MACD || 0;
+            techMsg = `Right now, the real-time technical indicators for this stock are: RSI=${technicals.RSI.toFixed(2)}, MACD=${macdValue.toFixed(2)} (Bullish if > 0, Bearish if < 0).`;
+        } else {
+            techMsg = `Current real-time technical indicators are temporarily unavailable.`;
+        }
+
         const prompt = `You are a friendly, encouraging AI Trading Mentor for a beginner trader.
 The user just ran a Technical Analysis Backtest (simulated trading) for the stock ${symbol} over the last ${days} days.
 The strategy executed ${totalTrades} trades and resulted in a total return of ${profitPercent}%.
 
-Analyze this result specifically for a beginner. 
-- If the timeframe (${days} days) is very short (like 1, 3, or 7 days) and there are 0 trades, explain to the beginner that technical indicators (like RSI) need at least 14 days of data to even start generating signals, so short timeframes often result in 0 trades.
-- If it's a longer timeframe and made profit, congratulate them and explain why this is a good sign.
-- If it lost money, warn them clearly.
+PORTFOLIO STATUS: ${holdingStatus}
+REAL-TIME TECHNICALS: ${techMsg}
 
-Provide a 2-3 sentence beginner-friendly suggestion.
+Analyze this result specifically for a beginner. 
+1. Briefly evaluate the backtest result (e.g. congratulate them if it was profitable, or explain that backtesting helps avoid bad strategies if it lost money).
+2. CRITICAL: Based on the REAL-TIME TECHNICALS and their PORTFOLIO STATUS, you MUST explicitly tell the user whether they should "BUY", "SELL", or "HOLD" right now. 
+- If they already own it, tell them whether to "HOLD" or "SELL".
+- If they do NOT own it, tell them whether to "BUY" or wait ("HOLD" off).
+
+Keep your response to a maximum of 3-4 clear sentences.
 Respond with plain text only, no JSON.`;
 
         const response = await generateWithFallback(prompt);
         return response.response.text().trim();
     } catch (error) {
         console.error('Error generating AI backtest suggestion:', error.message);
-        return null;
+        return "Keep experimenting with different timeframes and stocks to find the best strategy!";
     }
 };
 

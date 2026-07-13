@@ -300,7 +300,16 @@ router.post('/backtest', async (req, res) => {
         
         // Generate Beginner AI Suggestion based on the result
         const { getBacktestAISuggestion } = require('../services/aiService');
-        const aiSuggestion = await getBacktestAISuggestion(symbol, days || 365, result.profitPercent, result.totalTrades);
+        const { getTechnicalIndicators } = require('../services/technicalService');
+        const Portfolio = require('../models/Portfolio');
+        
+        const holding = await Portfolio.findOne({ symbol, status: 'HOLDING' });
+        const holdingStatus = holding ? `USER CURRENTLY OWNS THIS STOCK (Bought at: ₹${holding.buyPrice})` : `USER DOES NOT OWN THIS STOCK`;
+        
+        let technicals = null;
+        try { technicals = await getTechnicalIndicators(symbol); } catch(e) {}
+        
+        const aiSuggestion = await getBacktestAISuggestion(symbol, days || 365, result.profitPercent, result.totalTrades, holdingStatus, technicals);
         result.aiSuggestion = aiSuggestion;
         
         res.json(result);
