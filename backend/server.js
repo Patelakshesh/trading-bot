@@ -560,21 +560,33 @@ const runDailyAnalysis = async () => {
                     if (rec.action !== 'HOLD') {
                         const alertKey = `${owner._id}_AI_${rec.action}`;
                         if (!sentAlertsMemory.has(alertKey)) {
-                            const alertMsg = `🚨 **AI TRADING ALERT** 🚨\n\n` +
-                                             `📈 **Stock:** ${rec.symbol}\n` +
-                                             `💰 **Your Buy Price:** ₹${owner.buyPrice}\n` +
-                                             `📊 **Current Price:** ₹${currentPrices[rec.symbol] || 'N/A'}\n` +
-                                             `🟢 **Action:** ${rec.action}\n\n` +
-                                             `🧠 **AI Thoughts:** ${rec.reasoning}`;
+                            const currentPrice = currentPrices[rec.symbol];
+                            const profitPercent = currentPrice ? ((currentPrice - owner.buyPrice) / owner.buyPrice * 100).toFixed(2) : null;
+                            const profitEmoji = profitPercent >= 0 ? '📈' : '📉';
+                            const profitText = profitPercent !== null ? `${profitEmoji} P&L: ${profitPercent >= 0 ? '+' : ''}${profitPercent}%` : '';
+                            
+                            const actionIcon = rec.action === 'SELL' ? '🔴' : rec.action === 'BUY' ? '🟢' : '🟡';
+                            let actionLabel = rec.action;
+                            if (rec.action === 'SELL' && profitPercent >= 3) actionLabel = '✅ SELL (Profit Target Hit!)';
+                            else if (rec.action === 'SELL' && profitPercent <= -5) actionLabel = '🛑 SELL (Stop-Loss Hit \u2014 Cut Loss Now)';
+                            else if (rec.action === 'SELL') actionLabel = '⏰ SELL (Time Limit Reached)';
+                            else if (rec.action === 'HOLD') actionLabel = '⏳ HOLD (Wait for Recovery)';
+
+                            const alertMsg = `${actionIcon} <b>AI ALERT: ${rec.symbol}</b>\n\n` +
+                                             `💰 <b>You Bought At:</b> ₹${owner.buyPrice}\n` +
+                                             `📊 <b>Live Price Now:</b> ₹${currentPrice || 'N/A'}\n` +
+                                             `${profitText}\n\n` +
+                                             `<b>Action: ${actionLabel}</b>\n\n` +
+                                             `🧠 <b>Why:</b> ${rec.reasoning}`;
                             
                             if (owner.chatId !== 'UI_USER') {
-                                bot.sendMessage(owner.chatId, alertMsg, {parse_mode: 'Markdown'});
+                                bot.sendMessage(owner.chatId, alertMsg, {parse_mode: 'HTML'});
                             } else {
                                 // Bridge Dashboard stocks to actual Telegram users
                                 const allUsers = await Portfolio.distinct('chatId');
                                 const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
                                 for (let tId of telegramUsers) {
-                                    bot.sendMessage(tId, alertMsg, {parse_mode: 'Markdown'});
+                                    bot.sendMessage(tId, alertMsg, {parse_mode: 'HTML'});
                                 }
                             }
                             sentAlertsMemory.add(alertKey);
