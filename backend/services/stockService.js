@@ -6,66 +6,65 @@ const priceCache = new Map();
 const CACHE_DURATION_MS = 30000; // 30 seconds
 
 const getStockPrice = async (symbol) => {
+    const querySymbol = symbol && (symbol.endsWith('.NS') || symbol.endsWith('.BO')) ? symbol : `${symbol}.NS`;
+    if (!symbol) return null;
+    
+    // Check Cache first (30 second cache to prevent rate-limiting)
+    if (priceCache.has(querySymbol)) {
+        const cached = priceCache.get(querySymbol);
+        if (Date.now() - cached.timestamp < CACHE_DURATION_MS) {
+            return cached.price;
+        }
+    }
+
+    // --- PRIMARY: Yahoo Finance (Reliable, correct prices) ---
     try {
-        const querySymbol = symbol.endsWith('.NS') || symbol.endsWith('.BO') ? symbol : `${symbol}.NS`;
-        
-        // Check Cache first
-        if (priceCache.has(querySymbol)) {
-            const cached = priceCache.get(querySymbol);
-            if (Date.now() - cached.timestamp < CACHE_DURATION_MS) {
-                return cached.price;
-            }
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Yahoo Timeout')), 5000));
+        const quote = await Promise.race([yahooFinance.quote(querySymbol), timeout]);
+        const price = quote ? quote.regularMarketPrice : null;
+        if (price && price > 0) {
+            priceCache.set(querySymbol, { price, timestamp: Date.now() });
+            console.log(`[Yahoo] ${symbol} = ₹${price}`);
+            return price;
         }
+    } catch (yhError) {
+        console.warn(`[Yahoo] Failed for ${symbol}: ${yhError.message}. Trying Google...`);
+    }
 
-        // --- PRIMARY: Google Finance (Real-Time NSE/BSE Data) ---
-        try {
-            let gfExchange = 'NASDAQ';
-            let gfSymbol = symbol.split('.')[0];
-            if (symbol.endsWith('.NS') || querySymbol.endsWith('.NS')) gfExchange = 'NSE';
-            else if (symbol.endsWith('.BO') || querySymbol.endsWith('.BO')) gfExchange = 'BOM';
+    // --- FALLBACK: Google Finance ---
+    try {
+        const gfExchange = symbol.endsWith('.BO') ? 'BOM' : 'NSE';
+        const gfSymbol = symbol.split('.')[0];
+        const controller = new AbortController();
+        const gfTimeout = setTimeout(() => controller.abort(), 5000);
+        const response = await fetch(`https://www.google.com/finance/quote/${gfSymbol}:${gfExchange}`, { signal: controller.signal });
+        clearTimeout(gfTimeout);
+        const html = await response.text();
+        // Match the ₹-prefixed price (first rupee value on the stock's own page)
+        const match = html.match(/class="YMlKec">&#x20B9;([0-9,]+(?:\.[0-9]+)?)<\/div>/) ||
+                      html.match(/class="YMlKec">₹([0-9,]+(?:\.[0-9]+)?)<\/div>/);
+        if (match && match[1]) {
+            const parsedPrice = parseFloat(match[1].replace(/,/g, ''));
+            if (!isNaN(parsedPrice) && parsedPrice > 0) {
+                priceCache.set(querySymbol, { price: parsedPrice, timestamp: Date.now() });
+                console.log(`[GF] ${symbol} = ₹${parsedPrice}`);
+                return parsedPrice;
+            }
+        }
+    } catch (gfError) {
+        console.warn(`[GF] Failed for ${symbol}: ${gfError.message}`);
+    }
 
-            const response = await fetch(`https://www.google.com/finance/quote/${gfSymbol}:${gfExchange}`);
-            const html = await response.text();
-            
-            // Extract the main price using Regex
-            const match = html.match(/class="YMlKec fxKbKc">([^<]+)<\/div>/);
-            if (match && match[1]) {
-                const parsedPrice = parseFloat(match[1].replace(/[^0-9.]/g, ''));
-                if (!isNaN(parsedPrice)) {
-                    priceCache.set(querySymbol, { price: parsedPrice, timestamp: Date.now() });
-                    return parsedPrice;
-                }
-            }
-            throw new Error("Google Finance Scraping Failed");
-        } catch (gfError) {
-            console.error(`Google Finance failed for ${symbol}, attempting Yahoo Finance Fallback...`);
-            
-            // --- FALLBACK: Yahoo Finance (Often 15-min delayed for NSE) ---
-            const fetchQuote = yahooFinance.quote(querySymbol).catch(e => null);
-            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Yahoo Quote Timeout')), 2000));
-            
-            const quote = await Promise.race([fetchQuote, timeout]);
-            const price = quote ? quote.regularMarketPrice : null;
-            
-            if (price) {
-                priceCache.set(querySymbol, { price, timestamp: Date.now() });
-                return price;
-            } else {
-                throw new Error("Yahoo Quote returned null");
-            }
-        }
-    } catch (error) {
-        console.error(`Both Google Finance and Yahoo Finance failed for ${symbol}. Returning null.`);
-        }
-        
-        // Final Fallback: Use stale cache if absolutely everything is blocked
-        const querySymbol = symbol.endsWith('.NS') || symbol.endsWith('.BO') ? symbol : `${symbol}.NS`;
-        if (priceCache.has(querySymbol)) {
-            return priceCache.get(querySymbol).price;
-        }
-        
-        return null;
+    // Last Resort: Return stale cache
+    if (priceCache.has(querySymbol)) {
+        console.warn(`[Cache] Using stale price for ${symbol}`);
+        return priceCache.get(querySymbol).price;
+    }
+
+    console.error(`[Price] All sources failed for ${symbol}. Returning null.`);
+    return null;
 };
+
 
 const searchSymbol = async (query) => {
     try {
@@ -79,11 +78,12 @@ const searchSymbol = async (query) => {
         
         if (results.quotes && results.quotes.length > 0) {
             // Prioritize Indian stock exchanges (.NS or .BO)
-            const indianStock = results.quotes.find(q => q.symbol.endsWith('.NS') || q.symbol.endsWith('.BO'));
+            const indianStock = results.quotes.find(q => q.symbol && (q.symbol.endsWith('.NS') || q.symbol.endsWith('.BO')));
             if (indianStock) return indianStock.symbol;
             
-            // Fallback to the top result if it's not an Indian stock (e.g. AAPL)
-            return results.quotes[0].symbol;
+            // Fallback to the top result if it's not an Indian stock but has a symbol
+            const firstValidStock = results.quotes.find(q => q.symbol);
+            if (firstValidStock) return firstValidStock.symbol;
         }
         
         // If search completely fails, fallback to formatting it manually
