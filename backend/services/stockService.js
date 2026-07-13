@@ -149,7 +149,7 @@ const getMarketMovers = async () => {
                     symbol: item.symbol,
                     name: item.name,
                     price: price,
-                    changePercent: pseudoChange.toFixed(2)
+                    changePercent: pseudoChange
                 };
             }
             return null;

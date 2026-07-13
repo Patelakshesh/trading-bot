@@ -187,12 +187,12 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 const technicals = await getTechnicalIndicators(symbol);
                 await bot.editMessageText(`🧠 <b>Connecting to Wall Street Data for ${symbol}...</b>\n\n[🟩🟩🟩🟩🟩⬛] 80% - AI Crunching Technicals...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 
-                const { getStockAnalysis } = require('./services/aiService');
-                const analysis = await getStockAnalysis(symbol, news, technicals);
-                
-                // Fetch the live price for the single stock tip
+                // Fetch the live price for the single stock tip FIRST
                 const currentPrice = await getStockPrice(symbol);
                 const priceText = currentPrice ? `₹${currentPrice}` : 'N/A';
+                
+                const { getStockAnalysis } = require('./services/aiService');
+                const analysis = await getStockAnalysis(symbol, news, technicals, currentPrice);
                 
                 if (analysis && analysis.action) {
                     let targetLine = '';

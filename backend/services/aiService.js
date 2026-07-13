@@ -74,13 +74,16 @@ Only return valid JSON array without markdown formatting.`;
     }
 };
 
-const getStockAnalysis = async (symbol, news, technicals) => {
+const getStockAnalysis = async (symbol, news, technicals, currentPrice) => {
     try {
         const advancedMetrics = await advancedDataService.getAdvancedMetrics(symbol);
 
         const prompt = `
 You are an elite quantitative hedge fund AI advisor.
 Analyze the following multi-dimensional data for stock symbol: ${symbol}
+
+[0] LIVE MARKET PRICE:
+- Current Real-Time Price: ₹${currentPrice || 'Unknown'}
 
 [1] BREAKING NEWS SENTIMENT:
 ${news.length > 0 ? news.map(n => `- ${n.title}`).join('\n') : "No recent news."}
@@ -108,7 +111,7 @@ CRITICAL INSTRUCTIONS:
 3. If the stock is going viral on Social Media but Fundamentals are terrible (negative profit margin), warn the user it is a "Meme Stock Bubble".
 4. Determine if this is a BUY, SELL, or HOLD.
 5. Provide a short 2-sentence rationale explaining the alignment of Math, News, and Smart Money.
-6. The user is a standard cash investor. If you recommend BUY, calculate EXACT mathematical price values in Rupees (e.g. "₹105.50") for a short-term 'target' and 'stopLoss'. DO NOT just output percentages.
+6. The user is a standard cash investor. If you recommend BUY, calculate EXACT mathematical price values in Rupees (e.g. "₹105.50") for a short-term 'target' and 'stopLoss' based strictly on the Current Real-Time Price (₹${currentPrice || 'Unknown'}). DO NOT just output percentages.
 
 Return your response in STRICT JSON format:
 {
