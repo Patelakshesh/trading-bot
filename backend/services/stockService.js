@@ -3,7 +3,7 @@ const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHis
 
 // In-memory cache to prevent Yahoo Finance rate-limiting (HTTP 429)
 const priceCache = new Map();
-const CACHE_DURATION_MS = 30000; // 30 seconds
+const CACHE_DURATION_MS = 2 * 60 * 1000; // 2 minutes — prevents Yahoo Finance 429 rate-limit block
 
 const getStockPrice = async (symbol) => {
     const querySymbol = symbol && (symbol.endsWith('.NS') || symbol.endsWith('.BO')) ? symbol : `${symbol}.NS`;

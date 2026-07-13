@@ -471,11 +471,14 @@ const runDailyAnalysis = async () => {
         const currentPrices = {};
         const technicalData = {};
         const advancedData = {};
+        // Fetch prices with a delay between each stock to avoid Yahoo Finance rate-limiting (HTTP 429 / 2-min block)
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
         for(let item of holdings) {
             if(!currentPrices[item.symbol]) {
                 currentPrices[item.symbol] = await getStockPrice(item.symbol);
                 technicalData[item.symbol] = await getTechnicalIndicators(item.symbol);
                 advancedData[item.symbol] = await getAdvancedMetrics(item.symbol);
+                await sleep(600); // 600ms gap prevents rate-limit block
             }
         }
         for(let item of watchlist) {
@@ -483,6 +486,7 @@ const runDailyAnalysis = async () => {
                 currentPrices[item.symbol] = await getStockPrice(item.symbol);
                 technicalData[item.symbol] = await getTechnicalIndicators(item.symbol);
                 advancedData[item.symbol] = await getAdvancedMetrics(item.symbol);
+                await sleep(600); // 600ms gap prevents rate-limit block
             }
         }
 
