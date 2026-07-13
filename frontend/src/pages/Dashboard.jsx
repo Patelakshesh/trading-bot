@@ -137,14 +137,10 @@ const Dashboard = () => {
     }
   };
 
-  // Convert Yahoo Finance symbol to TradingView symbol
-  // Note: NSE restricts third-party iframe embedding on TradingView. 
-  // We map .NS to BSE: to bypass this restriction, as BSE data is free to embed.
   const getTradingViewSymbol = (sym) => {
     if(!sym) return 'AAPL';
-    if(sym.endsWith('.NS')) return 'BSE:' + sym.replace('.NS', '');
-    if(sym.endsWith('.BO')) return 'BSE:' + sym.replace('.BO', '');
-    return sym; 
+    // Let TradingView auto-resolve the best exchange instead of forcing BSE
+    return sym.replace('.NS', '').replace('.BO', '');
   };
 
   // Calculate Total Portfolio Stats
