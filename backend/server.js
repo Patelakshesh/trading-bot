@@ -30,7 +30,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
-        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/bought <SYMBOL> <PRICE>` - Track a stock\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
+        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
     });
 
     // 1. Upgraded /bought command to automatically fetch live price if omitted
@@ -40,18 +40,29 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         bot.sendMessage(chatId, `🔍 Finding correct ticker for "${rawSymbol}"...`);
         const symbol = await searchSymbol(rawSymbol);
         
-        let price = match[2] ? parseFloat(match[2]) : null;
-        const quantity = match[3] ? parseInt(match[3]) : 1;
+        let arg1 = match[2] ? parseFloat(match[2]) : null;
+        let arg2 = match[3] ? parseInt(match[3]) : null;
         
         try {
             const livePrice = await getStockPrice(symbol);
-            if (!price) {
-                if (livePrice) {
-                    price = livePrice;
-                } else {
-                    bot.sendMessage(chatId, `❌ Could not automatically fetch the live price for ${symbol}. Please try again and manually enter the price: \`/bought ${symbol} <PRICE>\``, {parse_mode: 'Markdown'});
-                    return;
-                }
+            if (!livePrice) {
+                bot.sendMessage(chatId, `❌ Could not automatically fetch the live price for ${symbol}. Please try again later.`, {parse_mode: 'Markdown'});
+                return;
+            }
+
+            let price = livePrice;
+            let quantity = 1;
+
+            // SMART DETECTION:
+            if (arg1 && arg2) {
+                // User provided both Price and Quantity: /bought ZOMATO 240 100
+                price = arg1;
+                quantity = arg2;
+            } else if (arg1) {
+                // User provided only ONE number (Invested Value): /bought ZOMATO 50000
+                // We use the LIVE PRICE to calculate how many shares they bought!
+                quantity = Math.floor(arg1 / livePrice);
+                if (quantity < 1) quantity = 1;
             }
 
             await Portfolio.create({
@@ -61,11 +72,10 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 quantity: quantity
             });
             
-            const profit = livePrice ? (((livePrice - price) / price) * 100).toFixed(2) : '0.00';
             const totalInvested = price * quantity;
-            const liveValue = livePrice ? livePrice * quantity : totalInvested;
+            const liveValue = livePrice * quantity;
             
-            bot.sendMessage(chatId, `✅ **Saved to Portfolio!**\n\n📈 **Stock:** ${symbol}\n📦 **Quantity:** ${quantity}\n💰 **Your Buy Price:** ₹${price} (Total: ₹${totalInvested})\n📊 **Live Market Price:** ₹${livePrice || price} (Total: ₹${liveValue})\n💸 **Current Profit:** ${profit}%\n\nI will now monitor this 24/7 and alert you when to sell!`, {parse_mode: 'Markdown'});
+            bot.sendMessage(chatId, `✅ **Saved to Portfolio!**\n\n📈 **Stock:** ${symbol}\n💰 **Invested:** ₹${totalInvested.toFixed(2)}\n📦 **Shares Bought:** ${quantity} (at ₹${price.toFixed(2)}/share)\n📊 **Live Market Price:** ₹${livePrice.toFixed(2)}\n\nI will now monitor this 24/7 and alert you when to sell!`, {parse_mode: 'Markdown'});
         } catch(err) {
             console.error(err);
             bot.sendMessage(chatId, '❌ Failed to save to database. Please check connection.');
@@ -331,8 +341,9 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         const welcomeMsg = `🤖 **Welcome to the AI Hedge Fund Bot!** 🤖\n\n` +
                            `I am your 24/7 personal trading assistant. I monitor the markets, read the news, and execute mathematical strategies for you.\n\n` +
                            `📌 **AVAILABLE COMMANDS:**\n\n` +
-                           `🛒 \`/bought <SYMBOL> <PRICE> <QTY>\`\n` +
-                           `↳ *Example: /bought ZOMATO 250 100*\n` +
+                           `🛒 \`/bought <SYMBOL> <TOTAL_INVESTED>\`\n` +
+                           `↳ *Example: /bought ZOMATO 10000*\n` +
+                           `↳ *(Auto-calculates quantity based on live market price!)*\n` +
                            `↳ Adds a stock to your live Web Dashboard.\n\n` +
                            `🤝 \`/sold <SYMBOL> <PRICE> <QTY>\`\n` +
                            `↳ *Example: /sold ZOMATO 260 100*\n` +
