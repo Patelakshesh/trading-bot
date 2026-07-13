@@ -623,6 +623,31 @@ cron.schedule('*/15 * * * *', async () => {
                         sentAlertsMemory.add(newsKey);
                     }
                 }
+
+                // 4. Good Breaking News Alert (New feature requested)
+                const goodNews = news.find(n => 
+                    (n.title.includes(item.symbol.replace('.NS', '')) || n.description.includes(item.symbol.replace('.NS', ''))) &&
+                    /(surge|jump|rise|profit|growth|buy|upgrade|record|win|success|deal)/i.test(n.title + n.description)
+                );
+
+                if (goodNews && !badNews) { // Don't spam if bad news already fired
+                    const goodNewsKey = `${item._id}_GOODNEWS_${goodNews.title.substring(0,20)}`;
+                    if (!sentAlertsMemory.has(goodNewsKey)) {
+                        const newsMsg = `🚀 **BULLISH NEWS ALERT** 🚀\n\n` +
+                                        `📈 **Stock:** ${item.symbol}\n` +
+                                        `📰 **Headline:** ${goodNews.title}\n\n` +
+                                        `Great news just dropped! Your stock might be about to surge. Keep a close eye on it!`;
+                        
+                        if (item.chatId !== 'UI_USER') {
+                            bot.sendMessage(item.chatId, newsMsg, {parse_mode: 'Markdown'});
+                        } else {
+                            const allUsers = await Portfolio.distinct('chatId');
+                            const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
+                            for (let tId of telegramUsers) bot.sendMessage(tId, newsMsg, {parse_mode: 'Markdown'});
+                        }
+                        sentAlertsMemory.add(goodNewsKey);
+                    }
+                }
             }
         }
     } catch(err) {
