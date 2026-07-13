@@ -54,15 +54,22 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             let quantity = 1;
 
             // SMART DETECTION:
-            if (arg1 && arg2) {
+            if (arg1 !== null && arg2 !== null) {
                 // User provided both Price and Quantity: /bought ZOMATO 240 100
                 price = arg1;
                 quantity = arg2;
-            } else if (arg1) {
-                // User provided only ONE number (Invested Value): /bought ZOMATO 50000
-                // We use the LIVE PRICE to calculate how many shares they bought!
-                quantity = Math.floor(arg1 / livePrice);
-                if (quantity < 1) quantity = 1;
+            } else if (arg1 !== null) {
+                // User provided only ONE number. Is it the Price, or the Invested Value?
+                // If the number is vastly larger than the current live price (e.g. > 50% larger), 
+                // it is safe to assume they entered a total INVESTED VALUE.
+                if (arg1 > livePrice * 1.5) {
+                    quantity = Math.floor(arg1 / livePrice);
+                    if (quantity < 1) quantity = 1;
+                } else {
+                    // Otherwise, it's just the manual PRICE they bought it at, and qty defaults to 1.
+                    price = arg1;
+                    quantity = 1;
+                }
             }
 
             await Portfolio.create({
