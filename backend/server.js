@@ -20,6 +20,9 @@ app.use(express.json());
 const PORT = process.env.PORT || 5000;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
+// Anti-Spam Memory: Prevents the bot from spamming the same alert every 15 minutes
+const sentAlertsMemory = new Set();
+
 // Initialize Telegram Bot
 let bot;
 if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
@@ -483,14 +486,18 @@ const runDailyAnalysis = async () => {
                         // Only send a push notification if the AI wants them to take ACTION (BUY/SELL).
                         // Do not spam them every 15 minutes with "HOLD" messages.
                         if (rec.action !== 'HOLD') {
-                            const alertMsg = `🚨 **AI TRADING ALERT** 🚨\n\n` +
-                                             `📈 **Stock:** ${rec.symbol}\n` +
-                                             `💰 **Your Buy Price:** ₹${owner.buyPrice}\n` +
-                                             `📊 **Current Price:** ₹${currentPrices[rec.symbol] || 'N/A'}\n` +
-                                             `🟢 **Action:** ${rec.action}\n\n` +
-                                             `🧠 **AI Thoughts:** ${rec.reasoning}`;
-                            
-                            bot.sendMessage(owner.chatId, alertMsg, {parse_mode: 'Markdown'});
+                            const alertKey = `${owner._id}_AI_${rec.action}`;
+                            if (!sentAlertsMemory.has(alertKey)) {
+                                const alertMsg = `🚨 **AI TRADING ALERT** 🚨\n\n` +
+                                                 `📈 **Stock:** ${rec.symbol}\n` +
+                                                 `💰 **Your Buy Price:** ₹${owner.buyPrice}\n` +
+                                                 `📊 **Current Price:** ₹${currentPrices[rec.symbol] || 'N/A'}\n` +
+                                                 `🟢 **Action:** ${rec.action}\n\n` +
+                                                 `🧠 **AI Thoughts:** ${rec.reasoning}`;
+                                
+                                bot.sendMessage(owner.chatId, alertMsg, {parse_mode: 'Markdown'});
+                                sentAlertsMemory.add(alertKey);
+                            }
                         }
                     }
                 }
@@ -527,39 +534,50 @@ cron.schedule('*/15 * * * *', async () => {
                 
                 // 1. Take-Profit Alert (+5%)
                 if (profitPercentage >= 5) {
-                    const alertMsg = `🎯 **TAKE PROFIT ALERT** 🎯\n\n` +
-                                     `🚀 **Stock:** ${item.symbol}\n` +
-                                     `💰 **Buy Price:** ₹${item.buyPrice}\n` +
-                                     `🤑 **Current Price:** ₹${currentPrice} (Up +${profitPercentage.toFixed(2)}%)\n\n` +
-                                     `You have reached your +5% target! Sell now to lock in profits!`;
-                    
-                    if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
+                    const tpKey = `${item._id}_TP`;
+                    if (!sentAlertsMemory.has(tpKey)) {
+                        const alertMsg = `🎯 **TAKE PROFIT ALERT** 🎯\n\n` +
+                                         `🚀 **Stock:** ${item.symbol}\n` +
+                                         `💰 **Buy Price:** ₹${item.buyPrice}\n` +
+                                         `🤑 **Current Price:** ₹${currentPrice} (Up +${profitPercentage.toFixed(2)}%)\n\n` +
+                                         `You have reached your +5% target! Sell now to lock in profits!`;
+                        
+                        if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
+                        sentAlertsMemory.add(tpKey);
+                    }
                 }
                 
                 // 2. Stop-Loss Alert (-5%)
                 if(profitPercentage <= -5) {
-                    const alertMsg = `⚠️ **EMERGENCY STOP-LOSS TRIGGERED** ⚠️\n\n` +
-                                     `📉 **Stock:** ${item.symbol}\n` +
-                                     `💰 **Buy Price:** ₹${item.buyPrice}\n` +
-                                     `🚨 **Current Price:** ₹${currentPrice} (Dropped ${profitPercentage.toFixed(2)}%)\n\n` +
-                                     `Mathematical Safety Net activated. Consider cutting your losses!`;
-                    
-                    if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
+                    const slKey = `${item._id}_SL`;
+                    if (!sentAlertsMemory.has(slKey)) {
+                        const alertMsg = `⚠️ **EMERGENCY STOP-LOSS TRIGGERED** ⚠️\n\n` +
+                                         `📉 **Stock:** ${item.symbol}\n` +
+                                         `💰 **Buy Price:** ₹${item.buyPrice}\n` +
+                                         `🚨 **Current Price:** ₹${currentPrice} (Dropped ${profitPercentage.toFixed(2)}%)\n\n` +
+                                         `Mathematical Safety Net activated. Consider cutting your losses!`;
+                        
+                        if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
+                        sentAlertsMemory.add(slKey);
+                    }
                 }
 
                 // 3. Bad Breaking News Alert
-                // Check if any news explicitly mentions this symbol and has words like crash, fall, drop, warning
                 const badNews = news.find(n => 
                     (n.title.includes(item.symbol.replace('.NS', '')) || n.description.includes(item.symbol.replace('.NS', ''))) &&
                     /(crash|fall|drop|warning|fraud|loss|sell|downgrade)/i.test(n.title + n.description)
                 );
 
                 if (badNews) {
-                    const newsMsg = `📰 **BREAKING BAD NEWS ALERT** 📰\n\n` +
-                                    `🚨 **Stock:** ${item.symbol}\n` +
-                                    `⚠️ **Headline:** ${badNews.title}\n\n` +
-                                    `This negative news might impact your holdings. Consider selling immediately!`;
-                    if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, newsMsg, {parse_mode: 'Markdown'});
+                    const newsKey = `${item._id}_NEWS_${badNews.title.substring(0,20)}`;
+                    if (!sentAlertsMemory.has(newsKey)) {
+                        const newsMsg = `📰 **BREAKING BAD NEWS ALERT** 📰\n\n` +
+                                        `🚨 **Stock:** ${item.symbol}\n` +
+                                        `⚠️ **Headline:** ${badNews.title}\n\n` +
+                                        `This negative news might impact your holdings. Consider selling immediately!`;
+                        if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, newsMsg, {parse_mode: 'Markdown'});
+                        sentAlertsMemory.add(newsKey);
+                    }
                 }
             }
         }
@@ -589,16 +607,20 @@ cron.schedule('0 */2 * * *', async () => {
             
             for (let chatId of allUsers) {
                 if (chatId !== 'UI_USER') {
-                    const tipMsg = `🌟 **PROACTIVE AI OPPORTUNITY** 🌟\n\n` +
-                                   `I just found a massive new setup based on breaking market data!\n\n` +
-                                   `📈 **Stock:** ${bestTip.symbol} (${bestTip.companyName})\n` +
-                                   `💰 **Current Price:** ${bestTip.currentPrice || 'N/A'}\n` +
-                                   `🟢 **Action:** ${bestTip.action}\n` +
-                                   `🎯 **Target:** ${bestTip.target} | 🛡️ **SL:** ${bestTip.stopLoss}\n\n` +
-                                   `🧠 **Why?** ${bestTip.rationale}\n\n` +
-                                   `*(Type \`/bought ${bestTip.symbol} <PRICE>\` to track it!)*`;
-                    
-                    bot.sendMessage(chatId, tipMsg, {parse_mode: 'Markdown'});
+                    const proactiveKey = `${chatId}_PROACTIVE_${bestTip.symbol}`;
+                    if (!sentAlertsMemory.has(proactiveKey)) {
+                        const tipMsg = `🌟 **PROACTIVE AI OPPORTUNITY** 🌟\n\n` +
+                                       `I just found a massive new setup based on breaking market data!\n\n` +
+                                       `📈 **Stock:** ${bestTip.symbol} (${bestTip.companyName})\n` +
+                                       `💰 **Current Price:** ${bestTip.currentPrice || 'N/A'}\n` +
+                                       `🟢 **Action:** ${bestTip.action}\n` +
+                                       `🎯 **Target:** ${bestTip.target} | 🛡️ **SL:** ${bestTip.stopLoss}\n\n` +
+                                       `🧠 **Why?** ${bestTip.rationale}\n\n` +
+                                       `*(Type \`/bought ${bestTip.symbol} <PRICE>\` to track it!)*`;
+                        
+                        bot.sendMessage(chatId, tipMsg, {parse_mode: 'Markdown'});
+                        sentAlertsMemory.add(proactiveKey);
+                    }
                 }
             }
         }
