@@ -108,12 +108,15 @@ CRITICAL INSTRUCTIONS:
 3. If the stock is going viral on Social Media but Fundamentals are terrible (negative profit margin), warn the user it is a "Meme Stock Bubble".
 4. Determine if this is a BUY, SELL, or HOLD.
 5. Provide a short 2-sentence rationale explaining the alignment of Math, News, and Smart Money.
+6. The user is a standard cash investor. If you recommend BUY, calculate EXACT mathematical price values in Rupees (e.g. "₹105.50") for a short-term 'target' and 'stopLoss'. DO NOT just output percentages.
 
 Return your response in STRICT JSON format:
 {
   "action": "BUY" | "SELL" | "HOLD",
   "confidence": <number 0-100>,
-  "rationale": "<your combined explanation>"
+  "rationale": "<your combined explanation>",
+  "target": "₹XXX.XX" (or null if not buying),
+  "stopLoss": "₹XXX.XX" (or null if not buying)
 }
 `;
         const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -169,6 +172,8 @@ CRITICAL INSTRUCTIONS:
 2. For each stock, you MUST provide a strict short-term trading plan (e.g., "Hold for 1 Day", "Hold for 3 Days").
 3. You must provide clear entry and exit targets.
 4. Guarantee maximum high-conviction logic.
+5. The user is a standard cash investor. You MUST ONLY recommend "BUY" setups. NEVER recommend "SELL SHORT". If a stock is a Top Loser today but you expect a strong reversal bounce, recommend it as a "BUY".
+6. For target and stopLoss, provide EXACT mathematical price values in Rupees (e.g., "₹105.50"). Calculate this based on the stock's current price. DO NOT just output percentages.
 ${budgetPrompt}
 ${rangePrompt}
 
@@ -177,11 +182,11 @@ Return ONLY a JSON array of exactly 5 objects. Do NOT use markdown code blocks l
   {
     "symbol": "TICKER.NS",
     "companyName": "Full Company Name Ltd",
-    "action": "BUY" | "SELL SHORT",
+    "action": "BUY",
     "duration": "1 Day" | "2 Days" | "3 Days",
     "rationale": "Short highly persuasive 1-sentence reason",
-    "target": "+5%",
-    "stopLoss": "-2%"${jsonFields}
+    "target": "₹XXX.XX",
+    "stopLoss": "₹XXX.XX"${jsonFields}
   }
 ]
 `;

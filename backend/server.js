@@ -182,9 +182,15 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 const priceText = currentPrice ? `₹${currentPrice}` : 'N/A';
                 
                 if (analysis && analysis.action) {
+                    let targetLine = '';
+                    if (analysis.target && analysis.stopLoss && analysis.action === 'BUY') {
+                        targetLine = `🎯 <b>Target:</b> ${analysis.target} | 🛡️ <b>SL:</b> ${analysis.stopLoss}\n`;
+                    }
+                
                     const finalMsg = `🚨 <b>INSTANT AI TIP: ${symbol}</b> 🚨\n\n` +
                                      `💰 <b>Live Price:</b> ${priceText}\n` +
                                      `📈 <b>Action:</b> ${analysis.action} (Confidence: ${analysis.confidence}%)\n` +
+                                     targetLine +
                                      `🧠 <b>AI Logic:</b> ${analysis.rationale}`;
                     bot.editMessageText(finalMsg, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 } else {
@@ -259,6 +265,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
 
             let totalInvested = 0;
             let totalCurrentValue = 0;
+            let holdingsList = `\n📋 **ACTIVE HOLDINGS & TARGETS**\n`;
 
             for (let item of holdings) {
                 const currentPrice = await getStockPrice(item.symbol);
@@ -267,6 +274,14 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 
                 totalInvested += invested;
                 totalCurrentValue += current;
+                
+                const target = (item.buyPrice * 1.05).toFixed(2);
+                const stopLoss = (item.buyPrice * 0.95).toFixed(2);
+                holdingsList += `🔹 **${item.symbol}:** Buy ₹${item.buyPrice} ➡️ Target: ₹${target} | SL: ₹${stopLoss}\n`;
+            }
+            
+            if (holdings.length === 0) {
+                holdingsList += `_No active holdings._\n`;
             }
             
             let totalRealizedProfit = 0;
@@ -289,7 +304,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                                     `${unrealizedEmoji} **Unrealized Profit:** ${unrealizedSign}₹${totalUnrealizedProfit.toFixed(2)} (${unrealizedSign}${totalProfitPercent}%)\n\n` +
                                     `🏦 **BANKED HISTORY**\n` +
                                     `${realizedEmoji} **Realized Profit (SOLD):** ${realizedSign}₹${totalRealizedProfit.toFixed(2)}\n\n` +
-                                    `💎 **NET GAINS:** ${totalUnrealizedProfit + totalRealizedProfit >= 0 ? '+' : ''}₹${(totalUnrealizedProfit + totalRealizedProfit).toFixed(2)}`, {parse_mode: 'Markdown'});
+                                    `💎 **NET GAINS:** ${totalUnrealizedProfit + totalRealizedProfit >= 0 ? '+' : ''}₹${(totalUnrealizedProfit + totalRealizedProfit).toFixed(2)}\n` +
+                                    holdingsList, {parse_mode: 'Markdown'});
         } catch (error) {
             console.error('Error calculating profit:', error);
             bot.sendMessage(chatId, `❌ Error calculating portfolio profit.`);
@@ -454,14 +470,18 @@ const runDailyAnalysis = async () => {
                 
                 for(let owner of owners) {
                     if (owner.chatId !== 'UI_USER') {
-                        const alertMsg = `🚨 **AI TRADING ALERT** 🚨\n\n` +
-                                         `📈 **Stock:** ${rec.symbol}\n` +
-                                         `💰 **Your Buy Price:** ₹${owner.buyPrice}\n` +
-                                         `📊 **Current Price:** ₹${currentPrices[rec.symbol] || 'N/A'}\n` +
-                                         `🟢 **Action:** ${rec.action}\n\n` +
-                                         `🧠 **AI Thoughts:** ${rec.reasoning}`;
-                        
-                        bot.sendMessage(owner.chatId, alertMsg, {parse_mode: 'Markdown'});
+                        // Only send a push notification if the AI wants them to take ACTION (BUY/SELL).
+                        // Do not spam them every 15 minutes with "HOLD" messages.
+                        if (rec.action !== 'HOLD') {
+                            const alertMsg = `🚨 **AI TRADING ALERT** 🚨\n\n` +
+                                             `📈 **Stock:** ${rec.symbol}\n` +
+                                             `💰 **Your Buy Price:** ₹${owner.buyPrice}\n` +
+                                             `📊 **Current Price:** ₹${currentPrices[rec.symbol] || 'N/A'}\n` +
+                                             `🟢 **Action:** ${rec.action}\n\n` +
+                                             `🧠 **AI Thoughts:** ${rec.reasoning}`;
+                            
+                            bot.sendMessage(owner.chatId, alertMsg, {parse_mode: 'Markdown'});
+                        }
                     }
                 }
             }
@@ -473,8 +493,8 @@ const runDailyAnalysis = async () => {
     }
 };
 
-// Internal Cron Job (Will run every single hour on the hour)
-cron.schedule('0 * * * *', runDailyAnalysis, {
+// Internal Cron Job (Will run every 15 minutes for near-instant AI analysis)
+cron.schedule('*/15 * * * *', runDailyAnalysis, {
     scheduled: true,
     timezone: "Asia/Kolkata"
 });
