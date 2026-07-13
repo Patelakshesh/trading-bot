@@ -249,6 +249,18 @@ const Dashboard = () => {
                         </button>
                       </h2>
                       <span style={{color: 'var(--text-secondary)', fontSize: '0.9rem'}}>Qty: {item.quantity}</span>
+                      <div style={{marginTop: '6px', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', padding: '6px 8px', borderRadius: '6px', display: 'inline-block'}}>
+                        <div style={{color: 'var(--text-secondary)'}}>🛒 Bought: <strong>{new Date(item.createdAt).toLocaleDateString()}</strong></div>
+                        {(() => {
+                           const daysHeld = Math.floor((Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+                           const daysLeft = 5 - daysHeld;
+                           return (
+                             <div style={{marginTop: '4px', color: daysLeft <= 1 ? 'var(--danger)' : 'var(--warning)', fontWeight: daysLeft <= 1 ? 'bold' : 'normal'}}>
+                               ⏳ Time-Stop: {daysLeft > 0 ? `${daysLeft} days remaining` : '⚠️ EXPIRED (SELL NOW)'}
+                             </div>
+                           );
+                        })()}
+                      </div>
                     </div>
                     <span className={`badge ${!hasLivePrice ? 'hold' : isProfit ? 'buy' : 'sell'}`}>
                       {!hasLivePrice ? 'API Blocked' : `${isProfit ? '+' : ''}${plPercentage.toFixed(2)}%`}
