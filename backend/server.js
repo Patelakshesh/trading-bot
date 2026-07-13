@@ -309,12 +309,15 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     // Replace the progress bar with the final result!
                     await bot.editMessageText(msgText, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 } else {
-                    await bot.editMessageText(`❌ Wall Street servers blocked the AI scan. Try again in 2 minutes.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                    await bot.editMessageText(`⚠️ AI returned no results. Retrying with a different model automatically next time. Please type /tip again.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 }
             } catch (err) {
-                console.error("TELEGRAM GLOBAL TIP ERROR:", err);
-                // Fallback in case statusMsg.message_id is somehow unavailable or threw an error
-                await bot.sendMessage(chatId, `❌ Error fetching global AI tips.`);
+                console.error("TELEGRAM GLOBAL TIP ERROR:", err.message);
+                try {
+                    await bot.editMessageText(`⚠️ <b>AI temporarily unavailable.</b>\n\nAll AI models were tried. Please type <code>/tip</code> again in 30 seconds.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                } catch {
+                    await bot.sendMessage(chatId, `⚠️ AI temporarily unavailable. Please try /tip again in 30 seconds.`);
+                }
             }
         }
     });

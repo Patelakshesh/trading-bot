@@ -16,13 +16,18 @@ const AI_MODELS = [
 
 async function generateWithFallback(prompt) {
     let lastError;
-    for (const modelName of AI_MODELS) {
+    for (let i = 0; i < AI_MODELS.length; i++) {
+        const modelName = AI_MODELS[i];
         try {
             const model = ai.getGenerativeModel({ model: modelName });
-            return await model.generateContent(prompt);
+            const result = await model.generateContent(prompt);
+            console.log(`[AI] Success with model: ${modelName}`);
+            return result;
         } catch (error) {
             console.warn(`[AI Fallback] Model ${modelName} failed: ${error.message}. Trying next...`);
             lastError = error;
+            // Wait 1s before trying next model (helps with rate limits)
+            if (i < AI_MODELS.length - 1) await new Promise(r => setTimeout(r, 1000));
         }
     }
     throw new Error(`All AI models failed. Last error: ${lastError.message}`);
@@ -222,18 +227,41 @@ Return ONLY a JSON array of exactly 5 objects. Do NOT use markdown code blocks l
   }
 ]
 `;
-        const response = await generateWithFallback(prompt);
-        let aiText = response.response.text();
+        // Try to get a valid JSON response — retry with a simpler prompt if parsing fails
+        let parsedResult = null;
+        let lastRawText = '';
         
-        const jsonStart = aiText.indexOf('[');
-        const jsonEnd = aiText.lastIndexOf(']');
-        if (jsonStart !== -1 && jsonEnd !== -1) {
-            aiText = aiText.substring(jsonStart, jsonEnd + 1);
-        } else {
-            aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const usePrompt = attempt === 0 ? prompt : 
+                    // Simpler fallback prompt if the first attempt fails to parse
+                    `Give me exactly 5 Indian NSE stocks to BUY today as short-term swing trades. For each, provide: symbol (.NS), companyName, action (BUY), currentPrice (in ₹), duration (1-3 Days), target price (in ₹), stopLoss price (in ₹), rationale (1 sentence). Return ONLY a valid JSON array. No markdown.`;
+                
+                const response = await generateWithFallback(usePrompt);
+                let aiText = response.response.text();
+                lastRawText = aiText;
+                
+                // Strip markdown code fences
+                aiText = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                
+                const jsonStart = aiText.indexOf('[');
+                const jsonEnd = aiText.lastIndexOf(']');
+                if (jsonStart !== -1 && jsonEnd !== -1) {
+                    aiText = aiText.substring(jsonStart, jsonEnd + 1);
+                }
+                
+                parsedResult = JSON.parse(aiText);
+                if (Array.isArray(parsedResult) && parsedResult.length > 0) break;
+            } catch (parseErr) {
+                console.warn(`[AI Top5] Attempt ${attempt + 1} failed: ${parseErr.message}. Raw: ${lastRawText.substring(0, 200)}`);
+            }
         }
         
-        return JSON.parse(aiText);
+        if (!parsedResult || parsedResult.length === 0) {
+            throw new Error('AI returned invalid data after 2 attempts');
+        }
+        
+        return parsedResult;
     } catch (error) {
         console.error('Error in getGlobalTop5TradingTips:', error.message);
         return null;
