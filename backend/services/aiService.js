@@ -178,7 +178,7 @@ const getGlobalTop5TradingTips = async (news, movers, budget = null, priceRange 
             rangePrompt = `CRITICAL: The user has specifically requested stocks priced strictly between ₹${priceRange.min} and ₹${priceRange.max}. You MUST ONLY recommend stocks that currently trade within this exact price range. If the provided movers do not fit this range, you must use your elite quantitative knowledge to recommend 5 other highly explosive stocks (e.g., penny stocks or mid-caps) that fit this price bracket. You must estimate and provide their current price in the JSON.`;
         }
         
-        // Always require the AI to provide its estimated current price for the UI
+        // Always require the AI to provide the current (entry/buy) price
         jsonFields += `,\n    "currentPrice": "₹XXX.XX"`;
 
         const prompt = `
@@ -210,10 +210,11 @@ Return ONLY a JSON array of exactly 5 objects. Do NOT use markdown code blocks l
     "symbol": "TICKER.NS",
     "companyName": "Full Company Name Ltd",
     "action": "BUY",
+    "currentPrice": "₹XXX.XX",
     "duration": "1 Day" | "2 Days" | "3 Days",
-    "rationale": "Short highly persuasive 1-sentence reason",
     "target": "₹XXX.XX",
-    "stopLoss": "₹XXX.XX"${jsonFields}
+    "stopLoss": "₹XXX.XX",
+    "rationale": "Short highly persuasive 1-sentence reason"${jsonFields}
   }
 ]
 `;

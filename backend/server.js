@@ -290,20 +290,20 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 if (top5 && top5.length > 0) {
                     await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩🟩🟩🟩] 100% - Trades Generated!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                     
-                    let msgText = `🎯 <b>TOP 5 ELITE SWING TRADES</b> (98% Algorithmic Conviction)\n\n`;
+                    let msgText = `🎯 <b>TOP 5 AI SWING TRADES</b>\n\n`;
                     top5.forEach((t, i) => {
-                        const icon = t.action.includes('BUY') ? '🟢' : '🔴';
-                        const companyStr = t.companyName ? ` (${t.companyName})` : '';
-                        msgText += `${i+1}. <b>${t.symbol}</b>${companyStr} ${icon} <b>${t.action}</b>\n`;
+                        const companyStr = t.companyName ? ` — ${t.companyName}` : '';
+                        msgText += `${i+1}\ufe0f\u20e3 <b>${t.symbol}</b>${companyStr}\n`;
+                        msgText += `   🟢 <b>Action: ${t.action}</b> | ⏳ Hold: <b>${t.duration}</b>\n`;
                         if (t.currentPrice) {
-                            msgText += `💸 Current Price: <b>${t.currentPrice}</b>\n`;
+                            msgText += `   💰 <b>Buy At:</b> ${t.currentPrice}\n`;
                         }
                         if (t.allocatedFunds && t.sharesToBuy) {
-                            msgText += `💸 Allocate: <b>${t.allocatedFunds}</b> (Buy ${t.sharesToBuy} shares)\n`;
+                            msgText += `   💵 Invest: <b>${t.allocatedFunds}</b> → Buy <b>${t.sharesToBuy} shares</b>\n`;
                         }
-                        msgText += `⏳ Hold: <b>${t.duration}</b>\n`;
-                        msgText += `🎯 Target: <b>${t.target}</b> | 🛡️ SL: <b>${t.stopLoss}</b>\n`;
-                        msgText += `🧠 <i>${t.rationale}</i>\n\n`;
+                        msgText += `   🎯 <b>Sell At (Target):</b> ${t.target || 'N/A'}\n`;
+                        msgText += `   🛡️ <b>Stop-Loss (Exit if):</b> ${t.stopLoss || 'N/A'}\n`;
+                        msgText += `   🧠 <i>${t.rationale}</i>\n\n`;
                     });
                     
                     // Replace the progress bar with the final result!
