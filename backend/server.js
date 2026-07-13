@@ -482,22 +482,29 @@ const runDailyAnalysis = async () => {
                 const owners = holdings.filter(h => h.symbol === rec.symbol);
                 
                 for(let owner of owners) {
-                    if (owner.chatId !== 'UI_USER') {
-                        // Only send a push notification if the AI wants them to take ACTION (BUY/SELL).
-                        // Do not spam them every 15 minutes with "HOLD" messages.
-                        if (rec.action !== 'HOLD') {
-                            const alertKey = `${owner._id}_AI_${rec.action}`;
-                            if (!sentAlertsMemory.has(alertKey)) {
-                                const alertMsg = `🚨 **AI TRADING ALERT** 🚨\n\n` +
-                                                 `📈 **Stock:** ${rec.symbol}\n` +
-                                                 `💰 **Your Buy Price:** ₹${owner.buyPrice}\n` +
-                                                 `📊 **Current Price:** ₹${currentPrices[rec.symbol] || 'N/A'}\n` +
-                                                 `🟢 **Action:** ${rec.action}\n\n` +
-                                                 `🧠 **AI Thoughts:** ${rec.reasoning}`;
-                                
+                    // Only send a push notification if the AI wants them to take ACTION (BUY/SELL).
+                    // Do not spam them every 15 minutes with "HOLD" messages.
+                    if (rec.action !== 'HOLD') {
+                        const alertKey = `${owner._id}_AI_${rec.action}`;
+                        if (!sentAlertsMemory.has(alertKey)) {
+                            const alertMsg = `🚨 **AI TRADING ALERT** 🚨\n\n` +
+                                             `📈 **Stock:** ${rec.symbol}\n` +
+                                             `💰 **Your Buy Price:** ₹${owner.buyPrice}\n` +
+                                             `📊 **Current Price:** ₹${currentPrices[rec.symbol] || 'N/A'}\n` +
+                                             `🟢 **Action:** ${rec.action}\n\n` +
+                                             `🧠 **AI Thoughts:** ${rec.reasoning}`;
+                            
+                            if (owner.chatId !== 'UI_USER') {
                                 bot.sendMessage(owner.chatId, alertMsg, {parse_mode: 'Markdown'});
-                                sentAlertsMemory.add(alertKey);
+                            } else {
+                                // Bridge Dashboard stocks to actual Telegram users
+                                const allUsers = await Portfolio.distinct('chatId');
+                                const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
+                                for (let tId of telegramUsers) {
+                                    bot.sendMessage(tId, alertMsg, {parse_mode: 'Markdown'});
+                                }
                             }
+                            sentAlertsMemory.add(alertKey);
                         }
                     }
                 }
@@ -542,7 +549,13 @@ cron.schedule('*/15 * * * *', async () => {
                                          `🤑 **Current Price:** ₹${currentPrice} (Up +${profitPercentage.toFixed(2)}%)\n\n` +
                                          `You have reached your +5% target! Sell now to lock in profits!`;
                         
-                        if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
+                        if (item.chatId !== 'UI_USER') {
+                            bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
+                        } else {
+                            const allUsers = await Portfolio.distinct('chatId');
+                            const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
+                            for (let tId of telegramUsers) bot.sendMessage(tId, alertMsg, {parse_mode: 'Markdown'});
+                        }
                         sentAlertsMemory.add(tpKey);
                     }
                 }
@@ -557,7 +570,13 @@ cron.schedule('*/15 * * * *', async () => {
                                          `🚨 **Current Price:** ₹${currentPrice} (Dropped ${profitPercentage.toFixed(2)}%)\n\n` +
                                          `Mathematical Safety Net activated. Consider cutting your losses!`;
                         
-                        if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
+                        if (item.chatId !== 'UI_USER') {
+                            bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
+                        } else {
+                            const allUsers = await Portfolio.distinct('chatId');
+                            const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
+                            for (let tId of telegramUsers) bot.sendMessage(tId, alertMsg, {parse_mode: 'Markdown'});
+                        }
                         sentAlertsMemory.add(slKey);
                     }
                 }
@@ -575,7 +594,14 @@ cron.schedule('*/15 * * * *', async () => {
                                         `🚨 **Stock:** ${item.symbol}\n` +
                                         `⚠️ **Headline:** ${badNews.title}\n\n` +
                                         `This negative news might impact your holdings. Consider selling immediately!`;
-                        if(item.chatId !== 'UI_USER') bot.sendMessage(item.chatId, newsMsg, {parse_mode: 'Markdown'});
+                        
+                        if (item.chatId !== 'UI_USER') {
+                            bot.sendMessage(item.chatId, newsMsg, {parse_mode: 'Markdown'});
+                        } else {
+                            const allUsers = await Portfolio.distinct('chatId');
+                            const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
+                            for (let tId of telegramUsers) bot.sendMessage(tId, newsMsg, {parse_mode: 'Markdown'});
+                        }
                         sentAlertsMemory.add(newsKey);
                     }
                 }

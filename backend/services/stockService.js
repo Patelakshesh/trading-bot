@@ -17,30 +17,12 @@ const getStockPrice = async (symbol) => {
             }
         }
 
-        // Add .catch() to prevent Unhandled Promise Rejections from crashing the server
-        // if Yahoo responds with a 429 after the timeout has already moved on
-        const fetchQuote = yahooFinance.quote(querySymbol).catch(e => null);
-        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Yahoo Quote Timeout')), 2000));
-        
-        const quote = await Promise.race([fetchQuote, timeout]);
-        const price = quote ? quote.regularMarketPrice : null;
-        
-        if (price) {
-            priceCache.set(querySymbol, { price, timestamp: Date.now() });
-            return price;
-        } else {
-            throw new Error("Yahoo Quote returned null - Forcing Fallback");
-        }
-        
-    } catch (error) {
-        console.error(`Yahoo Finance failed for ${symbol}, attempting Google Finance Fallback...`);
-        
+        // --- PRIMARY: Google Finance (Real-Time NSE/BSE Data) ---
         try {
-            // Google Finance Fallback Scraper
             let gfExchange = 'NASDAQ';
             let gfSymbol = symbol.split('.')[0];
-            if (symbol.endsWith('.NS')) gfExchange = 'NSE';
-            else if (symbol.endsWith('.BO')) gfExchange = 'BOM';
+            if (symbol.endsWith('.NS') || querySymbol.endsWith('.NS')) gfExchange = 'NSE';
+            else if (symbol.endsWith('.BO') || querySymbol.endsWith('.BO')) gfExchange = 'BOM';
 
             const response = await fetch(`https://www.google.com/finance/quote/${gfSymbol}:${gfExchange}`);
             const html = await response.text();
@@ -48,16 +30,32 @@ const getStockPrice = async (symbol) => {
             // Extract the main price using Regex
             const match = html.match(/class="YMlKec fxKbKc">([^<]+)<\/div>/);
             if (match && match[1]) {
-                // Remove currency symbols and commas (e.g. ₹670.90 -> 670.90)
                 const parsedPrice = parseFloat(match[1].replace(/[^0-9.]/g, ''));
                 if (!isNaN(parsedPrice)) {
-                    const querySymbol = symbol.endsWith('.NS') || symbol.endsWith('.BO') ? symbol : `${symbol}.NS`;
                     priceCache.set(querySymbol, { price: parsedPrice, timestamp: Date.now() });
                     return parsedPrice;
                 }
             }
+            throw new Error("Google Finance Scraping Failed");
         } catch (gfError) {
-            console.error(`Google Finance fallback also failed for ${symbol}`);
+            console.error(`Google Finance failed for ${symbol}, attempting Yahoo Finance Fallback...`);
+            
+            // --- FALLBACK: Yahoo Finance (Often 15-min delayed for NSE) ---
+            const fetchQuote = yahooFinance.quote(querySymbol).catch(e => null);
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Yahoo Quote Timeout')), 2000));
+            
+            const quote = await Promise.race([fetchQuote, timeout]);
+            const price = quote ? quote.regularMarketPrice : null;
+            
+            if (price) {
+                priceCache.set(querySymbol, { price, timestamp: Date.now() });
+                return price;
+            } else {
+                throw new Error("Yahoo Quote returned null");
+            }
+        }
+    } catch (error) {
+        console.error(`Both Google Finance and Yahoo Finance failed for ${symbol}. Returning null.`);
         }
         
         // Final Fallback: Use stale cache if absolutely everything is blocked
