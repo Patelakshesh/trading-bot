@@ -30,16 +30,27 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/bought <SYMBOL> <PRICE>` - Track a stock\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
     });
 
-    // 1. Upgraded /bought command to show live price and support quantity
-    bot.onText(/\/bought ([^\s]+)\s+([\d.]+)(?:\s+(\d+))?/, async (msg, match) => {
+    // 1. Upgraded /bought command to automatically fetch live price if omitted
+    bot.onText(/\/bought ([^\s]+)(?:\s+([\d.]+))?(?:\s+(\d+))?/, async (msg, match) => {
         const chatId = msg.chat.id;
         const rawSymbol = match[1];
         bot.sendMessage(chatId, `🔍 Finding correct ticker for "${rawSymbol}"...`);
         const symbol = await searchSymbol(rawSymbol);
-        const price = parseFloat(match[2]);
+        
+        let price = match[2] ? parseFloat(match[2]) : null;
         const quantity = match[3] ? parseInt(match[3]) : 1;
         
         try {
+            const livePrice = await getStockPrice(symbol);
+            if (!price) {
+                if (livePrice) {
+                    price = livePrice;
+                } else {
+                    bot.sendMessage(chatId, `❌ Could not automatically fetch the live price for ${symbol}. Please try again and manually enter the price: \`/bought ${symbol} <PRICE>\``, {parse_mode: 'Markdown'});
+                    return;
+                }
+            }
+
             await Portfolio.create({
                 chatId: chatId.toString(),
                 symbol: symbol,
@@ -47,12 +58,11 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 quantity: quantity
             });
             
-            const livePrice = await getStockPrice(symbol);
-            const profit = livePrice ? (((livePrice - price) / price) * 100).toFixed(2) : 'N/A';
+            const profit = livePrice ? (((livePrice - price) / price) * 100).toFixed(2) : '0.00';
             const totalInvested = price * quantity;
-            const liveValue = livePrice ? livePrice * quantity : 'N/A';
+            const liveValue = livePrice ? livePrice * quantity : totalInvested;
             
-            bot.sendMessage(chatId, `✅ **Saved to Portfolio!**\n\n📈 **Stock:** ${symbol}\n📦 **Quantity:** ${quantity}\n💰 **Your Buy Price:** ₹${price} (Total: ₹${totalInvested})\n📊 **Live Market Price:** ₹${livePrice || 'N/A'} (Total: ₹${liveValue})\n💸 **Current Profit:** ${profit}%\n\nI will now monitor this 24/7 and alert you when to sell!`, {parse_mode: 'Markdown'});
+            bot.sendMessage(chatId, `✅ **Saved to Portfolio!**\n\n📈 **Stock:** ${symbol}\n📦 **Quantity:** ${quantity}\n💰 **Your Buy Price:** ₹${price} (Total: ₹${totalInvested})\n📊 **Live Market Price:** ₹${livePrice || price} (Total: ₹${liveValue})\n💸 **Current Profit:** ${profit}%\n\nI will now monitor this 24/7 and alert you when to sell!`, {parse_mode: 'Markdown'});
         } catch(err) {
             console.error(err);
             bot.sendMessage(chatId, '❌ Failed to save to database. Please check connection.');
@@ -555,6 +565,45 @@ cron.schedule('*/15 * * * *', async () => {
         }
     } catch(err) {
         console.error('Error in Auto-Alert CRON:', err);
+    }
+});
+
+// PROACTIVE AI TIP BROADCASTER (Runs every 2 hours to send instant new opportunities)
+cron.schedule('0 */2 * * *', async () => {
+    if (!bot) return;
+    try {
+        console.log('Scanning for new Proactive AI Tips...');
+        const { getLatestNews } = require('./services/newsService');
+        const { getMarketMovers } = require('./services/stockService');
+        const { getGlobalTop5TradingTips } = require('./services/aiService');
+        
+        const news = await getLatestNews();
+        const movers = await getMarketMovers();
+        const top5 = await getGlobalTop5TradingTips(news, movers, null, null);
+        
+        if (top5 && top5.length > 0) {
+            const bestTip = top5[0]; // Take the absolute highest conviction tip
+            
+            // Get all unique chatIds from users who have used the bot
+            const allUsers = await Portfolio.distinct('chatId');
+            
+            for (let chatId of allUsers) {
+                if (chatId !== 'UI_USER') {
+                    const tipMsg = `🌟 **PROACTIVE AI OPPORTUNITY** 🌟\n\n` +
+                                   `I just found a massive new setup based on breaking market data!\n\n` +
+                                   `📈 **Stock:** ${bestTip.symbol} (${bestTip.companyName})\n` +
+                                   `💰 **Current Price:** ${bestTip.currentPrice || 'N/A'}\n` +
+                                   `🟢 **Action:** ${bestTip.action}\n` +
+                                   `🎯 **Target:** ${bestTip.target} | 🛡️ **SL:** ${bestTip.stopLoss}\n\n` +
+                                   `🧠 **Why?** ${bestTip.rationale}\n\n` +
+                                   `*(Type \`/bought ${bestTip.symbol} <PRICE>\` to track it!)*`;
+                    
+                    bot.sendMessage(chatId, tipMsg, {parse_mode: 'Markdown'});
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error broadcasting tip:', err);
     }
 });
 
