@@ -86,13 +86,23 @@ router.get('/news', async (req, res) => {
 router.post('/portfolio', async (req, res) => {
     try {
         const { symbol, buyPrice, quantity } = req.body;
-        // Default chatId if added from UI (so Telegram alerts can still try to route, 
-        // though realistically you'd link it to a user account)
+        const cleanSymbol = symbol.trim().toUpperCase().replace(/\s+/g, '');
+        
+        let finalPrice = buyPrice;
+        if (!finalPrice) {
+            const { getStockPrice } = require('../services/stockService');
+            const livePrice = await getStockPrice(cleanSymbol);
+            if (livePrice) {
+                finalPrice = livePrice;
+            } else {
+                return res.status(400).json({ error: 'Could not fetch live price automatically. Please enter a manual price.' });
+            }
+        }
+
         const newStock = await Portfolio.create({
             chatId: 'UI_USER', 
-            // Clean up any extra spaces in the symbol
-            symbol: symbol.trim().toUpperCase().replace(/\s+/g, ''),
-            buyPrice,
+            symbol: cleanSymbol,
+            buyPrice: finalPrice,
             quantity: quantity || 1
         });
         res.json(newStock);

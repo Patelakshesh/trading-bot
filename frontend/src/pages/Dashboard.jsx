@@ -361,8 +361,8 @@ const Dashboard = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Buy Price (₹)</label>
-                <input required type="number" step="0.01" value={formData.buyPrice} onChange={(e) => setFormData({...formData, buyPrice: e.target.value})} />
+                <label>Buy Price (₹) - <span style={{color: 'var(--accent-blue)'}}>Leave blank for Auto Live Price</span></label>
+                <input type="number" step="0.01" value={formData.buyPrice} onChange={(e) => setFormData({...formData, buyPrice: e.target.value})} placeholder="Auto-fetch live price..." />
               </div>
               <div className="form-group">
                 <label>Quantity</label>
