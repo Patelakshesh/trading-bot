@@ -304,7 +304,11 @@ router.post('/backtest', async (req, res) => {
         const Portfolio = require('../models/Portfolio');
         
         const holding = await Portfolio.findOne({ symbol, status: 'HOLDING' });
-        const holdingStatus = holding ? `USER CURRENTLY OWNS THIS STOCK (Bought at: ₹${holding.buyPrice})` : `USER DOES NOT OWN THIS STOCK`;
+        let holdingStatus = `⚪ You DO NOT own this stock.`;
+        if (holding) {
+            const daysHeld = Math.floor((Date.now() - new Date(holding.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+            holdingStatus = `🟢 You OWN this stock! (Bought at: ₹${holding.buyPrice}, Days Held: ${daysHeld})`;
+        }
         
         let technicals = null;
         try { technicals = await getTechnicalIndicators(symbol); } catch(e) {}

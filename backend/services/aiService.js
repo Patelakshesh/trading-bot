@@ -299,21 +299,18 @@ const getBacktestAISuggestion = async (symbol, days, profitPercent, totalTrades,
             techMsg = `Current real-time technical indicators are temporarily unavailable.`;
         }
 
-        const prompt = `You are a friendly, encouraging AI Trading Mentor for a beginner trader.
-The user just ran a Technical Analysis Backtest (simulated trading) for the stock ${symbol} over the last ${days} days.
-The strategy executed ${totalTrades} trades and resulted in a total return of ${profitPercent}%.
+        const prompt = `You are a strict, ultra-clear AI Trading Mentor for a beginner trader.
+The user just ran a Technical Analysis Backtest for ${symbol}. The strategy returned ${profitPercent}% from ${totalTrades} trades.
 
 PORTFOLIO STATUS: ${holdingStatus}
 REAL-TIME TECHNICALS: ${techMsg}
 
-Analyze this result specifically for a beginner. 
-1. Briefly evaluate the backtest result (e.g. congratulate them if it was profitable, or explain that backtesting helps avoid bad strategies if it lost money).
-2. CRITICAL: Based on the REAL-TIME TECHNICALS and their PORTFOLIO STATUS, you MUST explicitly tell the user whether they should "BUY", "SELL", or "HOLD" right now. 
-- If they already own it, tell them whether to "HOLD" or "SELL".
-- If they do NOT own it, tell them whether to "BUY" or wait ("HOLD" off).
+You MUST respond using EXACTLY this structured format, nothing else (no introductory paragraphs):
 
-Keep your response to a maximum of 3-4 clear sentences.
-Respond with plain text only, no JSON.`;
+**Backtest Result:** [1 brief sentence evaluating the ${profitPercent}% return]
+**Portfolio Status:** ${holdingStatus.split(' (')[0]} [If they own it, mention the Days Held in parentheses]
+**Current Action:** [BUY NOW, SELL NOW, or HOLD]
+**Reason:** [1 very simple beginner-friendly sentence explaining the RSI/MACD reason and Time-Stop if days held >= 5]`;
 
         const response = await generateWithFallback(prompt);
         return response.response.text().trim();
