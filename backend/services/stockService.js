@@ -65,7 +65,6 @@ const getStockPrice = async (symbol) => {
         }
         
         return null;
-    }
 };
 
 const searchSymbol = async (query) => {
