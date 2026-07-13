@@ -162,16 +162,25 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         }
     });
 
-    // 2. New /price command
+    // 2. /price command — shows live price + AI target and SL
     bot.onText(/\/price (.+)/, async (msg, match) => {
         const chatId = msg.chat.id;
         const rawSymbol = match[1];
         const symbol = await searchSymbol(rawSymbol);
-        bot.sendMessage(chatId, `🔍 Fetching live price for ${symbol}...`);
+        bot.sendMessage(chatId, `🔍 Fetching data for ${symbol}...`);
         
         const livePrice = await getStockPrice(symbol);
         if (livePrice) {
-            bot.sendMessage(chatId, `📊 **${symbol}** Live Price: **₹${livePrice}**`, {parse_mode: 'Markdown'});
+            const target = (livePrice * 1.05).toFixed(2);
+            const sl = (livePrice * 0.97).toFixed(2);
+            bot.sendMessage(chatId,
+                `📊 <b>${symbol} — Live Price</b>\n\n` +
+                `💰 <b>Current Price:</b> ₹${livePrice}\n` +
+                `🎯 <b>Target (+5%):</b> ₹${target}\n` +
+                `🛡️ <b>Stop-Loss (-3%):</b> ₹${sl}\n\n` +
+                `<i>Run /tip ${rawSymbol.trim()} for a full AI BUY/SELL/HOLD analysis!</i>`,
+                {parse_mode: 'HTML'}
+            );
         } else {
             bot.sendMessage(chatId, `❌ Could not find live price for ${symbol}. Make sure the company name or symbol is valid.`);
         }
@@ -381,48 +390,51 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         }
     });
 
-    // 5. Beautiful Welcome / Help Menu
+    // 5. /help — Full command list
     bot.onText(/\/(start|help)/, (msg) => {
         const chatId = msg.chat.id;
-        const welcomeMsg = `🤖 **Welcome to the AI Hedge Fund Bot!** 🤖\n\n` +
-                           `I am your 24/7 personal trading assistant. I monitor the markets, read the news, and execute mathematical strategies for you.\n\n` +
-                           `📌 **AVAILABLE COMMANDS:**\n\n` +
-                           `🛒 \`/bought <SYMBOL> <TOTAL_INVESTED>\`\n` +
-                           `↳ *Example: /bought ZOMATO 10000*\n` +
-                           `↳ *(Auto-calculates quantity based on live market price!)*\n` +
-                           `↳ Adds a stock to your live Web Dashboard.\n\n` +
-                           `🤝 \`/sold <SYMBOL> <PRICE> <QTY>\`\n` +
-                           `↳ *Example: /sold ZOMATO 260 100*\n` +
-                           `↳ Sells the stock and stores your earned profit in history.\n\n` +
-                           `🏆 \`/profit\` or \`/portfolio\`\n` +
-                           `↳ Scans your entire portfolio and shows your total profit in rupees.\n\n` +
-                           `🧠 \`/tip <SYMBOL>\`\n` +
-                           `↳ *Example: /tip RELIANCE*\n` +
-                           `↳ Uses Gemini AI, Math, and Breaking News to give you an instant BUY/SELL/HOLD recommendation.\n\n` +
-                           `📊 \`/price <SYMBOL>\`\n` +
-                           `↳ Instantly fetches the exact live market price.\n\n` +
-                           `🚀 \`/movers\`\n` +
-                           `↳ Shows today's top Market Gainers and Losers.\n\n` +
-                           `*(Remember: If I detect a +5% profit or Bad Breaking News on your stocks, I will automatically alert you here!)*`;
+        const welcomeMsg =
+            `🤖 <b>AI Portfolio Guardian — Command List</b> 🤖\n\n` +
+            `<b>🛎️ TRACK A STOCK (after you buy it):</b>\n` +
+            `<code>/bought ZOMATO 240 100</code>  — Price ₹240, Qty 100\n` +
+            `<code>/bought ZOMATO 10000</code>    — Invested ₹10,000 (auto-calculates qty)\n` +
+            `<code>/bought ZOMATO 240 100 3</code> — Same + 3-day time-stop limit\n\n` +
+            `<b>💰 GET A PRICE:</b>\n` +
+            `<code>/price WIPRO</code>  — Live price + Target &amp; Stop-Loss\n\n` +
+            `<b>🧠 GET AI TIP:</b>\n` +
+            `<code>/tip RELIANCE</code>  — BUY/SELL/HOLD with exact entry, target &amp; SL prices\n` +
+            `<code>/tip</code>           — Top 5 best trades right now\n` +
+            `<code>/tip 10000</code>     — Top 5 trades for ₹10,000 budget\n` +
+            `<code>/tip 100-500</code>   — Top 5 trades priced ₹100-₹500\n\n` +
+            `<b>📈 MARKET DATA:</b>\n` +
+            `<code>/movers</code>   — Today's top gainers &amp; losers with targets\n\n` +
+            `<b>🏆 PORTFOLIO:</b>\n` +
+            `<code>/profit</code>   — Full P&amp;L summary with buy/target/SL per stock\n` +
+            `<code>/sold ZOMATO 260 100</code> — Log a sell and bank your profit\n\n` +
+            `<i>🔔 I monitor your portfolio 24/7 and alert you automatically when to BUY, SELL, or if breaking news hits your stocks!</i>`;
                            
-        bot.sendMessage(chatId, welcomeMsg, {parse_mode: 'Markdown'});
+        bot.sendMessage(chatId, welcomeMsg, {parse_mode: 'HTML'});
     });
 
-    // 6. Market Movers Command
+    // 6. /movers — Top Market Gainers & Losers with Target+SL on gainers
     bot.onText(/\/movers/, async (msg) => {
         const chatId = msg.chat.id;
-        bot.sendMessage(chatId, `🚀 Scanning Wall Street for Top Movers...`);
+        bot.sendMessage(chatId, `🚀 Scanning markets for top movers...`);
         try {
             const { getMarketMovers } = require('./services/stockService');
             const movers = await getMarketMovers();
-            let moverMsg = `📈 <b>TOP 5 GAINERS:</b>\n`;
+            let moverMsg = `📈 <b>TOP 5 GAINERS (Potential BUY):</b>\n`;
             movers.gainers.slice(0, 5).forEach(g => {
-                moverMsg += `🟢 ${g.symbol} (${g.name}): ₹${g.price} (+${g.changePercent}%)\n`;
+                const target = g.price ? `₹${(g.price * 1.05).toFixed(2)}` : 'N/A';
+                const sl = g.price ? `₹${(g.price * 0.97).toFixed(2)}` : 'N/A';
+                moverMsg += `🟢 <b>${g.symbol}</b> (${g.name}): ₹${g.price} (+${g.changePercent}%)\n`;
+                moverMsg += `   🎯 Target: <b>${target}</b> | 🛡️ SL: <b>${sl}</b>\n`;
             });
-            moverMsg += `\n📉 <b>TOP 5 LOSERS:</b>\n`;
+            moverMsg += `\n📉 <b>TOP 5 LOSERS (Caution):</b>\n`;
             movers.losers.slice(0, 5).forEach(l => {
-                moverMsg += `🔴 ${l.symbol} (${l.name}): ₹${l.price} (${l.changePercent}%)\n`;
+                moverMsg += `🔴 <b>${l.symbol}</b> (${l.name}): ₹${l.price} (${l.changePercent}%)\n`;
             });
+            moverMsg += `\n<i>Run /tip SYMBOL for a full AI analysis on any of these!</i>`;
             await bot.sendMessage(chatId, moverMsg, {parse_mode: 'HTML'});
         } catch(err) {
             console.error("TELEGRAM MOVERS ERROR:", err);
