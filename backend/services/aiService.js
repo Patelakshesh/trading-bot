@@ -204,56 +204,58 @@ const getGlobalTop5TradingTips = async (news, movers, budget = null, priceRange 
         }
 
         const prompt = `
-You are a SENIOR RISK COMMITTEE of 3 expert Indian stock traders.
-Your job is to find the BEST 5 stocks for short-term swing trading today.
-You are strict, disciplined, and never recommend a trade unless MULTIPLE signals confirm it.
-You think like a real human expert, not a marketing bot.
+You are a SENIOR RISK COMMITTEE of 3 expert Indian stock traders at a top Mumbai-based fund.
+Your job is to find the BEST 5 INDIAN NSE stocks for short-term swing trading today.
+
+⚠️ CRITICAL RULE - INDIAN STOCKS ONLY:
+- You MUST ONLY recommend stocks listed on the INDIAN NSE exchange.
+- Every symbol MUST end with .NS (e.g., RELIANCE.NS, WIPRO.NS, ZOMATO.NS).
+- NEVER recommend US stocks, global stocks, or any symbol without .NS
+- If a stock in the movers list does NOT have .NS, ignore it completely.
+- Valid examples: TATAMOTORS.NS, HDFCBANK.NS, INFY.NS, BAJFINANCE.NS, NIFTY stocks.
+- Invalid examples: AAPL, TSLA, NOG, TEAM, VE — these are US stocks, NEVER recommend them.
 
 === TODAY'S MARKET DATA ===
 
-LATEST NEWS:
+LATEST INDIAN MARKET NEWS:
 ${news.slice(0, 8).map(n => `- ${n.title}`).join('\n')}
 
-TOP GAINERS (Momentum stocks):
-${movers.gainers.slice(0, 6).map(g => `- ${g.symbol} (${g.name}): ₹${g.price} (+${g.changePercent}%)`).join('\n')}
+TOP NSE GAINERS TODAY:
+${movers.gainers.slice(0, 6).map(g => `- ${g.symbol} (${g.name}): \u20b9${g.price} (+${g.changePercent}%)`).join('\n')}
 
-TOP LOSERS (Potential bounce-back candidates):
-${movers.losers.slice(0, 6).map(l => `- ${l.symbol} (${l.name}): ₹${l.price} (${l.changePercent}%)`).join('\n')}
+TOP NSE LOSERS (Bounce-back candidates):
+${movers.losers.slice(0, 6).map(l => `- ${l.symbol} (${l.name}): \u20b9${l.price} (${l.changePercent}%)`).join('\n')}
 
 === YOUR EXPERT DECISION RULES ===
 
-For each candidate stock, you MUST mentally verify these gates:
-GATE 1 - MOMENTUM: Is there a clear reason for the stock to move today? (news catalyst, sector strength, earnings?)
-GATE 2 - TECHNICAL: Would a technical analyst say this setup is safe to enter? Not overbought?
-GATE 3 - RISK/REWARD: Is the target at least 1.5x the stop-loss distance? (e.g., if SL is -3%, target must be +4.5% or more)
-GATE 4 - TIMING: Is this the RIGHT time to enter, or has the move already happened?
+For each candidate stock, verify ALL 4 gates:
+GATE 1 - MOMENTUM: Clear reason for the stock to move today (news, sector strength, earnings)?
+GATE 2 - TECHNICAL: RSI not above 68? Price not at resistance? Setup is safe to enter?
+GATE 3 - RISK/REWARD: Target is at least 1.5x the stop-loss distance?
+GATE 4 - TIMING: Is this the right time to enter, or has the move already happened?
 
-ONLY recommend a stock if it passes ALL 4 GATES. If a stock fails even one gate, skip it and find a better one.
+ONLY recommend if it passes ALL 4 GATES. Skip and find a better one if it fails.
 
-For Target and Stop-Loss:
-- Target = current price + 4% to 7% (realistic, achievable in 1-3 days)
-- Stop-Loss = current price - 2.5% to 4% (protects capital if wrong)
-
-For duration:
-- Stocks with very strong news catalyst: 1 Day
-- Strong technicals + news: 2 Days
-- Steady momentum play: 3 Days
+Pricing rules:
+- Target = current price + 4% to 7%
+- Stop-Loss = current price - 2.5% to 4%
+- All prices in Indian Rupees (\u20b9)
 ${budgetPrompt}
 ${rangePrompt}
 
-Return ONLY a valid JSON array of exactly 5 stocks. No markdown.
+Return ONLY a valid JSON array of exactly 5 INDIAN NSE stocks. No markdown, no explanation.
 [
   {
     "symbol": "TICKER.NS",
-    "companyName": "Full Company Name",
+    "companyName": "Full Indian Company Name",
     "action": "BUY",
-    "currentPrice": "₹XXX.XX",
+    "currentPrice": "\u20b9XXX.XX",
     "duration": "1 Day" | "2 Days" | "3 Days",
-    "target": "₹XXX.XX",
-    "stopLoss": "₹XXX.XX",
+    "target": "\u20b9XXX.XX",
+    "stopLoss": "\u20b9XXX.XX",
     "confidence": <70-95>,
-    "rationale": "Exactly 2 sentences: Why this stock now? What is the risk?",
-    "gatesPassed": "Momentum ✓ | Technical ✓ | Risk/Reward ✓ | Timing ✓"${jsonFields}
+    "rationale": "2 sentences: Why this Indian stock now? What is the risk?",
+    "gatesPassed": "Momentum \u2713 | Technical \u2713 | Risk/Reward \u2713 | Timing \u2713"${jsonFields}
   }
 ]
 `;
@@ -290,7 +292,25 @@ Return ONLY a valid JSON array of exactly 5 stocks. No markdown.
         if (!parsedResult || parsedResult.length === 0) {
             throw new Error('AI returned invalid data after 2 attempts');
         }
-        
+
+        // — SAFETY FILTER: Remove any non-Indian (US) stocks the AI might have slipped in —
+        const FALLBACK_INDIAN_STOCKS = [
+            { symbol: 'RELIANCE.NS', companyName: 'Reliance Industries', action: 'BUY', currentPrice: '\u20b9N/A', duration: '2 Days', target: '\u20b9N/A', stopLoss: '\u20b9N/A', confidence: 70, rationale: 'Large-cap Indian stock used as safe fallback.', gatesPassed: 'Fallback' },
+            { symbol: 'HDFCBANK.NS', companyName: 'HDFC Bank', action: 'BUY', currentPrice: '\u20b9N/A', duration: '2 Days', target: '\u20b9N/A', stopLoss: '\u20b9N/A', confidence: 70, rationale: 'Large-cap Indian bank used as safe fallback.', gatesPassed: 'Fallback' }
+        ];
+        let fallbackIndex = 0;
+        parsedResult = parsedResult.map(stock => {
+            const sym = (stock.symbol || '').toUpperCase();
+            // Reject if symbol doesn't end with .NS or .BO (means it's a US/unknown stock)
+            if (!sym.endsWith('.NS') && !sym.endsWith('.BO')) {
+                console.warn(`[AI Filter] Rejected non-Indian stock: ${stock.symbol}. Replacing with fallback.`);
+                const replacement = FALLBACK_INDIAN_STOCKS[fallbackIndex % FALLBACK_INDIAN_STOCKS.length];
+                fallbackIndex++;
+                return replacement;
+            }
+            return stock;
+        });
+
         return parsedResult;
     } catch (error) {
         console.error('Error in getGlobalTop5TradingTips:', error.message);
