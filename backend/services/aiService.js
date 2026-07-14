@@ -263,6 +263,7 @@ Return ONLY a valid JSON array of exactly 5 INDIAN NSE stocks. No markdown, no e
         // Try to get a valid JSON response — retry with a simpler prompt if parsing fails
         let parsedResult = null;
         let lastRawText = '';
+        let lastApiError = null;
         
         for (let attempt = 0; attempt < 2; attempt++) {
             try {
@@ -286,10 +287,16 @@ Return ONLY a valid JSON array of exactly 5 INDIAN NSE stocks. No markdown, no e
                 if (Array.isArray(parsedResult) && parsedResult.length > 0) break;
             } catch (parseErr) {
                 console.warn(`[AI Top5] Attempt ${attempt + 1} failed: ${parseErr.message}. Raw: ${lastRawText.substring(0, 200)}`);
+                if (parseErr.message.includes('All AI models failed')) {
+                    lastApiError = parseErr.message;
+                }
             }
         }
         
         if (!parsedResult || parsedResult.length === 0) {
+            if (lastApiError) {
+                throw new Error(`API_LIMIT_HIT: ${lastApiError}`);
+            }
             throw new Error('AI returned invalid data after 2 attempts');
         }
 
@@ -314,6 +321,9 @@ Return ONLY a valid JSON array of exactly 5 INDIAN NSE stocks. No markdown, no e
         return parsedResult;
     } catch (error) {
         console.error('Error in getGlobalTop5TradingTips:', error.message);
+        if (error.message.includes('API_LIMIT_HIT')) {
+            return { error: true, reason: 'RATE_LIMIT', message: error.message };
+        }
         return null;
     }
 };

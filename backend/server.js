@@ -339,7 +339,9 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩🟩⬛⬛] 75% - Quant AI crunching 98% algorithms...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 const top5 = await getGlobalTop5TradingTips(news, movers, budget, priceRange);
                 
-                if (top5 && top5.length > 0) {
+                if (top5 && top5.error && top5.reason === 'RATE_LIMIT') {
+                    await bot.editMessageText(`⚠️ <b>Google AI Rate Limit Exceeded!</b>\n\nYou are requesting too many tips too quickly, and the free Google AI quota is exhausted for this minute. Please wait 1-2 minutes and try again.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                } else if (top5 && top5.length > 0) {
                     await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩🟩🟩🟩] 100% - Trades Generated!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                     
                     let msgText = `🎯 <b>TOP 5 AI SWING TRADES</b>\n<i>Multi-gate expert analysis</i>\n\n`;
@@ -364,7 +366,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     // Replace the progress bar with the final result!
                     await bot.editMessageText(msgText, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 } else {
-                    await bot.editMessageText(`⚠️ AI returned no results. Retrying with a different model automatically next time. Please type /tip again.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                    await bot.editMessageText(`⚠️ AI returned no results. Data format was invalid or completely rejected. Retrying with a different model automatically next time. Please type /tip again.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 }
             } catch (err) {
                 console.error("TELEGRAM GLOBAL TIP ERROR:", err.message);
