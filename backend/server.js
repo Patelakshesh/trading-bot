@@ -271,8 +271,14 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     const actionIcon = analysis.action === 'BUY' ? '🟢' : analysis.action === 'SELL' ? '🔴' : '🟡';
                     
                     const livePrice = currentPrice || 0;
-                    const aiTarget = analysis.target || (analysis.action === 'BUY' ? `₹${(livePrice * 1.05).toFixed(2)}` : null);
-                    const aiSL = analysis.stopLoss || (analysis.action === 'BUY' ? `₹${(livePrice * 0.97).toFixed(2)}` : null);
+                    let aiTarget = analysis.target;
+                    if (!aiTarget || String(aiTarget).includes('N/A') || String(aiTarget).includes('None')) {
+                        aiTarget = `₹${(livePrice * 1.05).toFixed(2)}`;
+                    }
+                    let aiSL = analysis.stopLoss;
+                    if (!aiSL || String(aiSL).includes('N/A') || String(aiSL).includes('None')) {
+                        aiSL = `₹${(livePrice * 0.97).toFixed(2)}`;
+                    }
 
                     // Confidence bar visual
                     const conf = analysis.confidence || 0;
@@ -291,8 +297,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     } else if (analysis.action === 'SELL') {
                         priceBlock += `🔴 <b>Exit now at market price:</b> ${priceText}\n`;
                     } else {
-                        priceBlock += `🎯 <b>Next Target:</b> ${aiTarget || `₹${(livePrice*1.05).toFixed(2)}`}\n`;
-                        priceBlock += `🛡️ <b>Stop-Loss:</b> ${aiSL || `₹${(livePrice*0.97).toFixed(2)}`}\n`;
+                        priceBlock += `🎯 <b>Next Target:</b> ${aiTarget}\n`;
+                        priceBlock += `🛡️ <b>Stop-Loss:</b> ${aiSL}\n`;
                     }
 
                     const brokerSymbol = symbol.replace('.NS', '').replace('.BO', '');
