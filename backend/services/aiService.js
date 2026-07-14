@@ -160,13 +160,13 @@ For BUY: Calculate EXACT price targets based on ₹${currentPrice || 0}:
 
 === OUTPUT (Strict JSON only, no markdown) ===
 {
-  "action": "BUY" | "SELL" | "HOLD",
-  "confidence": <number 0-100>,
-  "bullishSignals": <number of signals that were BULLISH>,
+  "action": "BUY",
+  "confidence": 85,
+  "bullishSignals": 4,
   "rationale": "<2 sentence expert explanation: what signals aligned, what risk exists>",
-  "target": "₹XXX.XX" (or null),
-  "stopLoss": "₹XXX.XX" (or null),
-  "riskLevel": "LOW" | "MEDIUM" | "HIGH"
+  "target": "₹XXX.XX",
+  "stopLoss": "₹XXX.XX",
+  "riskLevel": "LOW"
 }
 `;
 

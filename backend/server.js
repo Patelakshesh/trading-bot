@@ -327,7 +327,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             const statusMsg = await bot.sendMessage(chatId, `🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[⬛⬛⬛⬛⬛⬛⬛⬛] 0% - Initializing AI...`, {parse_mode: 'HTML'});
             
             try {
-                const { getMarketMovers } = require('./services/stockService');
+                const { getMarketMovers, getStockPrice } = require('./services/stockService');
                 const { getGlobalTop5TradingTips } = require('./services/aiService');
                 
                 await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩⬛⬛⬛⬛⬛⬛] 25% - Scraping Breaking News...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
@@ -344,6 +344,20 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 } else if (top5 && top5.length > 0) {
                     await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩🟩🟩🟩] 100% - Trades Generated!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                     
+                    // Fetch real prices to fix AI hallucinations
+                    for (let t of top5) {
+                        try {
+                            const realPrice = await getStockPrice(t.symbol);
+                            if (realPrice && !isNaN(realPrice)) {
+                                t.currentPrice = realPrice;
+                                if (t.action === 'BUY') {
+                                    t.target = realPrice * 1.05;
+                                    t.stopLoss = realPrice * 0.97;
+                                }
+                            }
+                        } catch(e) { console.error("Failed to fetch real price for", t.symbol); }
+                    }
+
                     let msgText = `🎯 <b>TOP 5 AI SWING TRADES</b>\n<i>Multi-gate expert analysis</i>\n\n`;
                     top5.forEach((t, i) => {
                         const companyStr = t.companyName ? ` — ${t.companyName}` : '';
