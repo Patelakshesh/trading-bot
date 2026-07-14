@@ -344,15 +344,28 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 } else if (top5 && top5.length > 0) {
                     await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩🟩🟩🟩] 100% - Trades Generated!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                     
-                    // Fetch real prices to fix AI hallucinations
+                    // Fetch real prices to fix AI hallucinations, but keep AI's Risk/Reward ratio
                     for (let t of top5) {
                         try {
                             const realPrice = await getStockPrice(t.symbol);
                             if (realPrice && !isNaN(realPrice)) {
+                                // Calculate AI's intended percentage gain/loss based on its hallucinated price
+                                let targetMultiplier = 1.05;
+                                let slMultiplier = 0.97;
+                                
+                                if (t.currentPrice && t.target && t.stopLoss) {
+                                    const aiEntry = parseFloat(t.currentPrice.toString().replace(/[^0-9.]/g, ''));
+                                    const aiTarget = parseFloat(t.target.toString().replace(/[^0-9.]/g, ''));
+                                    const aiSL = parseFloat(t.stopLoss.toString().replace(/[^0-9.]/g, ''));
+                                    
+                                    if (aiEntry > 0 && aiTarget > 0) targetMultiplier = aiTarget / aiEntry;
+                                    if (aiEntry > 0 && aiSL > 0) slMultiplier = aiSL / aiEntry;
+                                }
+
                                 t.currentPrice = realPrice;
                                 if (t.action === 'BUY') {
-                                    t.target = realPrice * 1.05;
-                                    t.stopLoss = realPrice * 0.97;
+                                    t.target = realPrice * targetMultiplier;
+                                    t.stopLoss = realPrice * slMultiplier;
                                 }
                             }
                         } catch(e) { console.error("Failed to fetch real price for", t.symbol); }
