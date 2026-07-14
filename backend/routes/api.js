@@ -276,6 +276,35 @@ router.get('/ai/recommendations', async (req, res) => {
         const top10 = await getTop10Recommendations(news);
         
         if (top10 && top10.length > 0) {
+            // Post-process to fix AI price hallucinations (Same as Telegram Bot logic)
+            const { getStockPrice } = require('../services/stockService');
+            for (let t of top10) {
+                try {
+                    const realPrice = await getStockPrice(t.symbol);
+                    if (realPrice && !isNaN(realPrice)) {
+                        let targetMultiplier = 1.05;
+                        let slMultiplier = 0.97;
+                        
+                        if (t.currentPrice && t.target && t.stopLoss) {
+                            const aiEntry = parseFloat(t.currentPrice.toString().replace(/[^0-9.]/g, ''));
+                            const aiTarget = parseFloat(t.target.toString().replace(/[^0-9.]/g, ''));
+                            const aiSL = parseFloat(t.stopLoss.toString().replace(/[^0-9.]/g, ''));
+                            
+                            if (aiEntry > 0 && aiTarget > 0) targetMultiplier = aiTarget / aiEntry;
+                            if (aiEntry > 0 && aiSL > 0) slMultiplier = aiSL / aiEntry;
+                        }
+
+                        t.currentPrice = realPrice;
+                        if (t.action === 'BUY') {
+                            t.target = (realPrice * targetMultiplier).toFixed(2);
+                            t.stopLoss = (realPrice * slMultiplier).toFixed(2);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error fixing AI price for UI:", e.message);
+                }
+            }
+
             aiRecommendationsCache = { data: top10, lastFetch: Date.now() };
             res.json(top10);
         } else {
