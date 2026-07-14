@@ -7,9 +7,9 @@ const advancedDataService = require('./advancedDataService');
 const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const AI_MODELS = [
+    'gemini-3.1-flash-lite',
+    'gemini-3.5-flash',
     'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-lite',
     'gemini-flash-latest',
     'gemini-2.5-flash-lite',
     'gemini-pro-latest'
