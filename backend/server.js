@@ -307,7 +307,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                         `<b>\u26a0\ufe0f Risk Level:</b> ${riskEmoji}\n\n` +
                         `<b>\ud83e\udde0 Expert Analysis:</b>\n<i>${analysis.rationale}</i>\n\n` +
                         (analysis.action === 'BUY' && conf >= 80
-                            ? `\u2705 <b>HIGH CONVICTION</b> \u2014 Safe to act at market open.`
+                            ? `\u2705 <b>HIGH CONVICTION</b> \u2014 Safe to act right now at current price.`
                             : analysis.action === 'BUY' && conf < 80
                             ? `\u26a0\ufe0f <b>LOW CONVICTION</b> \u2014 Consider skipping this trade.`
                             : ``);

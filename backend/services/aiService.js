@@ -216,6 +216,8 @@ Your job is to find the BEST 5 INDIAN NSE stocks for short-term swing trading to
 - Invalid examples: AAPL, TSLA, NOG, TEAM, VE — these are US stocks, NEVER recommend them.
 
 === TODAY'S MARKET DATA ===
+CURRENT TIME IN INDIA: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+(Ensure your tips and rationale are immediately actionable at THIS exact time. Do not just say 'Buy at 9:15 AM' if it is already the afternoon!)
 
 LATEST INDIAN MARKET NEWS:
 ${news.slice(0, 8).map(n => `- ${n.title}`).join('\n')}
@@ -232,7 +234,7 @@ For each candidate stock, verify ALL 4 gates:
 GATE 1 - MOMENTUM: Clear reason for the stock to move today (news, sector strength, earnings)?
 GATE 2 - TECHNICAL: RSI not above 68? Price not at resistance? Setup is safe to enter?
 GATE 3 - RISK/REWARD: Target is at least 1.5x the stop-loss distance?
-GATE 4 - TIMING: Is this the right time to enter, or has the move already happened?
+GATE 4 - TIMING: Is this the right time to enter right now, at the current time? Or has the move already happened?
 
 ONLY recommend if it passes ALL 4 GATES. Skip and find a better one if it fails.
 
