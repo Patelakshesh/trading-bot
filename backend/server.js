@@ -295,18 +295,21 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                         priceBlock += `🛡️ <b>Stop-Loss:</b> ${aiSL || `₹${(livePrice*0.97).toFixed(2)}`}\n`;
                     }
 
+                    const brokerSymbol = symbol.replace('.NS', '').replace('.BO', '');
+
                     const finalMsg =
                         `${actionIcon} <b>AI TIP: ${symbol}</b>\n` +
                         `${'─'.repeat(28)}\n\n` +
+                        `\ud83d\udd0d <b>Search in Groww/Zerodha/Upstox:</b> <code>${brokerSymbol}</code>\n\n` +
                         priceBlock +
-                        `\n<b>📊 Confidence:</b> ${confBar} <b>${conf}%</b>\n` +
-                        `<b>⚡ Signals Aligned:</b> ${analysis.bullishSignals || '?'}/6 bullish\n` +
-                        `<b>⚠️ Risk Level:</b> ${riskEmoji}\n\n` +
-                        `<b>🧠 Expert Analysis:</b>\n<i>${analysis.rationale}</i>\n\n` +
+                        `\n<b>\ud83d\udcca Confidence:</b> ${confBar} <b>${conf}%</b>\n` +
+                        `<b>\u26a1 Signals Aligned:</b> ${analysis.bullishSignals || '?'}/6 bullish\n` +
+                        `<b>\u26a0\ufe0f Risk Level:</b> ${riskEmoji}\n\n` +
+                        `<b>\ud83e\udde0 Expert Analysis:</b>\n<i>${analysis.rationale}</i>\n\n` +
                         (analysis.action === 'BUY' && conf >= 80
-                            ? `✅ <b>HIGH CONVICTION</b> — Safe to act at market open.`
+                            ? `\u2705 <b>HIGH CONVICTION</b> \u2014 Safe to act at market open.`
                             : analysis.action === 'BUY' && conf < 80
-                            ? `⚠️ <b>LOW CONVICTION</b> — Consider skipping this trade.`
+                            ? `\u26a0\ufe0f <b>LOW CONVICTION</b> \u2014 Consider skipping this trade.`
                             : ``);
 
                     await bot.editMessageText(finalMsg, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
@@ -345,14 +348,17 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                         const formatPrice = (p) => (p && typeof p === 'number') ? `₹${p.toFixed(2)}` : (p && !p.toString().includes('₹') ? `₹${p}` : p);
                         const confBar = t.confidence >= 85 ? '🟢🟢🟢🟢🟢' : t.confidence >= 75 ? '🟢🟢🟢🟢⬛' : '🟢🟢🟢⬛⬛';
                         
+                        const brokerSymbol = t.symbol.replace('.NS', '').replace('.BO', '');
+                        
                         msgText += `${i+1}\ufe0f\u20e3 <b>${t.symbol}</b>${companyStr}\n`;
-                        msgText += `   🟢 <b>${t.action}</b> | ⏳ Hold: <b>${t.duration}</b>\n`;
-                        if (t.currentPrice) msgText += `   💰 <b>Buy At:</b> ${formatPrice(t.currentPrice)}\n`;
-                        if (t.allocatedFunds && t.sharesToBuy) msgText += `   💵 Invest: <b>${t.allocatedFunds}</b> → <b>${t.sharesToBuy} shares</b>\n`;
-                        msgText += `   🎯 <b>Target:</b> ${formatPrice(t.target) || 'N/A'} | 🛡️ <b>SL:</b> ${formatPrice(t.stopLoss) || 'N/A'}\n`;
-                        if (t.confidence) msgText += `   📊 <b>Confidence:</b> ${confBar} ${t.confidence}%\n`;
-                        if (t.gatesPassed) msgText += `   ✅ <b>Gates:</b> <i>${t.gatesPassed}</i>\n`;
-                        msgText += `   🧠 <i>${t.rationale}</i>\n\n`;
+                        msgText += `   \ud83d\udd0d <b>Search in Groww/Zerodha:</b> <code>${brokerSymbol}</code>\n`;
+                        msgText += `   \ud83d\udfe2 <b>${t.action}</b> | \u23f3 Hold: <b>${t.duration}</b>\n`;
+                        if (t.currentPrice) msgText += `   \ud83d\udcb0 <b>Buy At:</b> ${formatPrice(t.currentPrice)}\n`;
+                        if (t.allocatedFunds && t.sharesToBuy) msgText += `   \ud83d\udcb5 Invest: <b>${t.allocatedFunds}</b> \u2192 <b>${t.sharesToBuy} shares</b>\n`;
+                        msgText += `   \ud83c\udfaf <b>Target:</b> ${formatPrice(t.target) || 'N/A'} | \ud83d\udee1\ufe0f <b>SL:</b> ${formatPrice(t.stopLoss) || 'N/A'}\n`;
+                        if (t.confidence) msgText += `   \ud83d\udcca <b>Confidence:</b> ${confBar} ${t.confidence}%\n`;
+                        if (t.gatesPassed) msgText += `   \u2705 <b>Gates:</b> <i>${t.gatesPassed}</i>\n`;
+                        msgText += `   \ud83e\udde0 <i>${t.rationale}</i>\n\n`;
                     });
                     
                     // Replace the progress bar with the final result!
