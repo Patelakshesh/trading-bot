@@ -296,11 +296,22 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     }
 
                     const brokerSymbol = symbol.replace('.NS', '').replace('.BO', '');
+                    
+                    const holding = await Portfolio.findOne({ symbol, status: 'HOLDING', chatId: chatId.toString() });
+                    let holdingStatusText = "";
+                    if (holding) {
+                        const currentProfit = currentPrice ? (((currentPrice - holding.buyPrice) / holding.buyPrice) * 100).toFixed(2) : 0;
+                        const profitEmoji = parseFloat(currentProfit) >= 0 ? '📈' : '📉';
+                        holdingStatusText = `🎒 <b>YOU ALREADY OWN THIS!</b>\n` +
+                                            `💰 Bought: ₹${holding.buyPrice} → Now: ₹${currentPrice || '?'} (${profitEmoji} ${currentProfit}%)\n` +
+                                            `${'─'.repeat(28)}\n\n`;
+                    }
 
                     const finalMsg =
                         `${actionIcon} <b>AI TIP: ${symbol}</b>\n` +
                         `${'─'.repeat(28)}\n\n` +
-                        `\ud83d\udd0d <b>Search in Groww/Zerodha/Upstox:</b> <code>${brokerSymbol}</code>\n\n` +
+                        holdingStatusText +
+                        `\ud83d\udd0d <b>Search in Groww/Zerodha:</b> <code>${brokerSymbol}</code>\n\n` +
                         priceBlock +
                         `\n<b>\ud83d\udcca Confidence:</b> ${confBar} <b>${conf}%</b>\n` +
                         `<b>\u26a1 Signals Aligned:</b> ${analysis.bullishSignals || '?'}/6 bullish\n` +
