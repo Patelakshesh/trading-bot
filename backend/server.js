@@ -23,6 +23,37 @@ const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 // Anti-Spam Memory: Prevents the bot from spamming the same alert every 15 minutes
 const sentAlertsMemory = new Set();
 
+// ─── INDIAN MARKET HOURS HELPER ──────────────────────────────────────────────
+// NSE/BSE: Monday–Friday, 9:15 AM – 3:30 PM IST
+function isMarketOpen() {
+    const now = new Date();
+    // Convert to IST (UTC+5:30)
+    const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+    const ist = new Date(now.getTime() + IST_OFFSET);
+    const day = ist.getUTCDay(); // 0=Sun, 6=Sat
+    const h = ist.getUTCHours();
+    const m = ist.getUTCMinutes();
+    const totalMin = h * 60 + m;
+    // Mon–Fri only, 9:15 AM (555 min) to 3:30 PM (930 min)
+    return day >= 1 && day <= 5 && totalMin >= 555 && totalMin <= 930;
+}
+
+function nextMarketOpenStr() {
+    const now = new Date();
+    const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+    const ist = new Date(now.getTime() + IST_OFFSET);
+    const day = ist.getUTCDay();
+    const h = ist.getUTCHours();
+    const m = ist.getUTCMinutes();
+    const totalMin = h * 60 + m;
+    if (day >= 1 && day <= 5 && totalMin < 555) return 'today at 9:15 AM IST';
+    if (day === 5 && totalMin > 930) return 'Monday at 9:15 AM IST';
+    if (day === 6) return 'Monday at 9:15 AM IST';
+    if (day === 0) return 'Monday at 9:15 AM IST';
+    return 'tomorrow at 9:15 AM IST';
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Initialize Telegram Bot
 let bot;
 if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
@@ -573,21 +604,28 @@ const runDailyAnalysis = async () => {
                             const actionIcon = rec.action === 'SELL' ? '🔴' : rec.action === 'BUY' ? '🟢' : '🟡';
                             let actionLabel = rec.action;
                             if (rec.action === 'SELL' && profitPercent >= 3) actionLabel = '✅ SELL (Profit Target Hit!)';
-                            else if (rec.action === 'SELL' && profitPercent <= -5) actionLabel = '🛑 SELL (Stop-Loss Hit \u2014 Cut Loss Now)';
+                            else if (rec.action === 'SELL' && profitPercent <= -5) actionLabel = '🛑 SELL (Stop-Loss Hit — Cut Loss Now)';
                             else if (rec.action === 'SELL') actionLabel = '⏰ SELL (Time Limit Reached)';
                             else if (rec.action === 'HOLD') actionLabel = '⏳ HOLD (Wait for Recovery)';
 
+                            const marketOpen = isMarketOpen();
+                            const timingNote = marketOpen
+                                ? `⏰ <b>Market is OPEN</b> — You can execute this trade RIGHT NOW.`
+                                : `🔒 <b>Market is CLOSED.</b> Execute this trade when market opens <b>${nextMarketOpenStr()}</b>.`;
+
+                            const priceLabel = marketOpen ? 'Live Price Now' : 'Last Closing Price';
+
                             const alertMsg = `${actionIcon} <b>AI ALERT: ${rec.symbol}</b>\n\n` +
                                              `💰 <b>You Bought At:</b> ₹${owner.buyPrice}\n` +
-                                             `📊 <b>Live Price Now:</b> ₹${currentPrice || 'N/A'}\n` +
+                                             `📊 <b>${priceLabel}:</b> ₹${currentPrice || 'N/A'}\n` +
                                              `${profitText}\n\n` +
-                                             `<b>Action: ${actionLabel}</b>\n\n` +
+                                             `<b>Action: ${actionLabel}</b>\n` +
+                                             `${timingNote}\n\n` +
                                              `🧠 <b>Why:</b> ${rec.reasoning}`;
                             
                             if (owner.chatId !== 'UI_USER') {
                                 bot.sendMessage(owner.chatId, alertMsg, {parse_mode: 'HTML'});
                             } else {
-                                // Bridge Dashboard stocks to actual Telegram users
                                 const allUsers = await Portfolio.distinct('chatId');
                                 const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
                                 for (let tId of telegramUsers) {
@@ -623,28 +661,30 @@ cron.schedule('*/15 * * * *', async () => {
         const holdings = await Portfolio.find({ status: 'HOLDING' });
         const { getLatestNews } = require('./services/newsService');
         const news = await getLatestNews();
+        const marketOpen = isMarketOpen();
 
         for(let item of holdings) {
             const currentPrice = await getStockPrice(item.symbol);
             if(currentPrice) {
                 const profitPercentage = ((currentPrice - item.buyPrice) / item.buyPrice) * 100;
-                
-                // 1. Take-Profit Alert (+5%)
+                const priceLabel = marketOpen ? 'Live Price' : 'Last Closing Price';
+                const timingLine = marketOpen
+                    ? `⏰ Market is <b>OPEN</b> — Execute this trade <b>RIGHT NOW</b>.`
+                    : `🔒 Market is <b>CLOSED</b>. Act when market opens <b>${nextMarketOpenStr()}</b>.`;
+
+                // 1. Take-Profit Alert (+5%) — only fire during market hours OR store for morning
                 if (profitPercentage >= 5) {
                     const tpKey = `${item._id}_TP`;
                     if (!sentAlertsMemory.has(tpKey)) {
-                        const alertMsg = `🎯 **TAKE PROFIT ALERT** 🎯\n\n` +
-                                         `🚀 **Stock:** ${item.symbol}\n` +
-                                         `💰 **Buy Price:** ₹${item.buyPrice}\n` +
-                                         `🤑 **Current Price:** ₹${currentPrice} (Up +${profitPercentage.toFixed(2)}%)\n\n` +
-                                         `You have reached your +5% target! Sell now to lock in profits!`;
-                        
-                        if (item.chatId !== 'UI_USER') {
-                            bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
-                        } else {
-                            const allUsers = await Portfolio.distinct('chatId');
-                            const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
-                            for (let tId of telegramUsers) bot.sendMessage(tId, alertMsg, {parse_mode: 'Markdown'});
+                        const alertMsg = `🎯 <b>TAKE PROFIT ALERT: ${item.symbol}</b>\n\n` +
+                                         `💰 <b>Buy Price:</b> ₹${item.buyPrice}\n` +
+                                         `🤑 <b>${priceLabel}:</b> ₹${currentPrice} (+${profitPercentage.toFixed(2)}%)\n\n` +
+                                         `✅ You have reached your +5% profit target!\n` +
+                                         `${timingLine}`;
+                        const sendFn = (cId) => bot.sendMessage(cId, alertMsg, {parse_mode: 'HTML'});
+                        if (item.chatId !== 'UI_USER') { sendFn(item.chatId); } else {
+                            const telegramUsers = (await Portfolio.distinct('chatId')).filter(id => id !== 'UI_USER');
+                            for (let tId of telegramUsers) sendFn(tId);
                         }
                         sentAlertsMemory.add(tpKey);
                     }
@@ -654,68 +694,57 @@ cron.schedule('*/15 * * * *', async () => {
                 if(profitPercentage <= -5) {
                     const slKey = `${item._id}_SL`;
                     if (!sentAlertsMemory.has(slKey)) {
-                        const alertMsg = `⚠️ **EMERGENCY STOP-LOSS TRIGGERED** ⚠️\n\n` +
-                                         `📉 **Stock:** ${item.symbol}\n` +
-                                         `💰 **Buy Price:** ₹${item.buyPrice}\n` +
-                                         `🚨 **Current Price:** ₹${currentPrice} (Dropped ${profitPercentage.toFixed(2)}%)\n\n` +
-                                         `Mathematical Safety Net activated. Consider cutting your losses!`;
-                        
-                        if (item.chatId !== 'UI_USER') {
-                            bot.sendMessage(item.chatId, alertMsg, {parse_mode: 'Markdown'});
-                        } else {
-                            const allUsers = await Portfolio.distinct('chatId');
-                            const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
-                            for (let tId of telegramUsers) bot.sendMessage(tId, alertMsg, {parse_mode: 'Markdown'});
+                        const alertMsg = `🛑 <b>STOP-LOSS ALERT: ${item.symbol}</b>\n\n` +
+                                         `💰 <b>Buy Price:</b> ₹${item.buyPrice}\n` +
+                                         `🚨 <b>${priceLabel}:</b> ₹${currentPrice} (${profitPercentage.toFixed(2)}%)\n\n` +
+                                         `⚠️ Your stock has dropped -5%. Cut your loss now to protect your capital.\n` +
+                                         `${timingLine}`;
+                        const sendFn = (cId) => bot.sendMessage(cId, alertMsg, {parse_mode: 'HTML'});
+                        if (item.chatId !== 'UI_USER') { sendFn(item.chatId); } else {
+                            const telegramUsers = (await Portfolio.distinct('chatId')).filter(id => id !== 'UI_USER');
+                            for (let tId of telegramUsers) sendFn(tId);
                         }
                         sentAlertsMemory.add(slKey);
                     }
                 }
 
-                // 3. Bad Breaking News Alert
+                // 3. Bad Breaking News Alert (fires any time — market is not needed for news)
                 const badNews = news.find(n => 
                     (n.title.includes(item.symbol.replace('.NS', '')) || n.description.includes(item.symbol.replace('.NS', ''))) &&
                     /(crash|fall|drop|warning|fraud|loss|sell|downgrade)/i.test(n.title + n.description)
                 );
-
                 if (badNews) {
                     const newsKey = `${item._id}_NEWS_${badNews.title.substring(0,20)}`;
                     if (!sentAlertsMemory.has(newsKey)) {
-                        const newsMsg = `📰 **BREAKING BAD NEWS ALERT** 📰\n\n` +
-                                        `🚨 **Stock:** ${item.symbol}\n` +
-                                        `⚠️ **Headline:** ${badNews.title}\n\n` +
-                                        `This negative news might impact your holdings. Consider selling immediately!`;
-                        
-                        if (item.chatId !== 'UI_USER') {
-                            bot.sendMessage(item.chatId, newsMsg, {parse_mode: 'Markdown'});
-                        } else {
-                            const allUsers = await Portfolio.distinct('chatId');
-                            const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
-                            for (let tId of telegramUsers) bot.sendMessage(tId, newsMsg, {parse_mode: 'Markdown'});
+                        const newsMsg = `📰 <b>BAD NEWS ALERT: ${item.symbol}</b>\n\n` +
+                                        `⚠️ <b>Headline:</b> ${badNews.title}\n\n` +
+                                        `This negative news might hurt your stock.\n` +
+                                        `${timingLine}`;
+                        const sendFn = (cId) => bot.sendMessage(cId, newsMsg, {parse_mode: 'HTML'});
+                        if (item.chatId !== 'UI_USER') { sendFn(item.chatId); } else {
+                            const telegramUsers = (await Portfolio.distinct('chatId')).filter(id => id !== 'UI_USER');
+                            for (let tId of telegramUsers) sendFn(tId);
                         }
                         sentAlertsMemory.add(newsKey);
                     }
                 }
 
-                // 4. Good Breaking News Alert (New feature requested)
+                // 4. Good Breaking News Alert
                 const goodNews = news.find(n => 
                     (n.title.includes(item.symbol.replace('.NS', '')) || n.description.includes(item.symbol.replace('.NS', ''))) &&
                     /(surge|jump|rise|profit|growth|buy|upgrade|record|win|success|deal)/i.test(n.title + n.description)
                 );
-
-                if (goodNews && !badNews) { // Don't spam if bad news already fired
+                if (goodNews && !badNews) {
                     const goodNewsKey = `${item._id}_GOODNEWS_${goodNews.title.substring(0,20)}`;
                     if (!sentAlertsMemory.has(goodNewsKey)) {
-                        const newsMsg = `🚀 **BULLISH NEWS ALERT** 🚀\n\n` +
-                                        `📈 **Stock:** ${item.symbol}\n` +
-                                        `📰 **Headline:** ${goodNews.title}\n\n` +
-                                        `Great news just dropped! Your stock might be about to surge. Keep a close eye on it!`;
-                        
-                        if (item.chatId !== 'UI_USER') {
-                            bot.sendMessage(item.chatId, newsMsg, {parse_mode: 'Markdown'});
-                        } else {
-                            const allUsers = await Portfolio.distinct('chatId');
-                            const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
-                            for (let tId of telegramUsers) bot.sendMessage(tId, newsMsg, {parse_mode: 'Markdown'});
+                        const newsMsg = `🚀 <b>BULLISH NEWS ALERT: ${item.symbol}</b>\n\n` +
+                                        `📰 <b>Headline:</b> ${goodNews.title}\n\n` +
+                                        `Great news dropped! Your stock may surge.\n` +
+                                        `${timingLine}`;
+                        const sendFn = (cId) => bot.sendMessage(cId, newsMsg, {parse_mode: 'HTML'});
+                        if (item.chatId !== 'UI_USER') { sendFn(item.chatId); } else {
+                            const telegramUsers = (await Portfolio.distinct('chatId')).filter(id => id !== 'UI_USER');
+                            for (let tId of telegramUsers) sendFn(tId);
                         }
                         sentAlertsMemory.add(goodNewsKey);
                     }
@@ -727,9 +756,14 @@ cron.schedule('*/15 * * * *', async () => {
     }
 });
 
-// PROACTIVE AI TIP BROADCASTER (Runs every 2 hours to send instant new opportunities)
+// PROACTIVE AI TIP BROADCASTER (Runs every 2 hours, ONLY during market hours)
 cron.schedule('0 */2 * * *', async () => {
     if (!bot) return;
+    // Skip proactive tips outside market hours — prices are stale
+    if (!isMarketOpen()) {
+        console.log('Proactive Tip: Market closed, skipping broadcast.');
+        return;
+    }
     try {
         console.log('Scanning for new Proactive AI Tips...');
         const { getLatestNews } = require('./services/newsService');
@@ -741,25 +775,24 @@ cron.schedule('0 */2 * * *', async () => {
         const top5 = await getGlobalTop5TradingTips(news, movers, null, null);
         
         if (top5 && top5.length > 0) {
-            const bestTip = top5[0]; // Take the absolute highest conviction tip
-            
-            // Get all unique chatIds from users who have used the bot
+            const bestTip = top5[0];
             const allUsers = await Portfolio.distinct('chatId');
             
             for (let chatId of allUsers) {
                 if (chatId !== 'UI_USER') {
                     const proactiveKey = `${chatId}_PROACTIVE_${bestTip.symbol}`;
                     if (!sentAlertsMemory.has(proactiveKey)) {
-                        const tipMsg = `🌟 **PROACTIVE AI OPPORTUNITY** 🌟\n\n` +
-                                       `I just found a massive new setup based on breaking market data!\n\n` +
-                                       `📈 **Stock:** ${bestTip.symbol} (${bestTip.companyName})\n` +
-                                       `💰 **Current Price:** ${bestTip.currentPrice || 'N/A'}\n` +
-                                       `🟢 **Action:** ${bestTip.action}\n` +
-                                       `🎯 **Target:** ${bestTip.target} | 🛡️ **SL:** ${bestTip.stopLoss}\n\n` +
-                                       `🧠 **Why?** ${bestTip.rationale}\n\n` +
-                                       `*(Type \`/bought ${bestTip.symbol} <PRICE>\` to track it!)*`;
+                        const tipMsg = `🌟 <b>NEW AI OPPORTUNITY FOUND!</b>\n\n` +
+                                       `Based on live market data right now:\n\n` +
+                                       `📈 <b>${bestTip.symbol}</b> — ${bestTip.companyName || ''}\n` +
+                                       `💰 <b>Buy At (Entry):</b> ${bestTip.currentPrice || 'N/A'}\n` +
+                                       `🟢 <b>Action:</b> ${bestTip.action}\n` +
+                                       `🎯 <b>Target:</b> ${bestTip.target} | 🛡️ <b>SL:</b> ${bestTip.stopLoss}\n\n` +
+                                       `🧠 <b>Why?</b> ${bestTip.rationale}\n\n` +
+                                       `⏰ Market is <b>OPEN</b> — Act NOW!\n` +
+                                       `<i>Use /bought ${bestTip.symbol} to start tracking.</i>`;
                         
-                        bot.sendMessage(chatId, tipMsg, {parse_mode: 'Markdown'});
+                        bot.sendMessage(chatId, tipMsg, {parse_mode: 'HTML'});
                         sentAlertsMemory.add(proactiveKey);
                     }
                 }
@@ -769,6 +802,51 @@ cron.schedule('0 */2 * * *', async () => {
         console.error('Error broadcasting tip:', err);
     }
 });
+
+// ─── MORNING MARKET OPEN BELL (9:15 AM IST, Mon–Fri) ─────────────────────────
+// Resets the spam-guard and sends a morning portfolio summary with what to do today
+cron.schedule('15 3 * * 1-5', async () => {
+    // 9:15 AM IST = 3:15 AM UTC
+    if (!bot) return;
+    // Reset sentAlertsMemory so today's fresh alerts can fire
+    sentAlertsMemory.clear();
+    console.log('[Morning Bell] sentAlertsMemory reset. Market is now OPEN.');
+
+    try {
+        const holdings = await Portfolio.find({ status: 'HOLDING' });
+        if (!holdings || holdings.length === 0) return;
+
+        // Build a morning portfolio snapshot
+        const allUsers = await Portfolio.distinct('chatId');
+        const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
+        if (telegramUsers.length === 0) return;
+
+        let summaryLines = [];
+        for (let item of holdings) {
+            const currentPrice = await getStockPrice(item.symbol);
+            if (currentPrice) {
+                const pct = ((currentPrice - item.buyPrice) / item.buyPrice * 100).toFixed(2);
+                const pctEmoji = pct >= 0 ? '📈' : '📉';
+                const daysHeld = Math.floor((Date.now() - new Date(item.createdAt)) / 86400000);
+                summaryLines.push(`• <b>${item.symbol}</b>: Open ₹${currentPrice} | P&L ${pct >= 0 ? '+' : ''}${pct}% ${pctEmoji} | Day ${daysHeld}/${item.timeLimit || 5}`);
+            }
+        }
+
+        if (summaryLines.length > 0) {
+            const bellMsg = `🔔 <b>MARKET OPEN — 9:15 AM IST</b> 🔔\n\n` +
+                            `Good morning! Here is your portfolio snapshot for today:\n\n` +
+                            summaryLines.join('\n') +
+                            `\n\n💡 The AI will monitor your stocks during market hours and alert you if anything needs action.\n` +
+                            `📊 Type /profit to see your full portfolio details.`;
+            for (let chatId of telegramUsers) {
+                bot.sendMessage(chatId, bellMsg, {parse_mode: 'HTML'});
+            }
+        }
+    } catch (err) {
+        console.error('[Morning Bell] Error:', err);
+    }
+}, { timezone: 'UTC' });
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
