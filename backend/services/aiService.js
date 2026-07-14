@@ -249,11 +249,11 @@ Return ONLY a valid JSON array of exactly 5 INDIAN NSE stocks. No markdown, no e
     "symbol": "TICKER.NS",
     "companyName": "Full Indian Company Name",
     "action": "BUY",
-    "currentPrice": "\u20b9XXX.XX",
-    "duration": "1 Day" | "2 Days" | "3 Days",
-    "target": "\u20b9XXX.XX",
-    "stopLoss": "\u20b9XXX.XX",
-    "confidence": <70-95>,
+    "currentPrice": "\u20b9100.50",
+    "duration": "2 Days",
+    "target": "\u20b9106.00",
+    "stopLoss": "\u20b996.00",
+    "confidence": 85,
     "rationale": "2 sentences: Why this Indian stock now? What is the risk?",
     "gatesPassed": "Momentum \u2713 | Technical \u2713 | Risk/Reward \u2713 | Timing \u2713"${jsonFields}
   }
@@ -267,7 +267,7 @@ Return ONLY a valid JSON array of exactly 5 INDIAN NSE stocks. No markdown, no e
         for (let attempt = 0; attempt < 2; attempt++) {
             try {
                 const usePrompt = attempt === 0 ? prompt : 
-                    `Give exactly 5 Indian NSE stocks to BUY today as short-term swing trades. Return ONLY a valid JSON array. No markdown. Format EXACTLY like this:\n[{"symbol": "RELIANCE.NS", "companyName": "Reliance", "action": "BUY", "currentPrice": "₹2500.00", "duration": "1-3 Days", "target": "₹2600.00", "stopLoss": "₹2400.00", "rationale": "Strong breakout."}]`;
+                    `Give exactly 5 Indian NSE stocks to BUY today as short-term swing trades. Return ONLY a valid JSON array. No markdown. Format EXACTLY like this:\n[{"symbol": "RELIANCE.NS", "companyName": "Reliance", "action": "BUY", "currentPrice": "₹2500.00", "duration": "2 Days", "target": "₹2600.00", "stopLoss": "₹2400.00", "confidence": 85, "rationale": "Strong breakout.", "gatesPassed": "Fallback ✓"}]`;
                 
                 const response = await generateWithFallback(usePrompt);
                 let aiText = response.response.text();
