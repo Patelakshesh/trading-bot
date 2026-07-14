@@ -321,21 +321,19 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 if (top5 && top5.length > 0) {
                     await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩🟩🟩🟩] 100% - Trades Generated!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                     
-                    let msgText = `🎯 <b>TOP 5 AI SWING TRADES</b>\n\n`;
+                    let msgText = `🎯 <b>TOP 5 AI SWING TRADES</b>\n<i>Multi-gate expert analysis</i>\n\n`;
                     top5.forEach((t, i) => {
                         const companyStr = t.companyName ? ` — ${t.companyName}` : '';
                         const formatPrice = (p) => (p && typeof p === 'number') ? `₹${p.toFixed(2)}` : (p && !p.toString().includes('₹') ? `₹${p}` : p);
+                        const confBar = t.confidence >= 85 ? '🟢🟢🟢🟢🟢' : t.confidence >= 75 ? '🟢🟢🟢🟢⬛' : '🟢🟢🟢⬛⬛';
                         
                         msgText += `${i+1}\ufe0f\u20e3 <b>${t.symbol}</b>${companyStr}\n`;
-                        msgText += `   🟢 <b>Action: ${t.action}</b> | ⏳ Hold: <b>${t.duration}</b>\n`;
-                        if (t.currentPrice) {
-                            msgText += `   💰 <b>Buy At:</b> ${formatPrice(t.currentPrice)}\n`;
-                        }
-                        if (t.allocatedFunds && t.sharesToBuy) {
-                            msgText += `   💵 Invest: <b>${t.allocatedFunds}</b> → Buy <b>${t.sharesToBuy} shares</b>\n`;
-                        }
-                        msgText += `   🎯 <b>Sell At (Target):</b> ${formatPrice(t.target) || 'N/A'}\n`;
-                        msgText += `   🛡️ <b>Stop-Loss (Exit if):</b> ${formatPrice(t.stopLoss) || 'N/A'}\n`;
+                        msgText += `   🟢 <b>${t.action}</b> | ⏳ Hold: <b>${t.duration}</b>\n`;
+                        if (t.currentPrice) msgText += `   💰 <b>Buy At:</b> ${formatPrice(t.currentPrice)}\n`;
+                        if (t.allocatedFunds && t.sharesToBuy) msgText += `   💵 Invest: <b>${t.allocatedFunds}</b> → <b>${t.sharesToBuy} shares</b>\n`;
+                        msgText += `   🎯 <b>Target:</b> ${formatPrice(t.target) || 'N/A'} | 🛡️ <b>SL:</b> ${formatPrice(t.stopLoss) || 'N/A'}\n`;
+                        if (t.confidence) msgText += `   📊 <b>Confidence:</b> ${confBar} ${t.confidence}%\n`;
+                        if (t.gatesPassed) msgText += `   ✅ <b>Gates:</b> <i>${t.gatesPassed}</i>\n`;
                         msgText += `   🧠 <i>${t.rationale}</i>\n\n`;
                     });
                     

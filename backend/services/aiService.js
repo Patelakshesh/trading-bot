@@ -112,49 +112,64 @@ const getStockAnalysis = async (symbol, news, technicals, currentPrice) => {
         const advancedMetrics = await advancedDataService.getAdvancedMetrics(symbol);
 
         const prompt = `
-You are an elite quantitative hedge fund AI advisor.
-Analyze the following multi-dimensional data for stock symbol: ${symbol}
+You are a senior portfolio manager at a top-tier hedge fund in India. You have 20 years of trading experience.
+You think like a REAL HUMAN expert — cautious, data-driven, and never impulsive.
 
-[0] LIVE MARKET PRICE:
-- Current Real-Time Price: ₹${currentPrice || 'Unknown'}
+Stock: ${symbol} | Entry Price: ₹${currentPrice || 'Unknown'}
 
-[1] BREAKING NEWS SENTIMENT:
-${news.length > 0 ? news.map(n => `- ${n.title}`).join('\n') : "No recent news."}
+=== SIGNAL CHECKLIST (You MUST evaluate ALL of these before deciding) ===
 
-[2] TECHNICAL ANALYSIS (MATH):
-- Current RSI (14-day): ${technicals ? technicals.rsi : 'Unknown'}
-- MACD Signal: ${technicals ? technicals.macd : 'Unknown'}
+[SIGNAL 1] PRICE & TREND:
+- Current Price: ₹${currentPrice || 'Unknown'}
+- Is the price near a support level (good to BUY) or resistance level (risky to BUY)?
 
-[3] INSTITUTIONAL SMART MONEY (OPTIONS):
+[SIGNAL 2] TECHNICAL INDICATORS (Math cannot lie):
+- RSI (14-day): ${technicals ? technicals.rsi : 'Unknown'}
+  Rule: RSI < 35 = Oversold = Strong BUY signal. RSI > 68 = Overbought = DO NOT BUY.
+- MACD: ${technicals ? technicals.macd : 'Unknown'}
+  Rule: MACD line crossing above Signal line = Bullish. Crossing below = Bearish.
+
+[SIGNAL 3] INSTITUTIONAL SMART MONEY (What the big players are doing):
 - Put/Call Ratio: ${advancedMetrics.optionsData.putCallRatio} (${advancedMetrics.optionsData.sentiment})
+  Rule: Put/Call < 0.7 = Institutions are buying calls = BULLISH. Put/Call > 1.1 = Institutions are hedging = DO NOT BUY.
 
-[4] SOCIAL MEDIA VIRALITY (REDDIT/X):
-- Hype Level: ${advancedMetrics.socialSentiment.hypeLevel}
-- Recent Viral Posts: ${advancedMetrics.socialSentiment.recentPosts.length > 0 ? advancedMetrics.socialSentiment.recentPosts.join(' | ') : 'None'}
+[SIGNAL 4] NEWS SENTIMENT:
+${news.length > 0 ? news.slice(0, 5).map(n => `- ${n.title}`).join('\n') : 'No recent news.'}
+  Rule: Positive news + technical confirmation = strong signal. Positive news alone is NOT enough.
 
-[5] FUNDAMENTALS & EARNINGS:
-- Wall Street Recommendation: ${advancedMetrics.earningsData.recommendationKey}
+[SIGNAL 5] FUNDAMENTALS (Company health):
 - Revenue Growth: ${advancedMetrics.earningsData.revenueGrowth}
 - Profit Margin: ${advancedMetrics.earningsData.profitMargin}
-- Held by Institutions: ${advancedMetrics.earningsData.heldByInstitutions}
+- Analyst Rating: ${advancedMetrics.earningsData.recommendationKey}
+- Institutional Holding: ${advancedMetrics.earningsData.heldByInstitutions}
+  Rule: If profit margin is negative AND revenue is declining, this is a high-risk trade. Warn the user.
 
-CRITICAL INSTRUCTIONS:
-1. You must cross-reference ALL 5 dimensions. Do not rely solely on news.
-2. If Technical RSI is > 70 (Overbought) AND Options sentiment is Bearish, you MUST NOT issue a BUY signal, even if news is good.
-3. If the stock is going viral on Social Media but Fundamentals are terrible (negative profit margin), warn the user it is a "Meme Stock Bubble".
-4. Determine if this is a BUY, SELL, or HOLD.
-5. Provide a short 2-sentence rationale explaining the alignment of Math, News, and Smart Money.
-6. The user is a standard cash investor. If you recommend BUY, calculate EXACT mathematical price values in Rupees (e.g. "₹105.50") for a short-term 'target' and 'stopLoss' based strictly on the Current Real-Time Price (₹${currentPrice || 'Unknown'}). DO NOT just output percentages.
+[SIGNAL 6] SOCIAL HYPE CHECK:
+- Social Hype Level: ${advancedMetrics.socialSentiment.hypeLevel}
+  Rule: If a stock is trending on social media BUT fundamentals are bad, it is a bubble. NEVER chase hype alone.
 
-Return your response in STRICT JSON format:
+=== DECISION RULES (Follow strictly) ===
+Count how many signals are BULLISH:
+- BUY only if 3 or more signals are BULLISH. Assign confidence >= 70.
+- HOLD if 1-2 signals are bullish but others are neutral or unclear.
+- SELL if 2 or more signals are BEARISH.
+
+For BUY: Calculate EXACT price targets based on ₹${currentPrice || 0}:
+- Target: Entry price + 4% to 6% (realistic short-term gain)
+- Stop-Loss: Entry price - 3% to 4% (capital protection)
+
+=== OUTPUT (Strict JSON only, no markdown) ===
 {
   "action": "BUY" | "SELL" | "HOLD",
   "confidence": <number 0-100>,
-  "rationale": "<your combined explanation>",
-  "target": "₹XXX.XX" (or null if not buying),
-  "stopLoss": "₹XXX.XX" (or null if not buying)
+  "bullishSignals": <number of signals that were BULLISH>,
+  "rationale": "<2 sentence expert explanation: what signals aligned, what risk exists>",
+  "target": "₹XXX.XX" (or null),
+  "stopLoss": "₹XXX.XX" (or null),
+  "riskLevel": "LOW" | "MEDIUM" | "HIGH"
 }
 `;
+
         const response = await generateWithFallback(prompt);
         let aiText = response.response.text();
         
@@ -189,42 +204,60 @@ const getGlobalTop5TradingTips = async (news, movers, budget = null, priceRange 
         }
 
         const prompt = `
-You are an elite quantitative hedge fund manager with a verified 98% success rate in short-term swing trading.
-I am providing you with the latest breaking market news and today's top market gainers and losers.
+You are a SENIOR RISK COMMITTEE of 3 expert Indian stock traders.
+Your job is to find the BEST 5 stocks for short-term swing trading today.
+You are strict, disciplined, and never recommend a trade unless MULTIPLE signals confirm it.
+You think like a real human expert, not a marketing bot.
+
+=== TODAY'S MARKET DATA ===
 
 LATEST NEWS:
-${news.slice(0, 5).map(n => `- ${n.title}`).join('\n')}
+${news.slice(0, 8).map(n => `- ${n.title}`).join('\n')}
 
-TOP GAINERS TODAY (Includes Live Prices):
-${movers.gainers.map(g => `- ${g.symbol} (${g.name}): ₹${g.price} (+${g.changePercent}%)`).join('\n')}
+TOP GAINERS (Momentum stocks):
+${movers.gainers.slice(0, 6).map(g => `- ${g.symbol} (${g.name}): ₹${g.price} (+${g.changePercent}%)`).join('\n')}
 
-TOP LOSERS TODAY (Includes Live Prices):
-${movers.losers.map(l => `- ${l.symbol} (${l.name}): ₹${l.price} (${l.changePercent}%)`).join('\n')}
+TOP LOSERS (Potential bounce-back candidates):
+${movers.losers.slice(0, 6).map(l => `- ${l.symbol} (${l.name}): ₹${l.price} (${l.changePercent}%)`).join('\n')}
 
-CRITICAL INSTRUCTIONS:
-1. Analyze the news and movers to pick the ABSOLUTE BEST TOP 5 STOCKS to trade right now.
-2. For each stock, you MUST provide a strict short-term trading plan (e.g., "Hold for 1 Day", "Hold for 3 Days").
-3. You must provide clear entry and exit targets.
-4. Guarantee maximum high-conviction logic.
-5. The user is a standard cash investor. You MUST ONLY recommend "BUY" setups. NEVER recommend "SELL SHORT". If a stock is a Top Loser today but you expect a strong reversal bounce, recommend it as a "BUY".
-6. For target and stopLoss, provide EXACT mathematical price values in Rupees (e.g., "₹105.50"). Calculate this based on the stock's current price. DO NOT just output percentages.
+=== YOUR EXPERT DECISION RULES ===
+
+For each candidate stock, you MUST mentally verify these gates:
+GATE 1 - MOMENTUM: Is there a clear reason for the stock to move today? (news catalyst, sector strength, earnings?)
+GATE 2 - TECHNICAL: Would a technical analyst say this setup is safe to enter? Not overbought?
+GATE 3 - RISK/REWARD: Is the target at least 1.5x the stop-loss distance? (e.g., if SL is -3%, target must be +4.5% or more)
+GATE 4 - TIMING: Is this the RIGHT time to enter, or has the move already happened?
+
+ONLY recommend a stock if it passes ALL 4 GATES. If a stock fails even one gate, skip it and find a better one.
+
+For Target and Stop-Loss:
+- Target = current price + 4% to 7% (realistic, achievable in 1-3 days)
+- Stop-Loss = current price - 2.5% to 4% (protects capital if wrong)
+
+For duration:
+- Stocks with very strong news catalyst: 1 Day
+- Strong technicals + news: 2 Days
+- Steady momentum play: 3 Days
 ${budgetPrompt}
 ${rangePrompt}
 
-Return ONLY a JSON array of exactly 5 objects. Do NOT use markdown code blocks like \`\`\`json.
+Return ONLY a valid JSON array of exactly 5 stocks. No markdown.
 [
   {
     "symbol": "TICKER.NS",
-    "companyName": "Full Company Name Ltd",
+    "companyName": "Full Company Name",
     "action": "BUY",
     "currentPrice": "₹XXX.XX",
     "duration": "1 Day" | "2 Days" | "3 Days",
     "target": "₹XXX.XX",
     "stopLoss": "₹XXX.XX",
-    "rationale": "Short highly persuasive 1-sentence reason"${jsonFields}
+    "confidence": <70-95>,
+    "rationale": "Exactly 2 sentences: Why this stock now? What is the risk?",
+    "gatesPassed": "Momentum ✓ | Technical ✓ | Risk/Reward ✓ | Timing ✓"${jsonFields}
   }
 ]
 `;
+
         // Try to get a valid JSON response — retry with a simpler prompt if parsing fails
         let parsedResult = null;
         let lastRawText = '';
