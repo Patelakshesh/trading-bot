@@ -44,8 +44,8 @@ const getStockPrice = async (symbol) => {
         clearTimeout(gfTimeout);
         const html = await response.text();
         
-        // Match any currency symbol (₹, $, &#x20B9;, etc) before the number
-        const match = html.match(/class="YMlKec">[^0-9>]*([0-9,]+(?:\.[0-9]+)?)<\/div>/);
+        // Match the specific class for the main stock price (YMlKec fxKbKc)
+        const match = html.match(/class="YMlKec fxKbKc"[^>]*>[^0-9>]*([0-9,]+(?:\.[0-9]+)?)<\/div>/);
         if (match && match[1]) {
             const parsedPrice = parseFloat(match[1].replace(/,/g, ''));
             if (!isNaN(parsedPrice) && parsedPrice > 0) {
