@@ -270,28 +270,46 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 if (analysis && analysis.action) {
                     const actionIcon = analysis.action === 'BUY' ? '🟢' : analysis.action === 'SELL' ? '🔴' : '🟡';
                     
-                    // Always compute basic target/SL from live price if AI didn't provide them
                     const livePrice = currentPrice || 0;
                     const aiTarget = analysis.target || (analysis.action === 'BUY' ? `₹${(livePrice * 1.05).toFixed(2)}` : null);
                     const aiSL = analysis.stopLoss || (analysis.action === 'BUY' ? `₹${(livePrice * 0.97).toFixed(2)}` : null);
-                    
-                    let priceLinesMsg = `💰 <b>Live Price (Entry):</b> ${priceText}\n`;
+
+                    // Confidence bar visual
+                    const conf = analysis.confidence || 0;
+                    const confBar = conf >= 85 ? '🟢🟢🟢🟢🟢'
+                                  : conf >= 75 ? '🟢🟢🟢🟢⬛'
+                                  : conf >= 65 ? '🟢🟢🟢⬛⬛'
+                                  : '🟢🟢⬛⬛⬛';
+                    const riskEmoji = analysis.riskLevel === 'LOW' ? '✅ LOW'
+                                    : analysis.riskLevel === 'HIGH' ? '🔴 HIGH'
+                                    : '🟡 MEDIUM';
+
+                    let priceBlock = `💰 <b>Entry Price (Buy At):</b> ${priceText}\n`;
                     if (analysis.action === 'BUY') {
-                        priceLinesMsg += `🎯 <b>Target Sell Price:</b> ${aiTarget}\n`;
-                        priceLinesMsg += `🛡️ <b>Stop-Loss Price:</b> ${aiSL}\n`;
+                        priceBlock += `🎯 <b>Target (Sell At):</b> ${aiTarget}\n`;
+                        priceBlock += `🛡️ <b>Stop-Loss (Exit if):</b> ${aiSL}\n`;
                     } else if (analysis.action === 'SELL') {
-                        priceLinesMsg += `🔴 <b>Exit at:</b> ${priceText} (Sell immediately at market price)\n`;
+                        priceBlock += `🔴 <b>Exit now at market price:</b> ${priceText}\n`;
                     } else {
-                        // HOLD — show safe target and danger SL
-                        priceLinesMsg += `🎯 <b>Next Target:</b> ${aiTarget || `₹${(livePrice * 1.05).toFixed(2)}`}\n`;
-                        priceLinesMsg += `🛡️ <b>Stop-Loss:</b> ${aiSL || `₹${(livePrice * 0.97).toFixed(2)}`}\n`;
+                        priceBlock += `🎯 <b>Next Target:</b> ${aiTarget || `₹${(livePrice*1.05).toFixed(2)}`}\n`;
+                        priceBlock += `🛡️ <b>Stop-Loss:</b> ${aiSL || `₹${(livePrice*0.97).toFixed(2)}`}\n`;
                     }
-                
-                    const finalMsg = `🚨 <b>INSTANT AI TIP: ${symbol}</b> 🚨\n\n` +
-                                     `${actionIcon} <b>Action: ${analysis.action}</b> (Confidence: ${analysis.confidence}%)\n\n` +
-                                     priceLinesMsg +
-                                     `\n🧠 <b>AI Reason:</b> ${analysis.rationale}`;
-                    bot.editMessageText(finalMsg, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+
+                    const finalMsg =
+                        `${actionIcon} <b>AI TIP: ${symbol}</b>\n` +
+                        `${'─'.repeat(28)}\n\n` +
+                        priceBlock +
+                        `\n<b>📊 Confidence:</b> ${confBar} <b>${conf}%</b>\n` +
+                        `<b>⚡ Signals Aligned:</b> ${analysis.bullishSignals || '?'}/6 bullish\n` +
+                        `<b>⚠️ Risk Level:</b> ${riskEmoji}\n\n` +
+                        `<b>🧠 Expert Analysis:</b>\n<i>${analysis.rationale}</i>\n\n` +
+                        (analysis.action === 'BUY' && conf >= 80
+                            ? `✅ <b>HIGH CONVICTION</b> — Safe to act at market open.`
+                            : analysis.action === 'BUY' && conf < 80
+                            ? `⚠️ <b>LOW CONVICTION</b> — Consider skipping this trade.`
+                            : ``);
+
+                    await bot.editMessageText(finalMsg, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 } else {
                     await bot.editMessageText(`❌ AI failed to generate a tip for ${symbol} right now. Data might be unavailable.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 }
