@@ -843,6 +843,27 @@ cron.schedule('0 */2 * * *', async () => {
         const top5 = await getGlobalTop5TradingTips(news, movers, null, null);
         
         if (top5 && top5.length > 0) {
+            // Fix AI hallucinated price BEFORE sending notification
+            for (let t of top5) {
+                try {
+                    const realPrice = await getStockPrice(t.symbol);
+                    if (realPrice && !isNaN(realPrice)) {
+                        let targetMultiplier = 1.05;
+                        let slMultiplier = 0.97;
+                        if (t.currentPrice && t.target && t.stopLoss) {
+                            const aiEntry = parseFloat(t.currentPrice.toString().replace(/[^0-9.]/g, ''));
+                            const aiTarget = parseFloat(t.target.toString().replace(/[^0-9.]/g, ''));
+                            const aiSL = parseFloat(t.stopLoss.toString().replace(/[^0-9.]/g, ''));
+                            if (aiEntry > 0 && aiTarget > 0) targetMultiplier = aiTarget / aiEntry;
+                            if (aiEntry > 0 && aiSL > 0) slMultiplier = aiSL / aiEntry;
+                        }
+                        t.currentPrice = realPrice;
+                        t.target = `₹${(realPrice * targetMultiplier).toFixed(2)}`;
+                        t.stopLoss = `₹${(realPrice * slMultiplier).toFixed(2)}`;
+                    }
+                } catch(e) {}
+            }
+
             const bestTip = top5[0];
             const allUsers = await Portfolio.distinct('chatId');
             
@@ -850,10 +871,13 @@ cron.schedule('0 */2 * * *', async () => {
                 if (chatId !== 'UI_USER') {
                     const proactiveKey = `${chatId}_PROACTIVE_${bestTip.symbol}`;
                     if (!sentAlertsMemory.has(proactiveKey)) {
+                        const liveEntryPrice = typeof bestTip.currentPrice === 'number'
+                            ? `₹${bestTip.currentPrice.toFixed(2)}`
+                            : bestTip.currentPrice || 'N/A';
                         const tipMsg = `🌟 <b>NEW AI OPPORTUNITY FOUND!</b>\n\n` +
                                        `Based on live market data right now:\n\n` +
                                        `📈 <b>${bestTip.symbol}</b> — ${bestTip.companyName || ''}\n` +
-                                       `💰 <b>Buy At (Entry):</b> ${bestTip.currentPrice || 'N/A'}\n` +
+                                       `💰 <b>Buy At (LIVE Entry):</b> ${liveEntryPrice}\n` +
                                        `🟢 <b>Action:</b> ${bestTip.action}\n` +
                                        `🎯 <b>Target:</b> ${bestTip.target} | 🛡️ <b>SL:</b> ${bestTip.stopLoss}\n\n` +
                                        `🧠 <b>Why?</b> ${bestTip.rationale}\n\n` +
