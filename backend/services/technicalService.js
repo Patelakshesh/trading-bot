@@ -1,12 +1,12 @@
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
-const { RSI, MACD } = require('technicalindicators');
+const { RSI, MACD, SMA } = require('technicalindicators');
 
 const getTechnicalIndicators = async (symbol) => {
     try {
-        // Calculate date 90 days ago
+        // Calculate date 300 days ago (to ensure we have at least 200 trading days)
         const period1 = new Date();
-        period1.setDate(period1.getDate() - 90);
+        period1.setDate(period1.getDate() - 300);
         const period2 = new Date();
 
         const historical = await yahooFinance.historical(symbol, {
@@ -55,6 +55,21 @@ const getTechnicalIndicators = async (symbol) => {
         const distFromSupport = ((currentClose - supportLevel) / supportLevel * 100).toFixed(2);
         const nearSupport = parseFloat(distFromSupport) <= 3;
 
+        // === TREND ANALYSIS (Moving Averages) ===
+        // A stock below its 200-SMA is in a long-term downtrend (avoid buying)
+        let sma50 = null, sma200 = null, trendSignal = 'NEUTRAL';
+        if (closePrices.length >= 200) {
+            const sma200Values = SMA.calculate({ period: 200, values: closePrices });
+            sma200 = sma200Values[sma200Values.length - 1];
+            
+            const sma50Values = SMA.calculate({ period: 50, values: closePrices });
+            sma50 = sma50Values[sma50Values.length - 1];
+
+            if (currentClose > sma50 && currentClose > sma200) trendSignal = 'STRONG UPTREND (Above 50 & 200 SMA)';
+            else if (currentClose < sma200) trendSignal = 'DOWNTREND (Below 200 SMA - HIGH RISK)';
+            else trendSignal = 'SIDEWAYS / RECOVERING';
+        }
+
         return {
             RSI: currentRSI,
             MACD: currentMACD,
@@ -65,6 +80,9 @@ const getTechnicalIndicators = async (symbol) => {
             supportLevel: supportLevel.toFixed(2),
             distFromSupport: `${distFromSupport}%`,
             nearSupport,
+            sma50: sma50 ? sma50.toFixed(2) : 'N/A',
+            sma200: sma200 ? sma200.toFixed(2) : 'N/A',
+            trendSignal,
             status: currentRSI > 65 ? 'OVERBOUGHT (Risk of crash)' : currentRSI < 35 ? 'OVERSOLD (Potential bounce)' : 'NEUTRAL'
         };
     } catch (err) {

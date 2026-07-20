@@ -178,9 +178,16 @@ ${news.length > 0 ? news.slice(0, 5).map(n => `- ${n.title}`).join('\n') : 'No r
 [SIGNAL 8] SOCIAL HYPE:
 - ${hypeNote}
 
+[SIGNAL 9] LONG-TERM TREND (SMA):
+- 50-day SMA: ₹${technicals?.sma50 || 'Unknown'}
+- 200-day SMA: ₹${technicals?.sma200 || 'Unknown'}
+- Trend Status: ${technicals?.trendSignal || 'Unknown'}
+  Rule: If price is below 200-SMA, it is in a long-term downtrend. Very risky unless RSI is deeply oversold.
+
 === DECISION RULES ===
-- AUTOMATIC REJECT: If earnings risk is HIGH (within 5 days) — output HOLD regardless of other signals.
-- BUY if 3+ AVAILABLE signals are BULLISH. Confidence >= 70.
+- AUTOMATIC REJECT 1: If earnings risk is HIGH (within 5 days) — output HOLD regardless of other signals.
+- AUTOMATIC REJECT 2: If price is below 200-SMA AND RSI > 45 — output HOLD/SELL (falling knife).
+- BUY if 4+ AVAILABLE signals are BULLISH. Confidence >= 70.
 - HOLD if signals are mixed or mostly neutral.
 - SELL if 2+ AVAILABLE signals are explicitly BEARISH.
 
@@ -289,13 +296,14 @@ ${movers.losers.slice(0, 6).map(l => `- ${l.symbol} (${l.name}): \u20b9${l.price
 
 === YOUR EXPERT DECISION RULES ===
 
-For each candidate stock, verify ALL 4 gates:
+For each candidate stock, verify ALL 5 gates:
 GATE 1 - MOMENTUM: Clear reason for the stock to move today (news, sector strength, earnings)?
-GATE 2 - TECHNICAL: RSI not above 68? Price not at resistance? Setup is safe to enter?
-GATE 3 - RISK/REWARD: Target is at least 1.5x the stop-loss distance?
-GATE 4 - TIMING: Is this the right time to enter right now, at the current time? Or has the move already happened?
+GATE 2 - TREND (CRITICAL): Is the stock in a long-term uptrend? DO NOT recommend stocks in a long-term downtrend (below 200-day SMA) unless in Dip Buying mode.
+GATE 3 - TECHNICAL: RSI not above 68? Price not at resistance? Setup is safe to enter?
+GATE 4 - RISK/REWARD: Target is at least 1.5x the stop-loss distance?
+GATE 5 - TIMING: Is this the right time to enter right now, at the current time? Or has the move already happened?
 
-ONLY recommend if it passes ALL 4 GATES. Skip and find a better one if it fails.
+ONLY recommend if it passes ALL 5 GATES. Skip and find a better one if it fails.
 
 Pricing rules:
 - Target = current price + 4% to 7%
