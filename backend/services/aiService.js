@@ -204,7 +204,7 @@ For BUY: Calculate EXACT price targets:
     }
 };
 
-const getGlobalTop5TradingTips = async (news, movers, budget = null, priceRange = null) => {
+const getGlobalTop5TradingTips = async (news, movers, budget = null, priceRange = null, niftyChange = null) => {
     try {
         let budgetPrompt = "";
         let jsonFields = "";
@@ -218,9 +218,38 @@ const getGlobalTop5TradingTips = async (news, movers, budget = null, priceRange 
             rangePrompt = `CRITICAL: The user has specifically requested stocks priced strictly between ₹${priceRange.min} and ₹${priceRange.max}. You MUST ONLY recommend stocks that currently trade within this exact price range. If the provided movers do not fit this range, you must use your elite quantitative knowledge to recommend 5 other highly explosive stocks (e.g., penny stocks or mid-caps) that fit this price bracket. You must estimate and provide their current price in the JSON.`;
         }
 
+        // === MARKET-DIRECTION-AWARE STRATEGY ===
+        let marketStrategyPrompt = '';
+        if (niftyChange !== null) {
+            if (niftyChange <= -0.5) {
+                marketStrategyPrompt = `
+=== TODAY'S MARKET STRATEGY: DIP BUYING ===
+The Nifty 50 is DOWN ${Math.abs(niftyChange).toFixed(2)}% today. This is a DIP BUYING opportunity.
+Your PRIMARY job is to find QUALITY stocks that dropped today ONLY because of overall market weakness — NOT because of any company-specific problem.
+These stocks are temporarily cheap and historically bounce back 3-7% within 1-3 trading days.
+Look specifically in: TOP NSE LOSERS list for stocks with STRONG fundamentals that fell today.
+A stock falling -1% to -3% today when its fundamentals are strong = EXCELLENT buy setup.
+DO NOT recommend stocks that fell due to bad earnings, scandals, or downgrades — those falls are permanent.`;
+            } else if (niftyChange >= 0.3) {
+                marketStrategyPrompt = `
+=== TODAY'S MARKET STRATEGY: MOMENTUM BUYING ===
+The Nifty 50 is UP +${niftyChange.toFixed(2)}% today. This is a MOMENTUM opportunity.
+Your PRIMARY job is to find stocks that are breaking out above resistance levels with high volume.
+Look specifically in: TOP NSE GAINERS list for stocks with strong momentum that can continue 4-7% more.
+Avoid stocks that already jumped 5%+ today — the move may be over. Look for stocks up 1-3% that have more room to run.`;
+            } else {
+                marketStrategyPrompt = `
+=== TODAY'S MARKET STRATEGY: SELECTIVE TRADING ===
+The Nifty 50 is flat (${niftyChange >= 0 ? '+' : ''}${niftyChange.toFixed(2)}%) today. Market is sideways.
+Be VERY selective. Only recommend stocks with CRYSTAL CLEAR setups (confidence >= 80).
+Look for stocks with specific catalysts: earnings, news, sector rotation, or breakouts.`;
+            }
+        }
+
         const prompt = `
 You are a SENIOR RISK COMMITTEE of 3 expert Indian stock traders at a top Mumbai-based fund.
 Your job is to find the BEST 5 INDIAN NSE stocks for short-term swing trading today.
+${marketStrategyPrompt}
 
 ⚠️ CRITICAL RULE - INDIAN STOCKS ONLY:
 - You MUST ONLY recommend stocks listed on the INDIAN NSE exchange.

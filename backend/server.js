@@ -394,23 +394,23 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     
                     if (niftyChange !== null) {
                         if (niftyChange <= -0.5) {
-                            niftyBanner = `🔴 <b>MARKET WARNING: Nifty 50 is DOWN ${Math.abs(niftyChange).toFixed(2)}% today!</b>\n` +
-                                          `Buying in a falling market is HIGH RISK. Consider waiting or using smaller amounts.\n` +
+                            niftyBanner = `🔴 <b>MARKET DOWN: Nifty 50 is -${Math.abs(niftyChange).toFixed(2)}% today — DIP BUYING MODE</b>\n` +
+                                          `💡 Strategy: AI is finding quality stocks that fell cheap due to market weakness and will bounce in 1-3 days.\n` +
                                           `────────────────────────────\n\n`;
                         } else if (niftyChange >= 0.3) {
-                            niftyBanner = `🟢 <b>MARKET HEALTHY: Nifty 50 is UP +${niftyChange.toFixed(2)}% today.</b>\n` +
-                                          `Good conditions to trade. Market momentum is positive.\n` +
+                            niftyBanner = `🟢 <b>MARKET UP: Nifty 50 is +${niftyChange.toFixed(2)}% today — MOMENTUM MODE</b>\n` +
+                                          `💡 Strategy: AI is finding stocks breaking out with strong upward momentum.\n` +
                                           `────────────────────────────\n\n`;
                         } else {
-                            niftyBanner = `🟡 <b>MARKET NEUTRAL: Nifty 50 is ${niftyChange >= 0 ? '+' : ''}${niftyChange.toFixed(2)}% today.</b>\n` +
-                                          `Market is sideways. Be selective and trade only HIGH confidence tips.\n` +
+                            niftyBanner = `🟡 <b>MARKET FLAT: Nifty 50 is ${niftyChange >= 0 ? '+' : ''}${niftyChange.toFixed(2)}% today — SELECTIVE MODE</b>\n` +
+                                          `💡 Strategy: Market is sideways. AI will only show HIGH confidence trades.\n` +
                                           `────────────────────────────\n\n`;
                         }
                     }
                 } catch(e) { console.warn('Nifty check failed:', e.message); }
 
                 await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩🟩🟩⬛] 85% - Quant AI crunching algorithms...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
-                const top5 = await getGlobalTop5TradingTips(news, movers, budget, priceRange);
+                const top5 = await getGlobalTop5TradingTips(news, movers, budget, priceRange, niftyChange);
                 
                 if (top5 && top5.error && top5.reason === 'RATE_LIMIT') {
                     await bot.editMessageText(`⚠️ <b>Google AI Rate Limit Exceeded!</b>\n\nYou are requesting too many tips too quickly, and the free Google AI quota is exhausted for this minute. Please wait 1-2 minutes and try again.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
