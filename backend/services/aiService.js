@@ -111,52 +111,67 @@ const getStockAnalysis = async (symbol, news, technicals, currentPrice) => {
     try {
         const advancedMetrics = await advancedDataService.getAdvancedMetrics(symbol);
 
+        const optionsSentiment = advancedMetrics.optionsData.sentiment || '';
+        const optionsNote = optionsSentiment.includes('No Options Data') || optionsSentiment.includes('Unavailable')
+            ? 'OPTIONS DATA: Not available for this Indian NSE stock. Treat as NEUTRAL — do NOT penalize for missing data.'
+            : `Put/Call Ratio: ${advancedMetrics.optionsData.putCallRatio} (${optionsSentiment})`;
+
+        const hypeLevel = advancedMetrics.socialSentiment.hypeLevel;
+        const hypeNote = (hypeLevel === 'Unknown' || hypeLevel === 'LOW')
+            ? 'SOCIAL HYPE: Low Reddit activity is NORMAL for Indian stocks. Do NOT treat this as bearish.'
+            : `Social Hype Level: ${hypeLevel}`;
+
         const prompt = `
 You are a senior portfolio manager at a top-tier hedge fund in India. You have 20 years of trading experience.
-You think like a REAL HUMAN expert — cautious, data-driven, and never impulsive.
+You specialise in INDIAN NSE stocks and understand their market structure.
 
-Stock: ${symbol} | Entry Price: ₹${currentPrice || 'Unknown'}
+Stock: ${symbol} | Current Price: ₹${currentPrice || 'Unknown'}
+Current time in India: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
 
-=== SIGNAL CHECKLIST (You MUST evaluate ALL of these before deciding) ===
+⚠️ IMPORTANT RULE FOR INDIAN STOCKS:
+- Many Indian NSE stocks do NOT have options data or Reddit discussion. This is NORMAL.
+- Treat any 'N/A' or 'Unavailable' data as NEUTRAL — never as BEARISH.
+- Base your decision on the signals that DO have real data.
+
+=== SIGNAL CHECKLIST ===
 
 [SIGNAL 1] PRICE & TREND:
 - Current Price: ₹${currentPrice || 'Unknown'}
-- Is the price near a support level (good to BUY) or resistance level (risky to BUY)?
+- Is the price near support (good to BUY) or resistance (risky to BUY)?
 
-[SIGNAL 2] TECHNICAL INDICATORS (Math cannot lie):
+[SIGNAL 2] TECHNICAL INDICATORS:
 - RSI (14-day): ${technicals ? technicals.rsi : 'Unknown'}
-  Rule: RSI < 35 = Oversold = Strong BUY signal. RSI > 68 = Overbought = DO NOT BUY.
+  Rule: RSI < 40 = Oversold = BUY signal. RSI > 68 = Overbought = Caution.
 - MACD: ${technicals ? technicals.macd : 'Unknown'}
-  Rule: MACD line crossing above Signal line = Bullish. Crossing below = Bearish.
+  Rule: MACD positive/crossing above = Bullish. Negative = Bearish.
 
-[SIGNAL 3] INSTITUTIONAL SMART MONEY (What the big players are doing):
-- Put/Call Ratio: ${advancedMetrics.optionsData.putCallRatio} (${advancedMetrics.optionsData.sentiment})
-  Rule: Put/Call < 0.7 = Institutions are buying calls = BULLISH. Put/Call > 1.1 = Institutions are hedging = DO NOT BUY.
+[SIGNAL 3] INSTITUTIONAL MONEY:
+- ${optionsNote}
+  Rule: Only flag BEARISH if data explicitly shows Put/Call > 1.1.
 
 [SIGNAL 4] NEWS SENTIMENT:
-${news.length > 0 ? news.slice(0, 5).map(n => `- ${n.title}`).join('\n') : 'No recent news.'}
-  Rule: Positive news + technical confirmation = strong signal. Positive news alone is NOT enough.
+${news.length > 0 ? news.slice(0, 5).map(n => `- ${n.title}`).join('\n') : 'No recent news available.'}
+  Rule: Positive news + technical confirmation = strong BUY signal.
 
-[SIGNAL 5] FUNDAMENTALS (Company health):
-- Revenue Growth: ${advancedMetrics.earningsData.revenueGrowth}
-- Profit Margin: ${advancedMetrics.earningsData.profitMargin}
-- Analyst Rating: ${advancedMetrics.earningsData.recommendationKey}
-- Institutional Holding: ${advancedMetrics.earningsData.heldByInstitutions}
-  Rule: If profit margin is negative AND revenue is declining, this is a high-risk trade. Warn the user.
+[SIGNAL 5] FUNDAMENTALS:
+- Revenue Growth: ${advancedMetrics.earningsData.revenueGrowth || 'N/A'}
+- Profit Margin: ${advancedMetrics.earningsData.profitMargin || 'N/A'}
+- Analyst Rating: ${advancedMetrics.earningsData.recommendationKey || 'N/A'}
+- Institutional Holding: ${advancedMetrics.earningsData.heldByInstitutions || 'N/A'}
+  Rule: If data is N/A, treat as NEUTRAL. Only flag BEARISH if data is explicitly negative.
 
-[SIGNAL 6] SOCIAL HYPE CHECK:
-- Social Hype Level: ${advancedMetrics.socialSentiment.hypeLevel}
-  Rule: If a stock is trending on social media BUT fundamentals are bad, it is a bubble. NEVER chase hype alone.
+[SIGNAL 6] SOCIAL HYPE:
+- ${hypeNote}
 
-=== DECISION RULES (Follow strictly) ===
-Count how many signals are BULLISH:
-- BUY only if 3 or more signals are BULLISH. Assign confidence >= 70.
-- HOLD if 1-2 signals are bullish but others are neutral or unclear.
-- SELL if 2 or more signals are BEARISH.
+=== DECISION RULES ===
+- Count ONLY signals that have REAL data (not N/A or Unavailable).
+- BUY if 2 or more AVAILABLE signals are BULLISH. Confidence >= 70.
+- HOLD if signals are mixed or mostly neutral.
+- SELL if 2 or more AVAILABLE signals are explicitly BEARISH.
 
-For BUY: Calculate EXACT price targets based on ₹${currentPrice || 0}:
-- Target: Entry price + 4% to 6% (realistic short-term gain)
-- Stop-Loss: Entry price - 3% to 4% (capital protection)
+For BUY: Calculate EXACT price targets:
+- Target: Entry price + 4% to 6%
+- Stop-Loss: Entry price - 2.5% to 4%
 
 === OUTPUT (Strict JSON only, no markdown) ===
 {
