@@ -121,6 +121,10 @@ const getStockAnalysis = async (symbol, news, technicals, currentPrice) => {
             ? 'SOCIAL HYPE: Low Reddit activity is NORMAL for Indian stocks. Do NOT treat this as bearish.'
             : `Social Hype Level: ${hypeLevel}`;
 
+        // Earnings risk check
+        const { hasEarningsRisk } = require('./technicalService');
+        const earningsRisk = await hasEarningsRisk(symbol);
+
         const prompt = `
 You are a senior portfolio manager at a top-tier hedge fund in India. You have 20 years of trading experience.
 You specialise in INDIAN NSE stocks and understand their market structure.
@@ -128,7 +132,7 @@ You specialise in INDIAN NSE stocks and understand their market structure.
 Stock: ${symbol} | Current Price: ₹${currentPrice || 'Unknown'}
 Current time in India: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
 
-⚠️ IMPORTANT RULE FOR INDIAN STOCKS:
+⚠️ IMPORTANT RULES FOR INDIAN STOCKS:
 - Many Indian NSE stocks do NOT have options data or Reddit discussion. This is NORMAL.
 - Treat any 'N/A' or 'Unavailable' data as NEUTRAL — never as BEARISH.
 - Base your decision on the signals that DO have real data.
@@ -138,36 +142,47 @@ Current time in India: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Ko
 [SIGNAL 1] PRICE & TREND:
 - Current Price: ₹${currentPrice || 'Unknown'}
 - Is the price near support (good to BUY) or resistance (risky to BUY)?
+- Support Level (20-day low): ₹${technicals?.supportLevel || 'Unknown'}
+- Distance from support: ${technicals?.distFromSupport || 'Unknown'} ${technicals?.nearSupport ? '✅ NEAR SUPPORT — Excellent entry zone!' : ''}
 
 [SIGNAL 2] TECHNICAL INDICATORS:
-- RSI (14-day): ${technicals ? technicals.rsi : 'Unknown'}
+- RSI (7-day): ${technicals ? technicals.RSI?.toFixed(1) : 'Unknown'}
   Rule: RSI < 40 = Oversold = BUY signal. RSI > 68 = Overbought = Caution.
-- MACD: ${technicals ? technicals.macd : 'Unknown'}
-  Rule: MACD positive/crossing above = Bullish. Negative = Bearish.
+- Status: ${technicals?.status || 'Unknown'}
+- MACD: ${technicals?.MACD ? `MACD=${technicals.MACD.MACD?.toFixed(2)}, Signal=${technicals.MACD.signal?.toFixed(2)}, Histogram=${technicals.MACD.histogram?.toFixed(2)}` : 'Unknown'}
+  Rule: MACD positive/crossing above signal = Bullish. Negative = Bearish.
 
-[SIGNAL 3] INSTITUTIONAL MONEY:
+[SIGNAL 3] VOLUME (Institutional Confirmation):
+- Volume Signal: ${technicals?.volumeSignal || 'Unknown'}
+- Volume Ratio vs 10-day average: ${technicals?.volumeRatio || 'Unknown'}x
+  Rule: Volume >= 1.2x average = Smart money is moving this stock. Weak volume = unreliable move.
+
+[SIGNAL 4] EARNINGS RISK:
+- ${earningsRisk.reason}
+  Rule: If earnings are within 5 days, flag as HIGH RISK regardless of other signals.
+
+[SIGNAL 5] INSTITUTIONAL MONEY:
 - ${optionsNote}
   Rule: Only flag BEARISH if data explicitly shows Put/Call > 1.1.
 
-[SIGNAL 4] NEWS SENTIMENT:
+[SIGNAL 6] NEWS SENTIMENT:
 ${news.length > 0 ? news.slice(0, 5).map(n => `- ${n.title}`).join('\n') : 'No recent news available.'}
   Rule: Positive news + technical confirmation = strong BUY signal.
 
-[SIGNAL 5] FUNDAMENTALS:
+[SIGNAL 7] FUNDAMENTALS:
 - Revenue Growth: ${advancedMetrics.earningsData.revenueGrowth || 'N/A'}
 - Profit Margin: ${advancedMetrics.earningsData.profitMargin || 'N/A'}
 - Analyst Rating: ${advancedMetrics.earningsData.recommendationKey || 'N/A'}
-- Institutional Holding: ${advancedMetrics.earningsData.heldByInstitutions || 'N/A'}
-  Rule: If data is N/A, treat as NEUTRAL. Only flag BEARISH if data is explicitly negative.
+  Rule: If data is N/A, treat as NEUTRAL.
 
-[SIGNAL 6] SOCIAL HYPE:
+[SIGNAL 8] SOCIAL HYPE:
 - ${hypeNote}
 
 === DECISION RULES ===
-- Count ONLY signals that have REAL data (not N/A or Unavailable).
-- BUY if 2 or more AVAILABLE signals are BULLISH. Confidence >= 70.
+- AUTOMATIC REJECT: If earnings risk is HIGH (within 5 days) — output HOLD regardless of other signals.
+- BUY if 3+ AVAILABLE signals are BULLISH. Confidence >= 70.
 - HOLD if signals are mixed or mostly neutral.
-- SELL if 2 or more AVAILABLE signals are explicitly BEARISH.
+- SELL if 2+ AVAILABLE signals are explicitly BEARISH.
 
 For BUY: Calculate EXACT price targets:
 - Target: Entry price + 4% to 6%
@@ -177,7 +192,7 @@ For BUY: Calculate EXACT price targets:
 {
   "action": "BUY",
   "confidence": 85,
-  "bullishSignals": 4,
+  "bullishSignals": 5,
   "rationale": "<2 sentence expert explanation: what signals aligned, what risk exists>",
   "target": "₹XXX.XX",
   "stopLoss": "₹XXX.XX",

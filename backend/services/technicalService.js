@@ -1,5 +1,5 @@
 const YahooFinance = require('yahoo-finance2').default;
-const yahooFinance = new YahooFinance();
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
 const { RSI, MACD } = require('technicalindicators');
 
 const getTechnicalIndicators = async (symbol) => {
@@ -20,16 +20,17 @@ const getTechnicalIndicators = async (symbol) => {
         }
 
         const closePrices = historical.map(row => row.close);
+        const volumes = historical.map(row => row.volume);
 
         // Calculate RSI (7 period - Faster for Short Term Swing Trading)
         const rsiInput = { values: closePrices, period: 7 };
         const rsiValues = RSI.calculate(rsiInput);
         const currentRSI = rsiValues[rsiValues.length - 1];
 
-        // Calculate MACD (12, 26, 9)
+        // Calculate MACD
         const macdInput = {
             values: closePrices,
-            fastPeriod: 8, // Faster MACD
+            fastPeriod: 8,
             slowPeriod: 17,
             signalPeriod: 9,
             SimpleMAOscillator: false,
@@ -38,14 +39,54 @@ const getTechnicalIndicators = async (symbol) => {
         const macdValues = MACD.calculate(macdInput);
         const currentMACD = macdValues[macdValues.length - 1];
 
+        // === VOLUME ANALYSIS (Institutional buying detection) ===
+        const avgVolume10d = volumes.slice(-10).reduce((a, b) => a + b, 0) / 10;
+        const todayVolume = volumes[volumes.length - 1];
+        const volumeRatio = todayVolume / avgVolume10d;
+        const volumeSignal = volumeRatio >= 1.5 ? 'HIGH (Strong institutional buying)'
+                          : volumeRatio >= 1.2 ? 'ABOVE AVERAGE (Confirming move)'
+                          : volumeRatio >= 0.8 ? 'NORMAL'
+                          : 'LOW (Weak move - be cautious)';
+
+        // === SUPPORT LEVEL DETECTION (Near support = safer entry) ===
+        const last20Lows = historical.slice(-20).map(r => r.low);
+        const supportLevel = Math.min(...last20Lows);
+        const currentClose = closePrices[closePrices.length - 1];
+        const distFromSupport = ((currentClose - supportLevel) / supportLevel * 100).toFixed(2);
+        const nearSupport = parseFloat(distFromSupport) <= 3;
+
         return {
             RSI: currentRSI,
             MACD: currentMACD,
+            volume: todayVolume,
+            avgVolume: Math.round(avgVolume10d),
+            volumeRatio: volumeRatio.toFixed(2),
+            volumeSignal,
+            supportLevel: supportLevel.toFixed(2),
+            distFromSupport: `${distFromSupport}%`,
+            nearSupport,
             status: currentRSI > 65 ? 'OVERBOUGHT (Risk of crash)' : currentRSI < 35 ? 'OVERSOLD (Potential bounce)' : 'NEUTRAL'
         };
     } catch (err) {
         console.error(`Error calculating technicals for ${symbol}:`, err.message);
         return null;
+    }
+};
+
+// === EARNINGS RISK CHECK (Avoid buying before earnings - highest cause of crashes) ===
+const hasEarningsRisk = async (symbol) => {
+    try {
+        const summary = await yahooFinance.quoteSummary(symbol, { modules: ['calendarEvents'] });
+        const earningsDate = summary?.calendarEvents?.earnings?.earningsDate?.[0];
+        if (!earningsDate) return { hasRisk: false, reason: 'No upcoming earnings found' };
+        
+        const daysToEarnings = Math.floor((new Date(earningsDate) - new Date()) / (1000 * 60 * 60 * 24));
+        if (daysToEarnings >= 0 && daysToEarnings <= 5) {
+            return { hasRisk: true, reason: `⚠️ Earnings in ${daysToEarnings} days! HIGH RISK.`, daysToEarnings };
+        }
+        return { hasRisk: false, reason: `Earnings in ${daysToEarnings} days (safe)`, daysToEarnings };
+    } catch(e) {
+        return { hasRisk: false, reason: 'Earnings data unavailable' };
     }
 };
 
@@ -66,14 +107,11 @@ const runBacktest = async (symbol, days = 365) => {
         const closePrices = historical.map(row => row.close);
         const dates = historical.map(row => row.date);
 
-        // Use a faster 7-period RSI for Swing Trading
         const rsiValues = RSI.calculate({ values: closePrices, period: 7 });
-        
-        // Pad the beginning of RSI array with nulls to match the dates array length
         const rsiPadded = new Array(7).fill(null).concat(rsiValues);
 
-        let balance = 100000; // Start with 1,00,000 capital
-        let position = 0; // Number of shares owned
+        let balance = 100000;
+        let position = 0;
         let buyPriceTarget = 0;
         let daysHeld = 0;
         const trades = [];
@@ -83,11 +121,8 @@ const runBacktest = async (symbol, days = 365) => {
             const rsi = rsiPadded[i];
             const date = dates[i];
 
-            if (position > 0) {
-                daysHeld++;
-            }
+            if (position > 0) daysHeld++;
 
-            // BUY SIGNAL: RSI deeply oversold (< 35 on the fast 7-day scale)
             if (rsi < 35 && position === 0) {
                 const sharesToBuy = Math.floor(balance / price);
                 if (sharesToBuy > 0) {
@@ -97,9 +132,7 @@ const runBacktest = async (symbol, days = 365) => {
                     daysHeld = 0;
                     trades.push({ type: 'BUY', date, price, amount: sharesToBuy * price });
                 }
-            }
-            // SELL SIGNAL: RSI overbought (> 65), OR we hit a quick 4% profit, OR Time-Stop (max hold 5 days)
-            else if (position > 0 && (rsi > 65 || (price >= buyPriceTarget * 1.04) || daysHeld >= 5)) {
+            } else if (position > 0 && (rsi > 65 || (price >= buyPriceTarget * 1.04) || daysHeld >= 5)) {
                 const sellAmount = position * price;
                 balance += sellAmount;
                 trades.push({ type: 'SELL', date, price, amount: sellAmount, reason: rsi > 65 ? 'RSI' : (daysHeld >= 5 ? 'Time Stop' : 'Take Profit') });
@@ -108,7 +141,6 @@ const runBacktest = async (symbol, days = 365) => {
             }
         }
 
-        // Close any open position at the very end to calculate final profit
         if (position > 0) {
             const finalPrice = closePrices[closePrices.length - 1];
             balance += position * finalPrice;
@@ -135,4 +167,4 @@ const runBacktest = async (symbol, days = 365) => {
     }
 };
 
-module.exports = { getTechnicalIndicators, runBacktest };
+module.exports = { getTechnicalIndicators, runBacktest, hasEarningsRisk };
