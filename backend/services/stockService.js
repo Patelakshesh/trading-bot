@@ -150,16 +150,21 @@ const getMarketMovers = async () => {
         ];
         
         const pricePromises = fallbackData.map(async (item) => {
-            const price = await getStockPrice(item.symbol);
-            if(price) {
-                // Simulate a small random daily change for the UI fallback
-                const pseudoChange = (Math.random() * 6) - 2; 
-                return {
-                    symbol: item.symbol,
-                    name: item.name,
-                    price: price,
-                    changePercent: pseudoChange
-                };
+            try {
+                // Fetch REAL quote data to get accurate price AND change percent
+                const quote = await yahooFinance.quote(item.symbol);
+                if (quote && quote.regularMarketPrice) {
+                    return {
+                        symbol: item.symbol,
+                        name: item.name,
+                        price: quote.regularMarketPrice,
+                        changePercent: quote.regularMarketChangePercent || 0
+                    };
+                }
+            } catch(e) {
+                // If quote fails entirely, fall back to just price with 0 change
+                const price = await getStockPrice(item.symbol);
+                if (price) return { symbol: item.symbol, name: item.name, price, changePercent: 0 };
             }
             return null;
         });
