@@ -381,7 +381,35 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩⬛⬛⬛⬛] 50% - Fetching Market Movers...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 const movers = await getMarketMovers();
                 
-                await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩🟩⬛⬛] 75% - Quant AI crunching 98% algorithms...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩🟩⬛⬛] 75% - Checking Nifty 50 Market Direction...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                
+                // === PROFESSIONAL CHECK: NIFTY 50 MARKET DIRECTION ===
+                let niftyBanner = '';
+                try {
+                    const niftyPrice = await getStockPrice('^NSEI'); // Nifty 50 index
+                    const niftyQuote = require('yahoo-finance2').default;
+                    const yf = new niftyQuote({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+                    const niftyData = await yf.quote('^NSEI');
+                    const niftyChange = niftyData ? niftyData.regularMarketChangePercent : null;
+                    
+                    if (niftyChange !== null) {
+                        if (niftyChange <= -0.5) {
+                            niftyBanner = `🔴 <b>MARKET WARNING: Nifty 50 is DOWN ${Math.abs(niftyChange).toFixed(2)}% today!</b>\n` +
+                                          `Buying in a falling market is HIGH RISK. Consider waiting or using smaller amounts.\n` +
+                                          `────────────────────────────\n\n`;
+                        } else if (niftyChange >= 0.3) {
+                            niftyBanner = `🟢 <b>MARKET HEALTHY: Nifty 50 is UP +${niftyChange.toFixed(2)}% today.</b>\n` +
+                                          `Good conditions to trade. Market momentum is positive.\n` +
+                                          `────────────────────────────\n\n`;
+                        } else {
+                            niftyBanner = `🟡 <b>MARKET NEUTRAL: Nifty 50 is ${niftyChange >= 0 ? '+' : ''}${niftyChange.toFixed(2)}% today.</b>\n` +
+                                          `Market is sideways. Be selective and trade only HIGH confidence tips.\n` +
+                                          `────────────────────────────\n\n`;
+                        }
+                    }
+                } catch(e) { console.warn('Nifty check failed:', e.message); }
+
+                await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩🟩🟩⬛] 85% - Quant AI crunching algorithms...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 const top5 = await getGlobalTop5TradingTips(news, movers, budget, priceRange);
                 
                 if (top5 && top5.error && top5.reason === 'RATE_LIMIT') {
@@ -416,7 +444,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                         } catch(e) { console.error("Failed to fetch real price for", t.symbol); }
                     }
 
-                    let msgText = `🎯 <b>TOP 5 AI SWING TRADES</b>\n<i>Multi-gate expert analysis</i>\n\n`;
+                    let msgText = `🎯 <b>TOP 5 AI SWING TRADES</b>\n<i>Professional multi-gate analysis</i>\n\n` + niftyBanner;
                     top5.forEach((t, i) => {
                         const companyStr = t.companyName ? ` — ${t.companyName}` : '';
                         const formatPrice = (p) => (p && typeof p === 'number') ? `₹${p.toFixed(2)}` : (p && !p.toString().includes('₹') ? `₹${p}` : p);
