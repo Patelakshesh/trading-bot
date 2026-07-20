@@ -280,24 +280,24 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                         aiSL = `₹${(livePrice * 0.97).toFixed(2)}`;
                     }
 
-                    // Confidence bar visual
                     const conf = analysis.confidence || 0;
-                    const confBar = conf >= 85 ? '🟢🟢🟢🟢🟢'
-                                  : conf >= 75 ? '🟢🟢🟢🟢⬛'
-                                  : conf >= 65 ? '🟢🟢🟢⬛⬛'
-                                  : '🟢🟢⬛⬛⬛';
+                    const confBar = conf >= 85 ? '🟢🟢🟢🟢🟢 VERY STRONG'
+                                  : conf >= 75 ? '🟢🟢🟢🟢⬛ STRONG'
+                                  : conf >= 65 ? '🟢🟢🟢⬛⬛ MODERATE'
+                                  : '🟢🟢⬛⬛⬛ WEAK';
                     const riskEmoji = analysis.riskLevel === 'LOW' ? '✅ LOW'
                                     : analysis.riskLevel === 'HIGH' ? '🔴 HIGH'
                                     : '🟡 MEDIUM';
 
-                    let priceBlock = `💰 <b>Entry Price (Buy At):</b> ${priceText}\n`;
+                    let priceBlock = `💰 <b>Live Market Price:</b> ${priceText}\n`;
                     if (analysis.action === 'BUY') {
                         priceBlock += `🎯 <b>Target (Sell At):</b> ${aiTarget}\n`;
-                        priceBlock += `🛡️ <b>Stop-Loss (Exit if):</b> ${aiSL}\n`;
+                        priceBlock += `🛡️ <b>Stop-Loss (Exit if drops to):</b> ${aiSL}\n`;
                     } else if (analysis.action === 'SELL') {
                         priceBlock += `🔴 <b>Exit now at market price:</b> ${priceText}\n`;
                     } else {
-                        priceBlock += `🎯 <b>Next Target:</b> ${aiTarget}\n`;
+                        // HOLD — show next possible target if momentum recovers
+                        priceBlock += `🎯 <b>Next Target (if momentum picks up):</b> ${aiTarget}\n`;
                         priceBlock += `🛡️ <b>Stop-Loss:</b> ${aiSL}\n`;
                     }
 
@@ -313,21 +313,49 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                                             `${'─'.repeat(28)}\n\n`;
                     }
 
+                    // === CLEAR FINAL VERDICT — always easy to understand ===
+                    let verdictBlock = '';
+                    if (analysis.action === 'BUY' && conf >= 75) {
+                        verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                       `✅ <b>VERDICT: BUY NOW</b>\n` +
+                                       `Confidence is HIGH. This is a good trade to enter right now at ₹${currentPrice}.\n` +
+                                       `After buying, type: <code>/bought ${brokerSymbol} ${currentPrice} QUANTITY</code>`;
+                    } else if (analysis.action === 'BUY' && conf < 75) {
+                        verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                       `⚠️ <b>VERDICT: WEAK SIGNAL — SKIP THIS TRADE</b>\n` +
+                                       `Confidence is too low. The signals are not strong enough. Do NOT buy right now. Wait for a better setup.`;
+                    } else if (analysis.action === 'HOLD') {
+                        if (holding) {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                           `🟡 <b>VERDICT: HOLD — Keep your position</b>\n` +
+                                           `You own this stock. Do not sell yet. Wait for the target or stop-loss to be hit.`;
+                        } else {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                           `🚫 <b>VERDICT: DO NOT BUY NOW</b>\n` +
+                                           `Signals are mixed. This is NOT a good time to enter. Skip this stock and wait for a clearer setup.`;
+                        }
+                    } else if (analysis.action === 'SELL') {
+                        if (holding) {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                           `🔴 <b>VERDICT: SELL NOW</b>\n` +
+                                           `AI signals are bearish. Exit your position immediately to protect your capital.`;
+                        } else {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                           `🚫 <b>VERDICT: DO NOT BUY</b>\n` +
+                                           `AI signals are bearish. Absolutely do not enter this trade right now.`;
+                        }
+                    }
+
                     const finalMsg =
-                        `${actionIcon} <b>AI TIP: ${symbol}</b>\n` +
+                        `${actionIcon} <b>AI ANALYSIS: ${symbol}</b>\n` +
                         `${'─'.repeat(28)}\n\n` +
                         holdingStatusText +
-                        `\ud83d\udd0d <b>Search in Groww/Zerodha:</b> <code>${brokerSymbol}</code>\n\n` +
+                        `🔍 <b>Search in Groww/Zerodha:</b> <code>${brokerSymbol}</code>\n\n` +
                         priceBlock +
-                        `\n<b>\ud83d\udcca Confidence:</b> ${confBar} <b>${conf}%</b>\n` +
-                        `<b>\u26a1 Signals Aligned:</b> ${analysis.bullishSignals || '?'}/6 bullish\n` +
-                        `<b>\u26a0\ufe0f Risk Level:</b> ${riskEmoji}\n\n` +
-                        `<b>\ud83e\udde0 Expert Analysis:</b>\n<i>${analysis.rationale}</i>\n\n` +
-                        (analysis.action === 'BUY' && conf >= 80
-                            ? `\u2705 <b>HIGH CONVICTION</b> \u2014 Safe to act right now at current price.`
-                            : analysis.action === 'BUY' && conf < 80
-                            ? `\u26a0\ufe0f <b>LOW CONVICTION</b> \u2014 Consider skipping this trade.`
-                            : ``);
+                        `\n<b>📊 Confidence:</b> ${confBar}\n` +
+                        `<b>⚠️ Risk Level:</b> ${riskEmoji}\n\n` +
+                        `<b>🧠 Expert Analysis:</b>\n<i>${analysis.rationale}</i>` +
+                        verdictBlock;
 
                     await bot.editMessageText(finalMsg, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 } else {
