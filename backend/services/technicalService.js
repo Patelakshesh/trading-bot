@@ -1,6 +1,6 @@
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
-const { RSI, MACD, SMA } = require('technicalindicators');
+const { RSI, MACD, SMA, BollingerBands } = require('technicalindicators');
 
 const getTechnicalIndicators = async (symbol) => {
     try {
@@ -70,6 +70,23 @@ const getTechnicalIndicators = async (symbol) => {
             else trendSignal = 'SIDEWAYS / RECOVERING';
         }
 
+        // === BOLLINGER BANDS (Explosive Breakout Detection) ===
+        const bbInput = { period: 20, values: closePrices, stdDev: 2 };
+        const bbValues = BollingerBands.calculate(bbInput);
+        const currentBB = bbValues[bbValues.length - 1];
+        
+        // Calculate Bandwidth to detect a "Squeeze" (when bands are extremely tight, a massive move is coming)
+        let isSqueeze = false;
+        let bbStatus = 'NORMAL';
+        if (currentBB && currentBB.upper && currentBB.lower && currentBB.middle) {
+            const bandwidth = (currentBB.upper - currentBB.lower) / currentBB.middle;
+            isSqueeze = bandwidth < 0.05; // 5% bandwidth is very tight
+            
+            if (isSqueeze) bbStatus = 'SQUEEZE (Massive explosion imminent)';
+            else if (currentClose > currentBB.upper) bbStatus = 'BREAKOUT (Above Upper Band)';
+            else if (currentClose < currentBB.lower) bbStatus = 'OVERSOLD (Below Lower Band)';
+        }
+
         return {
             RSI: currentRSI,
             MACD: currentMACD,
@@ -83,6 +100,8 @@ const getTechnicalIndicators = async (symbol) => {
             sma50: sma50 ? sma50.toFixed(2) : 'N/A',
             sma200: sma200 ? sma200.toFixed(2) : 'N/A',
             trendSignal,
+            bbStatus,
+            isSqueeze,
             status: currentRSI > 65 ? 'OVERBOUGHT (Risk of crash)' : currentRSI < 35 ? 'OVERSOLD (Potential bounce)' : 'NEUTRAL'
         };
     } catch (err) {

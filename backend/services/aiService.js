@@ -184,6 +184,10 @@ ${news.length > 0 ? news.slice(0, 5).map(n => `- ${n.title}`).join('\n') : 'No r
 - Trend Status: ${technicals?.trendSignal || 'Unknown'}
   Rule: If price is below 200-SMA, it is in a long-term downtrend. Very risky unless RSI is deeply oversold.
 
+[SIGNAL 10] VOLATILITY & BREAKOUTS (Bollinger Bands):
+- Status: ${technicals?.bbStatus || 'Unknown'}
+  Rule: 'SQUEEZE' + 'HIGH VOLUME' = Massive Breakout imminent (Strong BUY). 'BREAKOUT' = Momentum is active.
+
 ${holding ? `
 [PORTFOLIO CONTEXT: USER ALREADY OWNS THIS STOCK]
 - Buy Price: ₹${holding.buyPrice}
