@@ -260,10 +260,28 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 const technicals = await getTechnicalIndicators(symbol);
                 await bot.editMessageText(`🧠 <b>Connecting to Wall Street Data for ${symbol}...</b>\n\n[🟩🟩🟩🟩🟩⬛] 80% - AI Crunching Technicals...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 
-                // Fetch the live price for the single stock tip FIRST
                 const currentPrice = await getStockPrice(symbol);
                 const priceText = currentPrice ? `₹${currentPrice}` : 'N/A';
-                
+
+                // Run backtest to prove system reliability to the user
+                const { runBacktest } = require('./services/technicalService');
+                const backtest = await runBacktest(symbol, 365);
+                let backtestMsg = '';
+                if (backtest && backtest.trades && backtest.trades.length > 0) {
+                    let winningTrades = 0;
+                    let lastBuyPrice = 0;
+                    for (const t of backtest.trades) {
+                        if (t.type === 'BUY') lastBuyPrice = t.price;
+                        if (t.type === 'SELL') {
+                            if (t.price > lastBuyPrice) winningTrades++;
+                        }
+                    }
+                    const totalSellTrades = backtest.trades.filter(t => t.type === 'SELL').length;
+                    const winRate = totalSellTrades > 0 ? Math.round((winningTrades / totalSellTrades) * 100) : 0;
+                    backtestMsg = `\n📜 <b>AI 1-Year Backtest Proof:</b>\n` +
+                                  `└ Win Rate: <b>${winRate}%</b> | Profit: <b>+${backtest.profitPercent}%</b>\n`;
+                }
+
                 const { getStockAnalysis } = require('./services/aiService');
                 const analysis = await getStockAnalysis(symbol, news, technicals, currentPrice);
                 
@@ -293,6 +311,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     if (analysis.action === 'BUY') {
                         priceBlock += `🎯 <b>Target (Sell At):</b> ${aiTarget}\n`;
                         priceBlock += `🛡️ <b>Stop-Loss (Exit if drops to):</b> ${aiSL}\n`;
+                        priceBlock += backtestMsg;
                     } else if (analysis.action === 'SELL') {
                         priceBlock += `🔴 <b>Exit now at market price:</b> ${priceText}\n`;
                     } else {
