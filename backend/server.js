@@ -385,12 +385,13 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 
                 // === PROFESSIONAL CHECK: NIFTY 50 MARKET DIRECTION ===
                 let niftyBanner = '';
+                let niftyChange = null;
                 try {
                     const niftyPrice = await getStockPrice('^NSEI'); // Nifty 50 index
                     const niftyQuote = require('yahoo-finance2').default;
                     const yf = new niftyQuote({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
                     const niftyData = await yf.quote('^NSEI');
-                    const niftyChange = niftyData ? niftyData.regularMarketChangePercent : null;
+                    niftyChange = niftyData ? niftyData.regularMarketChangePercent : null;
                     
                     if (niftyChange !== null) {
                         if (niftyChange <= -0.5) {
