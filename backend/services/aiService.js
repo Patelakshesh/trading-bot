@@ -107,7 +107,7 @@ Only return valid JSON array without markdown formatting.`;
     }
 };
 
-const getStockAnalysis = async (symbol, news, technicals, currentPrice) => {
+const getStockAnalysis = async (symbol, news, technicals, currentPrice, holding = null) => {
     try {
         const advancedMetrics = await advancedDataService.getAdvancedMetrics(symbol);
 
@@ -184,9 +184,20 @@ ${news.length > 0 ? news.slice(0, 5).map(n => `- ${n.title}`).join('\n') : 'No r
 - Trend Status: ${technicals?.trendSignal || 'Unknown'}
   Rule: If price is below 200-SMA, it is in a long-term downtrend. Very risky unless RSI is deeply oversold.
 
+${holding ? `
+[PORTFOLIO CONTEXT: USER ALREADY OWNS THIS STOCK]
+- Buy Price: ₹${holding.buyPrice}
+- Current Profit/Loss: ${(((currentPrice - holding.buyPrice) / holding.buyPrice) * 100).toFixed(2)}%
+- Days Held: ${Math.floor((new Date() - new Date(holding.buyDate)) / (1000 * 60 * 60 * 24))} days
+  Rule: If Days Held >= 3 and Profit is less than 2%, apply the TIME-STOP rule: Recommend SELL (Free up capital).
+  Rule: If Profit is >= 4%, recommend SELL (Take Profit).
+  Rule: If Loss is <= -3%, recommend SELL (Stop-Loss hit).
+` : ''}
+
 === DECISION RULES ===
 - AUTOMATIC REJECT 1: If earnings risk is HIGH (within 5 days) — output HOLD regardless of other signals.
 - AUTOMATIC REJECT 2: If price is below 200-SMA AND RSI > 45 — output HOLD/SELL (falling knife).
+- If USER ALREADY OWNS IT: Output 'HOLD' if momentum is still building, or 'SELL' if Time-Stop or Take-Profit is hit.
 - BUY if 4+ AVAILABLE signals are BULLISH. Confidence >= 70.
 - HOLD if signals are mixed or mostly neutral.
 - SELL if 2+ AVAILABLE signals are explicitly BEARISH.

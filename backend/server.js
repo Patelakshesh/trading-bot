@@ -282,8 +282,11 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                                   `└ Win Rate: <b>${winRate}%</b> | Profit: <b>+${backtest.profitPercent}%</b>\n`;
                 }
 
+                // Fetch user holding info to provide personalized AI advice
+                const holding = await Portfolio.findOne({ symbol, status: 'HOLDING', chatId: chatId.toString() });
+
                 const { getStockAnalysis } = require('./services/aiService');
-                const analysis = await getStockAnalysis(symbol, news, technicals, currentPrice);
+                const analysis = await getStockAnalysis(symbol, news, technicals, currentPrice, holding);
                 
                 if (analysis && analysis.action) {
                     const actionIcon = analysis.action === 'BUY' ? '🟢' : analysis.action === 'SELL' ? '🔴' : '🟡';
@@ -321,8 +324,6 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     }
 
                     const brokerSymbol = symbol.replace('.NS', '').replace('.BO', '');
-                    
-                    const holding = await Portfolio.findOne({ symbol, status: 'HOLDING', chatId: chatId.toString() });
                     let holdingStatusText = "";
                     if (holding) {
                         const currentProfit = currentPrice ? (((currentPrice - holding.buyPrice) / holding.buyPrice) * 100).toFixed(2) : 0;
