@@ -108,16 +108,16 @@ const getMarketMovers = async () => {
     try {
         // Enforce a strict 3-second timeout to prevent Yahoo from hanging the server
         // Add .catch() to prevent background Unhandled Rejection crashes when the abandoned promise finally fails
-        const fetchScreener = yahooFinance.screener({ scrIds: 'day_gainers', count: 5 }).catch(e => null);
-        const fetchLosers = yahooFinance.screener({ scrIds: 'day_losers', count: 5 }).catch(e => null);
+        const fetchScreener = yahooFinance.screener({ scrIds: 'day_gainers', count: 10, region: 'IN' }).catch(e => null);
+        const fetchLosers = yahooFinance.screener({ scrIds: 'day_losers', count: 10, region: 'IN' }).catch(e => null);
         
         const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
         
         const gainersResult = await Promise.race([fetchScreener, timeout]);
         const losersResult = await Promise.race([fetchLosers, timeout]);
         
-        if (!gainersResult || !losersResult) {
-            throw new Error("Yahoo Rate Limited - Booting Fallback");
+        if (!gainersResult || !losersResult || !gainersResult.quotes[0]?.symbol.endsWith('.NS')) {
+            throw new Error("Yahoo Rate Limited or Non-IN Stocks - Booting Fallback");
         }
 
         const mapQuote = (q) => ({
@@ -146,7 +146,25 @@ const getMarketMovers = async () => {
             { symbol: 'GMRINFRA.NS', name: 'GMR Airports Infrastructure' },
             { symbol: 'TATASTEEL.NS', name: 'Tata Steel Ltd' },
             { symbol: 'PNB.NS', name: 'Punjab National Bank' },
-            { symbol: 'BHEL.NS', name: 'Bharat Heavy Electricals' }
+            { symbol: 'BHEL.NS', name: 'Bharat Heavy Electricals' },
+            { symbol: 'MAZDOCK.NS', name: 'Mazagon Dock Shipbuilders' },
+            { symbol: 'HAL.NS', name: 'Hindustan Aeronautics Ltd' },
+            { symbol: 'BEL.NS', name: 'Bharat Electronics Ltd' },
+            { symbol: 'RECLTD.NS', name: 'REC Ltd' },
+            { symbol: 'PFC.NS', name: 'Power Finance Corp' },
+            { symbol: 'HUDCO.NS', name: 'Housing & Urban Dev Corp' },
+            { symbol: 'NBCC.NS', name: 'NBCC India Ltd' },
+            { symbol: 'SJVN.NS', name: 'SJVN Ltd' },
+            { symbol: 'TATAMOTORS.NS', name: 'Tata Motors Ltd' },
+            { symbol: 'ZOMATO.NS', name: 'Zomato Ltd' },
+            { symbol: 'OLECTRA.NS', name: 'Olectra Greentech' },
+            { symbol: 'ADANIPOWER.NS', name: 'Adani Power Ltd' },
+            { symbol: 'TATAPOWER.NS', name: 'Tata Power Co' },
+            { symbol: 'VBL.NS', name: 'Varun Beverages Ltd' },
+            { symbol: 'DIXON.NS', name: 'Dixon Technologies' },
+            { symbol: 'CDSL.NS', name: 'Central Depository Services' },
+            { symbol: 'BSE.NS', name: 'BSE Ltd' },
+            { symbol: 'ANGELONE.NS', name: 'Angel One Ltd' }
         ];
         
         const pricePromises = fallbackData.map(async (item) => {
@@ -175,8 +193,8 @@ const getMarketMovers = async () => {
         simulatedMovers.sort((a,b) => b.changePercent - a.changePercent);
         
         return { 
-            gainers: simulatedMovers.slice(0, 5), 
-            losers: simulatedMovers.slice(simulatedMovers.length - 5).reverse() 
+            gainers: simulatedMovers.slice(0, 15), 
+            losers: simulatedMovers.slice(simulatedMovers.length - 15).reverse() 
         };
     }
 };
