@@ -321,6 +321,21 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     // Never show a confusing 'BUY' or 'SKIP' verdict for an existing holder
                     let verdictBlock = '';
                     let holdingStatusText = '';
+                    
+                    const conf = analysis.confidence || 0;
+                    let confBar = conf >= 85 ? '🟢🟢🟢🟢🟢 VERY STRONG'
+                                  : conf >= 75 ? '🟢🟢🟢🟢⬛ STRONG'
+                                  : conf >= 65 ? '🟢🟢🟢⬛⬛ MODERATE'
+                                  : '🟢🟢⬛⬛⬛ WEAK';
+                    
+                    // If AI rejects the trade, don't show a misleading "Strong" confidence bar
+                    if (analysis.action !== 'BUY' && !holding) {
+                        confBar = '🔴 SYSTEM REJECTED (Unsafe/Choppy)';
+                    }
+                    
+                    const riskEmoji = analysis.riskLevel === 'LOW' ? '✅ LOW'
+                                    : analysis.riskLevel === 'HIGH' ? '🔴 HIGH'
+                                    : '🟡 MEDIUM';
 
                     if (holding) {
                         const currentProfit = currentPrice ? (((currentPrice - holding.buyPrice) / holding.buyPrice) * 100).toFixed(2) : 0;
@@ -383,14 +398,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                         }
                     }
 
-                    const conf = analysis.confidence || 0;
-                    const confBar = conf >= 85 ? '🟢🟢🟢🟢🟢 VERY STRONG'
-                                  : conf >= 75 ? '🟢🟢🟢🟢⬛ STRONG'
-                                  : conf >= 65 ? '🟢🟢🟢⬛⬛ MODERATE'
-                                  : '🟢🟢⬛⬛⬛ WEAK';
-                    const riskEmoji = analysis.riskLevel === 'LOW' ? '✅ LOW'
-                                    : analysis.riskLevel === 'HIGH' ? '🔴 HIGH'
-                                    : '🟡 MEDIUM';
+
 
                     const finalMsg =
                         `🧠 <b>AI ANALYSIS: ${symbol}</b>\n` +
