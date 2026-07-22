@@ -301,15 +301,6 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                         aiSL = `₹${(livePrice * 0.97).toFixed(2)}`;
                     }
 
-                    const conf = analysis.confidence || 0;
-                    const confBar = conf >= 85 ? '🟢🟢🟢🟢🟢 VERY STRONG'
-                                  : conf >= 75 ? '🟢🟢🟢🟢⬛ STRONG'
-                                  : conf >= 65 ? '🟢🟢🟢⬛⬛ MODERATE'
-                                  : '🟢🟢⬛⬛⬛ WEAK';
-                    const riskEmoji = analysis.riskLevel === 'LOW' ? '✅ LOW'
-                                    : analysis.riskLevel === 'HIGH' ? '🔴 HIGH'
-                                    : '🟡 MEDIUM';
-
                     let priceBlock = `💰 <b>Live Market Price:</b> ${priceText}\n`;
                     if (analysis.action === 'BUY') {
                         priceBlock += `🎯 <b>Target (Sell At):</b> ${aiTarget}\n`;
@@ -372,7 +363,6 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
 
                     } else {
                         // === NOT HOLDING → Show fresh BUY / SKIP verdict ===
-                        const conf = analysis.confidence || 0;
                         if (analysis.action === 'BUY' && conf >= 75) {
                             verdictBlock = `\n${'━'.repeat(28)}\n` +
                                 `✅ <b>VERDICT: BUY NOW</b>\n` +
