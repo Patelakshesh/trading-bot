@@ -15,12 +15,16 @@ const getTechnicalIndicators = async (symbol) => {
             interval: '1d'
         });
 
-        if (!historical || historical.length < 30) {
+        // FIX: Yahoo Finance often returns `null` for today's incomplete candle in Indian markets.
+        // We MUST filter out null rows, otherwise the entire technicalindicators library crashes.
+        const validHistorical = historical.filter(row => row.close !== null && row.volume !== null && row.high !== null && row.low !== null);
+
+        if (!validHistorical || validHistorical.length < 30) {
             return null; // Not enough data
         }
 
-        const closePrices = historical.map(row => row.close);
-        const volumes = historical.map(row => row.volume);
+        const closePrices = validHistorical.map(row => row.close);
+        const volumes = validHistorical.map(row => row.volume);
 
         // Calculate RSI (7 period - Faster for Short Term Swing Trading)
         const rsiInput = { values: closePrices, period: 7 };
@@ -49,7 +53,7 @@ const getTechnicalIndicators = async (symbol) => {
                           : 'LOW (Weak move - be cautious)';
 
         // === SUPPORT LEVEL DETECTION (Near support = safer entry) ===
-        const last20Lows = historical.slice(-20).map(r => r.low);
+        const last20Lows = validHistorical.slice(-20).map(r => r.low);
         const supportLevel = Math.min(...last20Lows);
         const currentClose = closePrices[closePrices.length - 1];
         const distFromSupport = ((currentClose - supportLevel) / supportLevel * 100).toFixed(2);
@@ -62,9 +66,9 @@ const getTechnicalIndicators = async (symbol) => {
         let adxValue = null;
         let trendStrength = 'UNKNOWN';
         try {
-            const highs = historical.map(r => r.high);
-            const lows = historical.map(r => r.low);
-            const adxInput = { close: closePrices, high: highs, low: lows, period: 14 };
+            const highPrices = validHistorical.map(r => r.high);
+            const lowPrices = validHistorical.map(r => r.low);
+            const adxInput = { close: closePrices, high: highPrices, low: lowPrices, period: 14 };
             const adxValues = ADX.calculate(adxInput);
             if (adxValues && adxValues.length > 0) {
                 adxValue = adxValues[adxValues.length - 1].adx;
