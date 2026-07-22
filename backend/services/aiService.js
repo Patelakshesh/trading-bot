@@ -343,6 +343,11 @@ GATE 4 - RISK/REWARD: Target at least 1.5x the stop-loss distance?
 GATE 5 - TIMING: Right time to enter NOW? Has the move already happened?
 GATE 6 (DIP MODE ONLY): Did the stock fall ONLY because of market weakness today? LOW volume on the dip confirms it is NOT a company problem.
 
+⚠️ CRITICAL INSTRUCTION ABOUT THE 'MOVERS' LIST:
+The 'TOP GAINERS/LOSERS' list provided above is just a suggestion. Many of those stocks are choppy, overbought, or dangerous.
+If the stocks in the Movers list DO NOT pass all 6 gates (e.g. they have ADX < 20, or RSI > 68), DO NOT RECOMMEND THEM.
+Instead, IGNORE the Movers list completely and use your own vast knowledge to generate 5 explosive HIGH-BETA Indian NSE stocks that actually pass the gates. NEVER force a bad stock into the top 5.
+
 ONLY recommend if it passes ALL applicable GATES. Skip and find a better one if it fails.
 
 Pricing rules:
