@@ -211,8 +211,8 @@ ${holding ? `
 - AUTOMATIC REJECT 2: If price is below 200-SMA AND RSI > 45 — output HOLD/SELL (falling knife).
 - AUTOMATIC REJECT 3 (MOST IMPORTANT): If ADX < 20 (RANGING/CHOPPY market) — output HOLD. Do NOT buy a choppy stock. The user will buy and the price will oscillate up and down with no profit.
 - If USER ALREADY OWNS IT: Output 'HOLD' if momentum is still building, or 'SELL' if Time-Stop or Take-Profit is hit.
-- BUY if 4+ AVAILABLE signals are BULLISH AND ADX >= 20. Confidence >= 75.
-- HOLD if signals are mixed or mostly neutral.
+- BUY if the setup is strong for Strategy B (e.g., RSI is oversold + Support is near, OR Volume is huge + Breakout). You only need 2 or 3 strong bullish signals to confirm a High-Beta momentum trade. ADX MUST be >= 20. Confidence >= 75.
+- HOLD if the setup is completely contradictory or ADX < 20.
 - SELL if 2+ AVAILABLE signals are explicitly BEARISH.
 
 For BUY: Calculate EXACT price targets:
