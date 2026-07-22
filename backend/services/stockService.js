@@ -133,20 +133,20 @@ const getMarketMovers = async () => {
         };
     } catch (error) {
         console.error("Yahoo Screener Blocked/Timed Out. Booting up Fail-Safe Fallback...");
-        // Bypassing Yahoo Block: Generate dynamic movers from popular volatile stocks
+        // Bypassing Yahoo Block: Generate dynamic movers from High-Beta/Volatile momentum stocks (Strategy B)
         const fallbackData = [
-            { symbol: 'RELIANCE.NS', name: 'Reliance Industries Ltd' },
-            { symbol: 'TCS.NS', name: 'Tata Consultancy Services' },
-            { symbol: 'HDFCBANK.NS', name: 'HDFC Bank Ltd' },
-            { symbol: 'INFY.NS', name: 'Infosys Ltd' },
-            { symbol: 'ZOMATO.NS', name: 'Zomato Ltd' },
             { symbol: 'SUZLON.NS', name: 'Suzlon Energy Ltd' },
-            { symbol: 'TATAMOTORS.NS', name: 'Tata Motors Ltd' },
-            { symbol: 'ITC.NS', name: 'ITC Ltd' },
-            { symbol: 'SBIN.NS', name: 'State Bank of India' },
-            { symbol: 'BHARTIARTL.NS', name: 'Bharti Airtel Ltd' },
-            { symbol: 'WIPRO.NS', name: 'Wipro Ltd' },
-            { symbol: 'BAJFINANCE.NS', name: 'Bajaj Finance Ltd' }
+            { symbol: 'IRFC.NS', name: 'Indian Railway Finance Corp' },
+            { symbol: 'RVNL.NS', name: 'Rail Vikas Nigam Ltd' },
+            { symbol: 'IREDA.NS', name: 'Indian Renewable Energy Dev' },
+            { symbol: 'NHPC.NS', name: 'NHPC Ltd' },
+            { symbol: 'YESBANK.NS', name: 'Yes Bank Ltd' },
+            { symbol: 'JIOFIN.NS', name: 'Jio Financial Services' },
+            { symbol: 'IDEA.NS', name: 'Vodafone Idea Ltd' },
+            { symbol: 'GMRINFRA.NS', name: 'GMR Airports Infrastructure' },
+            { symbol: 'TATASTEEL.NS', name: 'Tata Steel Ltd' },
+            { symbol: 'PNB.NS', name: 'Punjab National Bank' },
+            { symbol: 'BHEL.NS', name: 'Bharat Heavy Electricals' }
         ];
         
         const pricePromises = fallbackData.map(async (item) => {
