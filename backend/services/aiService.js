@@ -188,6 +188,13 @@ ${news.length > 0 ? news.slice(0, 5).map(n => `- ${n.title}`).join('\n') : 'No r
 - Status: ${technicals?.bbStatus || 'Unknown'}
   Rule: 'SQUEEZE' + 'HIGH VOLUME' = Massive Breakout imminent (Strong BUY). 'BREAKOUT' = Momentum is active.
 
+[SIGNAL 11] TREND STRENGTH (ADX — THE MOST IMPORTANT FILTER):
+- ADX Value: ${technicals?.adx || 'Unknown'}
+- Trend Strength: ${technicals?.trendStrength || 'Unknown'}
+  ⚠️ CRITICAL RULE: If ADX < 20 (RANGING/CHOPPY), the stock has NO clear direction.
+  It will go UP then DOWN then UP endlessly without a real trend. This is the #1 cause of losses for short-term traders.
+  If ADX < 20: Output HOLD/DO NOT BUY regardless of all other signals.
+
 ${holding ? `
 [PORTFOLIO CONTEXT: USER ALREADY OWNS THIS STOCK]
 - Buy Price: ₹${holding.buyPrice}
@@ -201,8 +208,9 @@ ${holding ? `
 === DECISION RULES ===
 - AUTOMATIC REJECT 1: If earnings risk is HIGH (within 5 days) — output HOLD regardless of other signals.
 - AUTOMATIC REJECT 2: If price is below 200-SMA AND RSI > 45 — output HOLD/SELL (falling knife).
+- AUTOMATIC REJECT 3 (MOST IMPORTANT): If ADX < 20 (RANGING/CHOPPY market) — output HOLD. Do NOT buy a choppy stock. The user will buy and the price will oscillate up and down with no profit.
 - If USER ALREADY OWNS IT: Output 'HOLD' if momentum is still building, or 'SELL' if Time-Stop or Take-Profit is hit.
-- BUY if 4+ AVAILABLE signals are BULLISH. Confidence >= 70.
+- BUY if 4+ AVAILABLE signals are BULLISH AND ADX >= 20. Confidence >= 75.
 - HOLD if signals are mixed or mostly neutral.
 - SELL if 2+ AVAILABLE signals are explicitly BEARISH.
 

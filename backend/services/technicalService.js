@@ -1,6 +1,6 @@
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
-const { RSI, MACD, SMA, BollingerBands } = require('technicalindicators');
+const { RSI, MACD, SMA, BollingerBands, ADX } = require('technicalindicators');
 
 const getTechnicalIndicators = async (symbol) => {
     try {
@@ -55,6 +55,26 @@ const getTechnicalIndicators = async (symbol) => {
         const distFromSupport = ((currentClose - supportLevel) / supportLevel * 100).toFixed(2);
         const nearSupport = parseFloat(distFromSupport) <= 3;
 
+        // === ADX (Trend Strength — detects choppy/ranging markets) ===
+        // ADX < 20 = CHOPPY (stock going up/down with no direction — AVOID)
+        // ADX 20-25 = WEAK TREND (risky)
+        // ADX > 25 = STRONG TREND (safe to trade)
+        let adxValue = null;
+        let trendStrength = 'UNKNOWN';
+        try {
+            const highs = historical.map(r => r.high);
+            const lows = historical.map(r => r.low);
+            const adxInput = { close: closePrices, high: highs, low: lows, period: 14 };
+            const adxValues = ADX.calculate(adxInput);
+            if (adxValues && adxValues.length > 0) {
+                adxValue = adxValues[adxValues.length - 1].adx;
+                trendStrength = adxValue >= 30 ? 'VERY STRONG TREND (Ideal to trade)'
+                              : adxValue >= 25 ? 'STRONG TREND (Safe to trade)'
+                              : adxValue >= 20 ? 'WEAK TREND (Caution — may reverse)'
+                              : 'RANGING/CHOPPY (Stock has no direction — AVOID)';
+            }
+        } catch(e) { console.warn('ADX calc failed:', e.message); }
+
         // === TREND ANALYSIS (Moving Averages) ===
         // A stock below its 200-SMA is in a long-term downtrend (avoid buying)
         let sma50 = null, sma200 = null, trendSignal = 'NEUTRAL';
@@ -100,6 +120,9 @@ const getTechnicalIndicators = async (symbol) => {
             sma50: sma50 ? sma50.toFixed(2) : 'N/A',
             sma200: sma200 ? sma200.toFixed(2) : 'N/A',
             trendSignal,
+            adx: adxValue ? adxValue.toFixed(1) : 'N/A',
+            trendStrength,
+            isChoppy: adxValue !== null && adxValue < 20,
             bbStatus,
             isSqueeze,
             status: currentRSI > 65 ? 'OVERBOUGHT (Risk of crash)' : currentRSI < 35 ? 'OVERSOLD (Potential bounce)' : 'NEUTRAL'
