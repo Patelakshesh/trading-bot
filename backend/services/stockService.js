@@ -28,10 +28,33 @@ const getStockPrice = async (symbol) => {
             return price;
         }
     } catch (yhError) {
-        console.warn(`[Yahoo] Failed for ${symbol}: ${yhError.message}. Trying Google...`);
+        console.warn(`[Yahoo] Failed for ${symbol}: ${yhError.message}. Trying Groww...`);
     }
 
-    // --- FALLBACK: Google Finance ---
+    // --- FALLBACK 1: Groww API (Highly reliable for NSE stocks) ---
+    try {
+        const cleanSymbol = symbol.split('.')[0];
+        const growwUrl = `https://groww.in/v1/api/stocks_data/v1/tr_live_prices/exchange/NSE/segment/CASH/${cleanSymbol}/latest`;
+        
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        const response = await fetch(growwUrl, { signal: controller.signal });
+        clearTimeout(timeout);
+        
+        if (response.ok) {
+            const data = await response.json();
+            const price = data.ltp || data.close;
+            if (price && price > 0) {
+                priceCache.set(querySymbol, { price, timestamp: Date.now() });
+                console.log(`[Groww] ${symbol} = ₹${price}`);
+                return price;
+            }
+        }
+    } catch (growwError) {
+        console.warn(`[Groww] Failed for ${symbol}: ${growwError.message}. Trying Google...`);
+    }
+
+    // --- FALLBACK 2: Google Finance HTML ---
     try {
         let gfExchange = 'NSE';
         if (symbol.endsWith('.BO')) gfExchange = 'BOM';
@@ -40,22 +63,25 @@ const getStockPrice = async (symbol) => {
         const gfSymbol = symbol.split('.')[0];
         const controller = new AbortController();
         const gfTimeout = setTimeout(() => controller.abort(), 5000);
-        const response = await fetch(`https://www.google.com/finance/quote/${gfSymbol}:${gfExchange}`, { signal: controller.signal });
+        const response = await fetch(`https://www.google.com/search?q=${gfSymbol}+share+price`, { 
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+            signal: controller.signal 
+        });
         clearTimeout(gfTimeout);
         const html = await response.text();
         
-        // Match the specific class for the main stock price (YMlKec fxKbKc)
-        const match = html.match(/class="YMlKec fxKbKc"[^>]*>[^0-9>]*([0-9,]+(?:\.[0-9]+)?)<\/div>/);
+        // Match Google Search price classes
+        const match = html.match(/IsqQVc NprOob w8qArf[^>]*>([0-9,]+(?:\.[0-9]+)?)/) || html.match(/BNeawe iBp4i AP7Wnd[^>]*>([0-9,]+(?:\.[0-9]+)?)/);
         if (match && match[1]) {
             const parsedPrice = parseFloat(match[1].replace(/,/g, ''));
             if (!isNaN(parsedPrice) && parsedPrice > 0) {
                 priceCache.set(querySymbol, { price: parsedPrice, timestamp: Date.now() });
-                console.log(`[GF] ${symbol} = ₹${parsedPrice}`);
+                console.log(`[GoogleSearch] ${symbol} = ₹${parsedPrice}`);
                 return parsedPrice;
             }
         }
     } catch (gfError) {
-        console.warn(`[GF] Failed for ${symbol}: ${gfError.message}`);
+        console.warn(`[GoogleSearch] Failed for ${symbol}: ${gfError.message}`);
     }
 
     // Last Resort: Return stale cache
