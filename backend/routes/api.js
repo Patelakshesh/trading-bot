@@ -391,20 +391,9 @@ router.get('/stock/history', async (req, res) => {
         // Google Finance Fallback for the live Quote (if Yahoo fails)
         let fallbackQuote = {};
         try {
-            let gfExchange = 'NASDAQ';
-            let gfSymbol = symbol.split('.')[0];
-            if (symbol.endsWith('.NS')) gfExchange = 'NSE';
-            else if (symbol.endsWith('.BO')) gfExchange = 'BOM';
-
-            const response = await fetch(`https://www.google.com/finance/quote/${gfSymbol}:${gfExchange}`);
-            const html = await response.text();
-            const match = html.match(/class="YMlKec fxKbKc">([^<]+)<\/div>/);
-            if (match && match[1]) {
-                const parsedPrice = parseFloat(match[1].replace(/[^0-9.]/g, ''));
-                if (!isNaN(parsedPrice)) fallbackQuote.price = parsedPrice;
-            }
+            const price = await getStockPrice(symbol);
+            if (price) fallbackQuote.price = price;
         } catch(e) {}
-        
         res.json({
             quote: {
                 price: fallbackQuote.price || null,

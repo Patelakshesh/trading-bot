@@ -56,32 +56,40 @@ const getStockPrice = async (symbol) => {
 
     // --- FALLBACK 2: Google Finance HTML ---
     try {
-        let gfExchange = 'NSE';
-        if (symbol.endsWith('.BO')) gfExchange = 'BOM';
-        else if (!symbol.endsWith('.NS') && !symbol.endsWith('.BO')) gfExchange = 'NASDAQ';
+        let exchanges = ['NSE'];
+        if (symbol.endsWith('.BO')) exchanges = ['BOM'];
+        else if (!symbol.endsWith('.NS') && !symbol.endsWith('.BO')) exchanges = ['NYSE', 'NASDAQ'];
         
         const gfSymbol = symbol.split('.')[0];
-        const controller = new AbortController();
-        const gfTimeout = setTimeout(() => controller.abort(), 5000);
-        const response = await fetch(`https://www.google.com/search?q=${gfSymbol}+share+price`, { 
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-            signal: controller.signal 
-        });
-        clearTimeout(gfTimeout);
-        const html = await response.text();
         
-        // Match Google Search price classes
-        const match = html.match(/IsqQVc NprOob w8qArf[^>]*>([0-9,]+(?:\.[0-9]+)?)/) || html.match(/BNeawe iBp4i AP7Wnd[^>]*>([0-9,]+(?:\.[0-9]+)?)/);
-        if (match && match[1]) {
-            const parsedPrice = parseFloat(match[1].replace(/,/g, ''));
-            if (!isNaN(parsedPrice) && parsedPrice > 0) {
-                priceCache.set(querySymbol, { price: parsedPrice, timestamp: Date.now() });
-                console.log(`[GoogleSearch] ${symbol} = ₹${parsedPrice}`);
-                return parsedPrice;
+        for (const exchange of exchanges) {
+            const controller = new AbortController();
+            const gfTimeout = setTimeout(() => controller.abort(), 4000);
+            try {
+                const response = await fetch(`https://www.google.com/finance/quote/${gfSymbol}:${exchange}`, { 
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    signal: controller.signal 
+                });
+                clearTimeout(gfTimeout);
+                
+                if (response.ok) {
+                    const html = await response.text();
+                    const match = html.match(/class="YMlKec fxKbKc">([^<]+)<\/div>/);
+                    if (match && match[1]) {
+                        const parsedPrice = parseFloat(match[1].replace(/[^0-9.]/g, ''));
+                        if (!isNaN(parsedPrice) && parsedPrice > 0) {
+                            priceCache.set(querySymbol, { price: parsedPrice, timestamp: Date.now() });
+                            console.log(`[GoogleFinance] ${symbol} = ₹${parsedPrice} (via ${exchange})`);
+                            return parsedPrice;
+                        }
+                    }
+                }
+            } catch (e) {
+                clearTimeout(gfTimeout);
             }
         }
     } catch (gfError) {
-        console.warn(`[GoogleSearch] Failed for ${symbol}: ${gfError.message}`);
+        console.warn(`[GoogleFinance] Failed for ${symbol}: ${gfError.message}`);
     }
 
     // Last Resort: Return stale cache
