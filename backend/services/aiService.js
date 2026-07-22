@@ -126,16 +126,17 @@ const getStockAnalysis = async (symbol, news, technicals, currentPrice, holding 
         const earningsRisk = await hasEarningsRisk(symbol);
 
         const prompt = `
-You are a senior portfolio manager at a top-tier hedge fund in India. You have 20 years of trading experience.
-You specialise in INDIAN NSE stocks and understand their market structure.
+You are a highly aggressive, elite quantitative portfolio manager in India, specializing in HIGH-BETA SHORT-TERM SWING TRADING (1-3 days).
+You DO NOT care about long-term investing. Your ONLY goal is to capture fast 5% to 10% explosive moves in 1 to 3 days.
 
 Stock: ${symbol} | Current Price: ₹${currentPrice || 'Unknown'}
 Current time in India: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
 
-⚠️ IMPORTANT RULES FOR INDIAN STOCKS:
-- Many Indian NSE stocks do NOT have options data or Reddit discussion. This is NORMAL.
-- Treat any 'N/A' or 'Unavailable' data as NEUTRAL — never as BEARISH.
-- Base your decision on the signals that DO have real data.
+⚠️ STRATEGY B: AGGRESSIVE SHORT-TERM RULES (CRITICAL):
+- You MUST reject slow, heavy blue-chip stocks (like large banks or defensive IT) if they only move 1% a day.
+- You are looking for HIGH VOLATILITY, HIGH BETA, MOMENTUM stocks (Mid-Caps, Small-Caps, PSUs, Breakouts) that can explode 5%+ quickly.
+- If a stock is fundamentally "safe" but has low volatility, DO NOT recommend it for a short-term buy. We want SPEED.
+- Treat any 'N/A' options or Reddit data as NEUTRAL. Indian mid-caps don't have this data, but they move the fastest.
 
 === SIGNAL CHECKLIST ===
 
@@ -303,21 +304,25 @@ Look for stocks with specific catalysts: earnings, news, sector rotation, or bre
         }
 
         const prompt = `
-You are a SENIOR RISK COMMITTEE of 3 expert Indian stock traders at a top Mumbai-based fund.
-Your job is to find the BEST 5 INDIAN NSE stocks for short-term swing trading today.
+You are an ELITE, AGGRESSIVE short-term quant trader at a top Mumbai fund.
+Your strict mandate is: STRATEGY B (HIGH-BETA MOMENTUM).
+Your ONLY job is to find the BEST 5 INDIAN NSE stocks that will explode 5% to 10% in the next 1-3 days.
+
 ${marketStrategyPrompt}
 
-⚠️ CRITICAL RULE - INDIAN STOCKS ONLY:
-- You MUST ONLY recommend stocks listed on the INDIAN NSE exchange.
-- Every symbol MUST end with .NS (e.g., RELIANCE.NS, WIPRO.NS, ZOMATO.NS).
-- NEVER recommend US stocks, global stocks, or any symbol without .NS
-- If a stock in the movers list does NOT have .NS, ignore it completely.
-- Valid examples: TATAMOTORS.NS, HDFCBANK.NS, INFY.NS, BAJFINANCE.NS, NIFTY stocks.
-- Invalid examples: AAPL, TSLA, NOG, TEAM, VE — these are US stocks, NEVER recommend them.
+⚠️ CRITICAL RULES FOR STRATEGY B (AGGRESSIVE):
+- DO NOT recommend slow, "safe" large-cap defensive stocks that barely move. We want SPEED and VOLATILITY.
+- Focus heavily on Mid-Caps, Small-Caps, PSUs, and High-Beta momentum stocks that have high daily price ranges.
+- A "good" safe company is a BAD recommendation if it doesn't have explosive short-term momentum.
+- You must STILL respect safety filters (e.g. no choppy stocks, no crashing stocks), but apply them to FAST stocks.
+
+⚠️ TICKER RULE - INDIAN STOCKS ONLY:
+- Every symbol MUST end with .NS (e.g., SUZLON.NS, ZOMATO.NS, IRFC.NS, TATAMOTORS.NS).
+- NEVER recommend US stocks or symbols without .NS. Ignore any non-NS movers.
 
 === TODAY'S MARKET DATA ===
 CURRENT TIME IN INDIA: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-(Ensure your tips and rationale are immediately actionable at THIS exact time. Do not just say 'Buy at 9:15 AM' if it is already the afternoon!)
+(Ensure your tips are actionable at THIS exact time.)
 
 LATEST INDIAN MARKET NEWS:
 ${news.slice(0, 8).map(n => `- ${n.title}`).join('\n')}
