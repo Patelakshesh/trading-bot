@@ -261,7 +261,7 @@ const getGlobalTop5TradingTips = async (news, movers, budget = null, priceRange 
         
         let rangePrompt = "";
         if (priceRange) {
-            rangePrompt = `CRITICAL: The user has specifically requested stocks priced strictly between ₹${priceRange.min} and ₹${priceRange.max}. You MUST ONLY recommend stocks that currently trade within this exact price range. If the provided movers do not fit this range, you must use your elite quantitative knowledge to recommend 5 other highly explosive stocks (e.g., penny stocks or mid-caps) that fit this price bracket. You must estimate and provide their current price in the JSON.`;
+            rangePrompt = `CRITICAL: The user requested stocks priced strictly between ₹${priceRange.min} and ₹${priceRange.max}. You MUST ONLY recommend stocks within this exact price range. If the provided movers do not fit this range, you must generate 5 other HIGH-BETA, HIGHLY VOLATILE momentum stocks (Strategy B) that fit this price bracket. NEVER recommend slow blue-chips just to fill the list.`;
         }
 
         // === MARKET-DIRECTION-AWARE STRATEGY ===
