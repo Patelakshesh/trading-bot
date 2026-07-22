@@ -159,41 +159,70 @@ const getMarketMovers = async () => {
         };
     } catch (error) {
         console.error("Yahoo Screener Blocked/Timed Out. Booting up Fail-Safe Fallback...");
-        // Bypassing Yahoo Block: Generate dynamic movers from High-Beta/Volatile momentum stocks (Strategy B)
+        // Bypassing Yahoo Block: Massive pool of 100 High-Beta/Volatile Indian stocks (Strategy B)
         const fallbackData = [
-            { symbol: 'SUZLON.NS', name: 'Suzlon Energy Ltd' },
-            { symbol: 'IRFC.NS', name: 'Indian Railway Finance Corp' },
-            { symbol: 'RVNL.NS', name: 'Rail Vikas Nigam Ltd' },
-            { symbol: 'IREDA.NS', name: 'Indian Renewable Energy Dev' },
-            { symbol: 'NHPC.NS', name: 'NHPC Ltd' },
-            { symbol: 'YESBANK.NS', name: 'Yes Bank Ltd' },
-            { symbol: 'JIOFIN.NS', name: 'Jio Financial Services' },
-            { symbol: 'IDEA.NS', name: 'Vodafone Idea Ltd' },
-            { symbol: 'GMRINFRA.NS', name: 'GMR Airports Infrastructure' },
-            { symbol: 'TATASTEEL.NS', name: 'Tata Steel Ltd' },
-            { symbol: 'PNB.NS', name: 'Punjab National Bank' },
-            { symbol: 'BHEL.NS', name: 'Bharat Heavy Electricals' },
-            { symbol: 'MAZDOCK.NS', name: 'Mazagon Dock Shipbuilders' },
-            { symbol: 'HAL.NS', name: 'Hindustan Aeronautics Ltd' },
-            { symbol: 'BEL.NS', name: 'Bharat Electronics Ltd' },
-            { symbol: 'RECLTD.NS', name: 'REC Ltd' },
-            { symbol: 'PFC.NS', name: 'Power Finance Corp' },
-            { symbol: 'HUDCO.NS', name: 'Housing & Urban Dev Corp' },
-            { symbol: 'NBCC.NS', name: 'NBCC India Ltd' },
-            { symbol: 'SJVN.NS', name: 'SJVN Ltd' },
-            { symbol: 'TATAMOTORS.NS', name: 'Tata Motors Ltd' },
-            { symbol: 'ZOMATO.NS', name: 'Zomato Ltd' },
-            { symbol: 'OLECTRA.NS', name: 'Olectra Greentech' },
-            { symbol: 'ADANIPOWER.NS', name: 'Adani Power Ltd' },
-            { symbol: 'TATAPOWER.NS', name: 'Tata Power Co' },
-            { symbol: 'VBL.NS', name: 'Varun Beverages Ltd' },
-            { symbol: 'DIXON.NS', name: 'Dixon Technologies' },
-            { symbol: 'CDSL.NS', name: 'Central Depository Services' },
-            { symbol: 'BSE.NS', name: 'BSE Ltd' },
-            { symbol: 'ANGELONE.NS', name: 'Angel One Ltd' }
+            { symbol: 'RELIANCE.NS', name: 'Reliance Industries' }, { symbol: 'TCS.NS', name: 'TCS' }, 
+            { symbol: 'HDFCBANK.NS', name: 'HDFC Bank' }, { symbol: 'ICICIBANK.NS', name: 'ICICI Bank' }, 
+            { symbol: 'INFY.NS', name: 'Infosys' }, { symbol: 'ITC.NS', name: 'ITC' }, 
+            { symbol: 'SBIN.NS', name: 'SBI' }, { symbol: 'LT.NS', name: 'Larsen & Toubro' }, 
+            { symbol: 'BAJFINANCE.NS', name: 'Bajaj Finance' }, { symbol: 'BHARTIARTL.NS', name: 'Bharti Airtel' }, 
+            { symbol: 'KOTAKBANK.NS', name: 'Kotak Bank' }, { symbol: 'AXISBANK.NS', name: 'Axis Bank' }, 
+            { symbol: 'ASIANPAINT.NS', name: 'Asian Paints' }, { symbol: 'HCLTECH.NS', name: 'HCL Tech' }, 
+            { symbol: 'MARUTI.NS', name: 'Maruti Suzuki' }, { symbol: 'SUNPHARMA.NS', name: 'Sun Pharma' }, 
+            { symbol: 'TITAN.NS', name: 'Titan' }, { symbol: 'WIPRO.NS', name: 'Wipro' }, 
+            { symbol: 'ULTRACEMCO.NS', name: 'UltraTech Cement' }, { symbol: 'ONGC.NS', name: 'ONGC' }, 
+            { symbol: 'NTPC.NS', name: 'NTPC' }, { symbol: 'POWERGRID.NS', name: 'Power Grid' }, 
+            { symbol: 'TATASTEEL.NS', name: 'Tata Steel' }, { symbol: 'M&M.NS', name: 'M&M' }, 
+            { symbol: 'TATAMOTORS.NS', name: 'Tata Motors' }, { symbol: 'COALINDIA.NS', name: 'Coal India' }, 
+            { symbol: 'HINDALCO.NS', name: 'Hindalco' }, { symbol: 'TECHM.NS', name: 'Tech Mahindra' }, 
+            { symbol: 'BAJAJFINSV.NS', name: 'Bajaj Finserv' }, { symbol: 'GRASIM.NS', name: 'Grasim' }, 
+            { symbol: 'ADANIENT.NS', name: 'Adani Ent' }, { symbol: 'ADANIPORTS.NS', name: 'Adani Ports' }, 
+            { symbol: 'APOLLOHOSP.NS', name: 'Apollo Hospitals' }, { symbol: 'BRITANNIA.NS', name: 'Britannia' }, 
+            { symbol: 'CIPLA.NS', name: 'Cipla' }, { symbol: 'DIVISLAB.NS', name: 'Divis Labs' }, 
+            { symbol: 'DRREDDY.NS', name: 'Dr Reddys' }, { symbol: 'EICHERMOT.NS', name: 'Eicher Motors' }, 
+            { symbol: 'HEROMOTOCO.NS', name: 'Hero MotoCorp' }, { symbol: 'HINDUNILVR.NS', name: 'HUL' }, 
+            { symbol: 'INDUSINDBK.NS', name: 'IndusInd Bank' }, { symbol: 'JSWSTEEL.NS', name: 'JSW Steel' }, 
+            { symbol: 'NESTLEIND.NS', name: 'Nestle India' }, { symbol: 'SBILIFE.NS', name: 'SBI Life' }, 
+            { symbol: 'TATACONSUM.NS', name: 'Tata Consumer' }, { symbol: 'UPL.NS', name: 'UPL' }, 
+            { symbol: 'BPCL.NS', name: 'BPCL' }, { symbol: 'SHREECEM.NS', name: 'Shree Cement' }, 
+            { symbol: 'SUZLON.NS', name: 'Suzlon Energy' }, { symbol: 'IRFC.NS', name: 'IRFC' }, 
+            { symbol: 'RVNL.NS', name: 'RVNL' }, { symbol: 'IREDA.NS', name: 'IREDA' }, 
+            { symbol: 'NHPC.NS', name: 'NHPC' }, { symbol: 'YESBANK.NS', name: 'Yes Bank' }, 
+            { symbol: 'JIOFIN.NS', name: 'Jio Financial' }, { symbol: 'IDEA.NS', name: 'Vodafone Idea' }, 
+            { symbol: 'GMRINFRA.NS', name: 'GMR Infra' }, { symbol: 'PNB.NS', name: 'PNB' }, 
+            { symbol: 'BHEL.NS', name: 'BHEL' }, { symbol: 'MAZDOCK.NS', name: 'Mazagon Dock' }, 
+            { symbol: 'HAL.NS', name: 'HAL' }, { symbol: 'BEL.NS', name: 'BEL' }, 
+            { symbol: 'RECLTD.NS', name: 'REC' }, { symbol: 'PFC.NS', name: 'PFC' }, 
+            { symbol: 'HUDCO.NS', name: 'HUDCO' }, { symbol: 'NBCC.NS', name: 'NBCC' }, 
+            { symbol: 'SJVN.NS', name: 'SJVN' }, { symbol: 'ZOMATO.NS', name: 'Zomato' }, 
+            { symbol: 'OLECTRA.NS', name: 'Olectra' }, { symbol: 'ADANIPOWER.NS', name: 'Adani Power' }, 
+            { symbol: 'TATAPOWER.NS', name: 'Tata Power' }, { symbol: 'VBL.NS', name: 'Varun Beverages' }, 
+            { symbol: 'DIXON.NS', name: 'Dixon' }, { symbol: 'CDSL.NS', name: 'CDSL' }, 
+            { symbol: 'BSE.NS', name: 'BSE' }, { symbol: 'ANGELONE.NS', name: 'Angel One' }, 
+            { symbol: 'KPITTECH.NS', name: 'KPIT Tech' }, { symbol: 'TATAELXSI.NS', name: 'Tata Elxsi' }, 
+            { symbol: 'PERSISTENT.NS', name: 'Persistent' }, { symbol: 'COFORGE.NS', name: 'Coforge' }, 
+            { symbol: 'LTTS.NS', name: 'LTTS' }, { symbol: 'LTIM.NS', name: 'LTIMindtree' }, 
+            { symbol: 'SONACOMS.NS', name: 'Sona Comstar' }, { symbol: 'MOTHERSON.NS', name: 'Motherson' }, 
+            { symbol: 'CAMS.NS', name: 'CAMS' }, { symbol: 'AUBANK.NS', name: 'AU Small Fin' }, 
+            { symbol: 'FEDERALBNK.NS', name: 'Federal Bank' }, { symbol: 'IDFCFIRSTB.NS', name: 'IDFC First' }, 
+            { symbol: 'CHOLAFIN.NS', name: 'Chola Fin' }, { symbol: 'M&MFIN.NS', name: 'M&M Fin' }, 
+            { symbol: 'MANAPPURAM.NS', name: 'Manappuram' }, { symbol: 'MUTHOOTFIN.NS', name: 'Muthoot Fin' }, 
+            { symbol: 'TVSMOTOR.NS', name: 'TVS Motor' }, { symbol: 'ASHOKLEY.NS', name: 'Ashok Leyland' }, 
+            { symbol: 'ESCORTS.NS', name: 'Escorts' }, { symbol: 'AMBUJACEM.NS', name: 'Ambuja Cement' }, 
+            { symbol: 'ACC.NS', name: 'ACC' }, { symbol: 'JINDALSTEL.NS', name: 'Jindal Steel' }, 
+            { symbol: 'NMDC.NS', name: 'NMDC' }
         ];
+
+        // Randomly shuffle the massive array
+        for (let i = fallbackData.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [fallbackData[i], fallbackData[j]] = [fallbackData[j], fallbackData[i]];
+        }
+
+        // Take 40 random stocks to process so the AI always gets a fresh, unique menu
+        const randomMenu = fallbackData.slice(0, 40);
         
-        const pricePromises = fallbackData.map(async (item) => {
+        const pricePromises = randomMenu.map(async (item) => {
             try {
                 // Fetch REAL quote data to get accurate price AND change percent
                 const quote = await yahooFinance.quote(item.symbol);
