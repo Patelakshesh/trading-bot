@@ -324,55 +324,91 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     }
 
                     const brokerSymbol = symbol.replace('.NS', '').replace('.BO', '');
-                    let holdingStatusText = "";
+
+                    // ===== VERDICT LOGIC =====
+                    // If user ALREADY HOLDS this stock → Show personalized HOLD/SELL advice
+                    // Never show a confusing 'BUY' or 'SKIP' verdict for an existing holder
+                    let verdictBlock = '';
+                    let holdingStatusText = '';
+
                     if (holding) {
                         const currentProfit = currentPrice ? (((currentPrice - holding.buyPrice) / holding.buyPrice) * 100).toFixed(2) : 0;
-                        const profitEmoji = parseFloat(currentProfit) >= 0 ? '📈' : '📉';
-                        holdingStatusText = `🎒 <b>YOU ALREADY OWN THIS!</b>\n` +
-                                            `💰 Bought: ₹${holding.buyPrice} → Now: ₹${currentPrice || '?'} (${profitEmoji} ${currentProfit}%)\n` +
-                                            `${'─'.repeat(28)}\n\n`;
+                        const profitVal = parseFloat(currentProfit);
+                        const profitEmoji = profitVal >= 0 ? '📈' : '📉';
+                        const daysHeld = Math.floor((new Date() - new Date(holding.buyDate)) / (1000 * 60 * 60 * 24));
+                        const targetPrice = (holding.buyPrice * 1.05).toFixed(2);
+                        const slPrice = (holding.buyPrice * 0.97).toFixed(2);
+
+                        holdingStatusText =
+                            `🎒 <b>YOU OWN THIS STOCK</b>\n` +
+                            `💵 Bought: ₹${holding.buyPrice} | Now: ₹${currentPrice || '?'}\n` +
+                            `${profitEmoji} <b>Current P&L: ${currentProfit}%</b>\n` +
+                            `📅 Days Held: <b>${daysHeld} day${daysHeld !== 1 ? 's' : ''}</b>\n` +
+                            `🎯 Your Target: ₹${targetPrice} | 🛡️ Stop-Loss: ₹${slPrice}\n` +
+                            `${'─'.repeat(28)}\n\n`;
+
+                        // Smart verdict based on the situation
+                        if (profitVal >= 4) {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                `🏆 <b>VERDICT: TAKE PROFIT NOW</b>\n` +
+                                `You are up ${currentProfit}%! You have reached your target. SELL NOW on Groww/Zerodha and lock in your profit. Don't be greedy.`;
+                        } else if (profitVal <= -3) {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                `🔴 <b>VERDICT: STOP-LOSS HIT — SELL NOW</b>\n` +
+                                `You are down ${currentProfit}%. Stop-Loss has been triggered. SELL IMMEDIATELY to protect your remaining capital. Do not hold and hope.`;
+                        } else if (daysHeld >= 3 && profitVal < 2) {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                `⏱️ <b>VERDICT: TIME-STOP — SELL TODAY</b>\n` +
+                                `You have held for ${daysHeld} days and momentum is weak. Sell today (even at ${currentProfit}%) and free up your capital for tomorrow's tip. Do not let your money sit idle.`;
+                        } else if (analysis.action === 'SELL') {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                `🔴 <b>VERDICT: SELL NOW</b>\n` +
+                                `Technical signals are now BEARISH. Exit your position now at ₹${currentPrice} to protect your capital.`;
+                        } else {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                `🟡 <b>VERDICT: HOLD — Wait for Target</b>\n` +
+                                `You have held for ${daysHeld} day${daysHeld !== 1 ? 's' : ''}. Target is ₹${targetPrice}. Keep holding. If it doesn't hit the target by Day 3, sell it.`;
+                        }
+
+                    } else {
+                        // === NOT HOLDING → Show fresh BUY / SKIP verdict ===
+                        const conf = analysis.confidence || 0;
+                        if (analysis.action === 'BUY' && conf >= 75) {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                `✅ <b>VERDICT: BUY NOW</b>\n` +
+                                `Confidence is HIGH. Good trade to enter at ₹${currentPrice}.\n` +
+                                `After buying, type: <code>/bought ${brokerSymbol} ${currentPrice} QUANTITY</code>`;
+                        } else if (analysis.action === 'BUY' && conf < 75) {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                `⚠️ <b>VERDICT: WAIT — Signal is Weak</b>\n` +
+                                `Confidence is only ${conf}%. Signals are not strong enough. DO NOT buy right now. Wait for a stronger setup.`;
+                        } else if (analysis.action === 'HOLD') {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                `🚫 <b>VERDICT: DO NOT BUY NOW</b>\n` +
+                                `Signals are mixed. This is NOT a good time to enter. Skip and wait for a clearer setup.`;
+                        } else if (analysis.action === 'SELL') {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                `🚫 <b>VERDICT: DO NOT BUY</b>\n` +
+                                `AI signals are bearish. Do not enter this trade right now.`;
+                        }
                     }
 
-                    // === CLEAR FINAL VERDICT — always easy to understand ===
-                    let verdictBlock = '';
-                    if (analysis.action === 'BUY' && conf >= 75) {
-                        verdictBlock = `\n${'━'.repeat(28)}\n` +
-                                       `✅ <b>VERDICT: BUY NOW</b>\n` +
-                                       `Confidence is HIGH. This is a good trade to enter right now at ₹${currentPrice}.\n` +
-                                       `After buying, type: <code>/bought ${brokerSymbol} ${currentPrice} QUANTITY</code>`;
-                    } else if (analysis.action === 'BUY' && conf < 75) {
-                        verdictBlock = `\n${'━'.repeat(28)}\n` +
-                                       `⚠️ <b>VERDICT: WEAK SIGNAL — SKIP THIS TRADE</b>\n` +
-                                       `Confidence is too low. The signals are not strong enough. Do NOT buy right now. Wait for a better setup.`;
-                    } else if (analysis.action === 'HOLD') {
-                        if (holding) {
-                            verdictBlock = `\n${'━'.repeat(28)}\n` +
-                                           `🟡 <b>VERDICT: HOLD — Keep your position</b>\n` +
-                                           `You own this stock. Do not sell yet. Wait for the target or stop-loss to be hit.`;
-                        } else {
-                            verdictBlock = `\n${'━'.repeat(28)}\n` +
-                                           `🚫 <b>VERDICT: DO NOT BUY NOW</b>\n` +
-                                           `Signals are mixed. This is NOT a good time to enter. Skip this stock and wait for a clearer setup.`;
-                        }
-                    } else if (analysis.action === 'SELL') {
-                        if (holding) {
-                            verdictBlock = `\n${'━'.repeat(28)}\n` +
-                                           `🔴 <b>VERDICT: SELL NOW</b>\n` +
-                                           `AI signals are bearish. Exit your position immediately to protect your capital.`;
-                        } else {
-                            verdictBlock = `\n${'━'.repeat(28)}\n` +
-                                           `🚫 <b>VERDICT: DO NOT BUY</b>\n` +
-                                           `AI signals are bearish. Absolutely do not enter this trade right now.`;
-                        }
-                    }
+                    const conf = analysis.confidence || 0;
+                    const confBar = conf >= 85 ? '🟢🟢🟢🟢🟢 VERY STRONG'
+                                  : conf >= 75 ? '🟢🟢🟢🟢⬛ STRONG'
+                                  : conf >= 65 ? '🟢🟢🟢⬛⬛ MODERATE'
+                                  : '🟢🟢⬛⬛⬛ WEAK';
+                    const riskEmoji = analysis.riskLevel === 'LOW' ? '✅ LOW'
+                                    : analysis.riskLevel === 'HIGH' ? '🔴 HIGH'
+                                    : '🟡 MEDIUM';
 
                     const finalMsg =
-                        `${actionIcon} <b>AI ANALYSIS: ${symbol}</b>\n` +
+                        `🧠 <b>AI ANALYSIS: ${symbol}</b>\n` +
                         `${'─'.repeat(28)}\n\n` +
                         holdingStatusText +
                         `🔍 <b>Search in Groww/Zerodha:</b> <code>${brokerSymbol}</code>\n\n` +
                         priceBlock +
-                        `\n<b>📊 Confidence:</b> ${confBar}\n` +
+                        `\n<b>📊 Signal Confidence:</b> ${confBar}\n` +
                         `<b>⚠️ Risk Level:</b> ${riskEmoji}\n\n` +
                         `<b>🧠 Expert Analysis:</b>\n<i>${analysis.rationale}</i>` +
                         verdictBlock;
