@@ -454,12 +454,21 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                                 stk.adx = tech.adx;
                                 stk.trend = tech.trendSignal;
                                 stk.rsi = tech.RSI;
+                                stk.sma200 = tech.sma200;
+                                stk.macdSignal = tech.MACD?.histogram;
                                 
-                                // Hard-filter: If ADX is choppy or RSI is dangerously overbought, reject it immediately
+                                // Hard-filter: Pre-filter stocks so the Global AI cannot hallucinate bad setups
                                 const adxValue = parseFloat(tech.adx) || 0;
                                 const rsiValue = parseFloat(tech.RSI) || 50;
+                                const sma200Value = parseFloat(tech.sma200) || 0;
+                                const livePrice = parseFloat(stk.price) || 0;
+                                
                                 if (adxValue < 20 || rsiValue > 70) {
-                                    return null; // Mathematically unsafe for Strategy B
+                                    return null; // Mathematically unsafe (Choppy or Overbought)
+                                }
+                                
+                                if (sma200Value > 0 && livePrice < sma200Value) {
+                                    return null; // Mathematically unsafe (Below 200-day moving average, falling knife)
                                 }
                             } else {
                                 return null; // No technical data available (e.g. ZOMATO bug)
