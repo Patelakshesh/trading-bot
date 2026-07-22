@@ -439,17 +439,32 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩⬛⬛⬛] 60% - Calculating Technical Gates...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 
                 // Enrich movers with ADX and SMA data so Global AI doesn't hallucinate bad stocks
+                // Enrich movers with ADX and SMA data, and STRICTLY FILTER OUT bad stocks
+                // LLMs ignore math rules, so we must hide bad stocks completely from the AI's menu.
                 const enrichMovers = async (list) => {
-                    return await Promise.all(list.map(async (stk) => {
+                    const enriched = await Promise.all(list.map(async (stk) => {
                         try {
                             const tech = await getTechnicalIndicators(stk.symbol);
                             if (tech) {
                                 stk.adx = tech.adx;
                                 stk.trend = tech.trendSignal;
+                                stk.rsi = tech.RSI;
+                                
+                                // Hard-filter: If ADX is choppy or RSI is dangerously overbought, reject it immediately
+                                const adxValue = parseFloat(tech.adx) || 0;
+                                const rsiValue = parseFloat(tech.RSI) || 50;
+                                if (adxValue < 20 || rsiValue > 70) {
+                                    return null; // Mathematically unsafe for Strategy B
+                                }
+                            } else {
+                                return null; // No technical data available (e.g. ZOMATO bug)
                             }
-                        } catch(e) {}
+                        } catch(e) {
+                            return null;
+                        }
                         return stk;
                     }));
+                    return enriched.filter(s => s !== null);
                 };
                 
                 const movers = {
