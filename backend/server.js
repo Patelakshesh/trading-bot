@@ -298,7 +298,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     }
                     let aiSL = analysis.stopLoss;
                     if (!aiSL || String(aiSL).includes('N/A') || String(aiSL).includes('None')) {
-                        aiSL = `₹${(livePrice * 0.97).toFixed(2)}`;
+                        aiSL = `₹${(livePrice * 0.95).toFixed(2)}`; // Widened to -5% to avoid false stop-loss on volatile stocks
                     }
 
                     let priceBlock = `💰 <b>Live Market Price:</b> ${priceText}\n`;
@@ -327,8 +327,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                         const profitVal = parseFloat(currentProfit);
                         const profitEmoji = profitVal >= 0 ? '📈' : '📉';
                         const daysHeld = Math.floor((new Date() - new Date(holding.createdAt)) / (1000 * 60 * 60 * 24));
-                        const targetPrice = (holding.buyPrice * 1.05).toFixed(2);
-                        const slPrice = (holding.buyPrice * 0.97).toFixed(2);
+                        const targetPrice = (holding.buyPrice * 1.07).toFixed(2); // +7% target
+                        const slPrice = (holding.buyPrice * 0.95).toFixed(2);  // -5% SL (wider, avoids false triggers)
 
                         holdingStatusText =
                             `🎒 <b>YOU OWN THIS STOCK</b>\n` +
@@ -339,14 +339,14 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                             `${'─'.repeat(28)}\n\n`;
 
                         // Smart verdict based on the situation
-                        if (profitVal >= 4) {
+                        if (profitVal >= 5) {
                             verdictBlock = `\n${'━'.repeat(28)}\n` +
                                 `🏆 <b>VERDICT: TAKE PROFIT NOW</b>\n` +
-                                `You are up ${currentProfit}%! You have reached your target. SELL NOW on Groww/Zerodha and lock in your profit. Don't be greedy.`;
-                        } else if (profitVal <= -3) {
+                                `You are up ${currentProfit}%! You have hit your target. SELL NOW and lock in your profit. Don’t be greedy.`;
+                        } else if (profitVal <= -5) {
                             verdictBlock = `\n${'━'.repeat(28)}\n` +
                                 `🔴 <b>VERDICT: STOP-LOSS HIT — SELL NOW</b>\n` +
-                                `You are down ${currentProfit}%. Stop-Loss has been triggered. SELL IMMEDIATELY to protect your remaining capital. Do not hold and hope.`;
+                                `You are down ${currentProfit}%. Stop-Loss triggered. SELL to protect your remaining capital. Do not hold and hope.`;
                         } else if (daysHeld >= 3 && profitVal < 2) {
                             verdictBlock = `\n${'━'.repeat(28)}\n` +
                                 `⏱️ <b>VERDICT: TIME-STOP — SELL TODAY</b>\n` +
