@@ -433,7 +433,29 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 const news = await getLatestNews();
                 
                 await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩⬛⬛⬛⬛] 50% - Fetching Market Movers...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
-                const movers = await getMarketMovers();
+                const { getTechnicalIndicators } = require('./services/technicalService');
+                const rawMovers = await getMarketMovers();
+                
+                await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩⬛⬛⬛] 60% - Calculating Technical Gates...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                
+                // Enrich movers with ADX and SMA data so Global AI doesn't hallucinate bad stocks
+                const enrichMovers = async (list) => {
+                    return await Promise.all(list.map(async (stk) => {
+                        try {
+                            const tech = await getTechnicalIndicators(stk.symbol);
+                            if (tech) {
+                                stk.adx = tech.adx;
+                                stk.trend = tech.trendSignal;
+                            }
+                        } catch(e) {}
+                        return stk;
+                    }));
+                };
+                
+                const movers = {
+                    gainers: await enrichMovers(rawMovers.gainers),
+                    losers: await enrichMovers(rawMovers.losers)
+                };
                 
                 await bot.editMessageText(`🌐 <b>Scanning Global Markets for Top 5 Trades...</b>${budgetMsg}${rangeMsg}\n\n[🟩🟩🟩🟩🟩🟩⬛⬛] 75% - Checking Nifty 50 Market Direction...`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 

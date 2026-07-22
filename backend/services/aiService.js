@@ -328,10 +328,10 @@ LATEST INDIAN MARKET NEWS:
 ${news.slice(0, 8).map(n => `- ${n.title}`).join('\n')}
 
 TOP NSE GAINERS TODAY:
-${movers.gainers.slice(0, 6).map(g => `- ${g.symbol} (${g.name}): \u20b9${g.price} (+${g.changePercent}%)`).join('\n')}
+${movers.gainers.slice(0, 6).map(g => `- ${g.symbol} (${g.name}): ₹${g.price} (+${g.changePercent}%) [ADX: ${g.adx || 'N/A'}] [Trend: ${g.trend || 'N/A'}]`).join('\n')}
 
 TOP NSE LOSERS (Bounce-back candidates):
-${movers.losers.slice(0, 6).map(l => `- ${l.symbol} (${l.name}): \u20b9${l.price} (${l.changePercent}%)`).join('\n')}
+${movers.losers.slice(0, 6).map(l => `- ${l.symbol} (${l.name}): ₹${l.price} (${l.changePercent}%) [ADX: ${l.adx || 'N/A'}] [Trend: ${l.trend || 'N/A'}]`).join('\n')}
 
 === YOUR EXPERT DECISION RULES ===
 
