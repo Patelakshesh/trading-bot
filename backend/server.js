@@ -326,7 +326,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                         const currentProfit = currentPrice ? (((currentPrice - holding.buyPrice) / holding.buyPrice) * 100).toFixed(2) : 0;
                         const profitVal = parseFloat(currentProfit);
                         const profitEmoji = profitVal >= 0 ? '📈' : '📉';
-                        const daysHeld = Math.floor((new Date() - new Date(holding.buyDate)) / (1000 * 60 * 60 * 24));
+                        const daysHeld = Math.floor((new Date() - new Date(holding.createdAt)) / (1000 * 60 * 60 * 24));
                         const targetPrice = (holding.buyPrice * 1.05).toFixed(2);
                         const slPrice = (holding.buyPrice * 0.97).toFixed(2);
 

@@ -192,7 +192,7 @@ ${holding ? `
 [PORTFOLIO CONTEXT: USER ALREADY OWNS THIS STOCK]
 - Buy Price: ₹${holding.buyPrice}
 - Current Profit/Loss: ${(((currentPrice - holding.buyPrice) / holding.buyPrice) * 100).toFixed(2)}%
-- Days Held: ${Math.floor((new Date() - new Date(holding.buyDate)) / (1000 * 60 * 60 * 24))} days
+- Days Held: ${Math.floor((new Date() - new Date(holding.createdAt)) / (1000 * 60 * 60 * 24))} days
   Rule: If Days Held >= 3 and Profit is less than 2%, apply the TIME-STOP rule: Recommend SELL (Free up capital).
   Rule: If Profit is >= 4%, recommend SELL (Take Profit).
   Rule: If Loss is <= -3%, recommend SELL (Stop-Loss hit).
