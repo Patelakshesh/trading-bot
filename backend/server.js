@@ -294,7 +294,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     const livePrice = currentPrice || 0;
                     let aiTarget = analysis.target;
                     if (!aiTarget || String(aiTarget).includes('N/A') || String(aiTarget).includes('None')) {
-                        aiTarget = `₹${(livePrice * 1.05).toFixed(2)}`;
+                        aiTarget = `₹${(livePrice * 1.07).toFixed(2)}`; // Updated to 7% HIGH REWARD
                     }
                     let aiSL = analysis.stopLoss;
                     if (!aiSL || String(aiSL).includes('N/A') || String(aiSL).includes('None')) {

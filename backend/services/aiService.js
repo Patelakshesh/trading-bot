@@ -206,18 +206,18 @@ ${holding ? `
   Rule: If Loss is <= -3%, recommend SELL (Stop-Loss hit).
 ` : ''}
 
-=== DECISION RULES ===
-- AUTOMATIC REJECT 1: If earnings risk is HIGH (within 5 days) — output HOLD regardless of other signals.
-- AUTOMATIC REJECT 2: If price is below 200-SMA AND RSI > 45 — output HOLD/SELL (falling knife).
-- AUTOMATIC REJECT 3 (MOST IMPORTANT): If ADX < 20 (RANGING/CHOPPY market) — output HOLD. Do NOT buy a choppy stock. The user will buy and the price will oscillate up and down with no profit.
+=== DECISION RULES (HIGH RISK, HIGH REWARD) ===
+- AUTOMATIC REJECT 1: If earnings risk is HIGH (within 5 days) AND sentiment is negative — output HOLD/SELL.
+- AUTOMATIC REJECT 2: If ADX < 20 (RANGING/CHOPPY market) AND there is NO major news catalyst — output HOLD. 
+- 🚀 CATALYST OVERRIDE: If there is massive, highly positive investor/market news (e.g. big contract, government policy, huge earnings), you MAY IGNORE technical weakness (like ADX < 20 or price below 200-SMA) and recommend a HIGH-RISK BUY. Strategy 2 embraces high risk for high reward!
 - If USER ALREADY OWNS IT: Output 'HOLD' if momentum is still building, or 'SELL' if Time-Stop or Take-Profit is hit.
-- BUY if the setup is strong for Strategy B (e.g., RSI is oversold + Support is near, OR Volume is huge + Breakout). You only need 2 or 3 strong bullish signals to confirm a High-Beta momentum trade. ADX MUST be >= 20. Confidence >= 75.
-- HOLD if the setup is completely contradictory or ADX < 20.
-- SELL if 2+ AVAILABLE signals are explicitly BEARISH.
+- BUY if the setup is explosive for Strategy B (e.g., RSI is oversold + Support is near, OR Volume is huge + Breakout, OR Major Positive News Catalyst). Confidence >= 75.
+- HOLD if the setup is completely dead with no news.
+- SELL if signals are explicitly BEARISH.
 
-For BUY: Calculate EXACT price targets:
-- Target: Entry price + 4% to 6%
-- Stop-Loss: Entry price - 2.5% to 4%
+For BUY: Calculate EXACT price targets for HIGH REWARD:
+- Target: Entry price + 7% to 10% (Explosive swing target)
+- Stop-Loss: Entry price - 4% to 6% (Give it room to breathe)
 
 === OUTPUT (Strict JSON only, no markdown) ===
 {
@@ -342,6 +342,7 @@ GATE 3 - TECHNICAL: RSI not above 68? Price not at resistance? ADX > 20 (NOT ran
 GATE 4 - RISK/REWARD: Target at least 1.5x the stop-loss distance?
 GATE 5 - TIMING: Right time to enter NOW? Has the move already happened?
 GATE 6 (DIP MODE ONLY): Did the stock fall ONLY because of market weakness today? LOW volume on the dip confirms it is NOT a company problem.
+GATE 7 (CATALYST OVERRIDE - HIGH RISK): Is there massive positive investor news or market catalysts? If yes, you MAY override technical weakness and recommend as a High-Risk Buy.
 
 ⚠️ CRITICAL INSTRUCTION ABOUT THE 'MOVERS' LIST:
 The 'TOP GAINERS/LOSERS' list provided above is just a suggestion. Many of those stocks are choppy, overbought, or dangerous.
@@ -350,9 +351,9 @@ Instead, IGNORE the Movers list completely and use your own vast knowledge to ge
 
 ONLY recommend if it passes ALL applicable GATES. Skip and find a better one if it fails.
 
-Pricing rules:
-- Target = current price + 4% to 7%
-- Stop-Loss = current price - 2.5% to 4%
+Pricing rules (HIGH RISK, HIGH REWARD):
+- Target = current price + 7% to 10% (Explosive targets only)
+- Stop-Loss = current price - 4% to 6%
 - All prices in Indian Rupees (\u20b9)
 ${budgetPrompt}
 ${rangePrompt}
