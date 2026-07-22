@@ -325,7 +325,7 @@ const Dashboard = () => {
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <div style={{cursor: 'pointer'}} onClick={() => setActiveChartSymbol(g.symbol)}>
                         <strong style={{ color: 'var(--text-primary)', display: 'block' }}>{g.symbol}</strong>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{g.name?.substring(0, 20)}</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{g.name?.substring(0, 20)} | ₹{g.price?.toFixed(2) || 'N/A'}</span>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <strong style={{ color: 'var(--success)', display: 'block' }}>+{g.changePercent?.toFixed(2)}%</strong>
@@ -346,7 +346,7 @@ const Dashboard = () => {
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <div style={{cursor: 'pointer'}} onClick={() => setActiveChartSymbol(l.symbol)}>
                         <strong style={{ color: 'var(--text-primary)', display: 'block' }}>{l.symbol}</strong>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{l.name?.substring(0, 20)}</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{l.name?.substring(0, 20)} | ₹{l.price?.toFixed(2) || 'N/A'}</span>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <strong style={{ color: 'var(--danger)', display: 'block' }}>{l.changePercent?.toFixed(2)}%</strong>

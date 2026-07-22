@@ -256,34 +256,41 @@ const getMarketMovers = async () => {
         // Take 40 random stocks to process so the AI always gets a fresh, unique menu
         const randomMenu = fallbackData.slice(0, 40);
         
-        const pricePromises = randomMenu.map(async (item) => {
-            try {
-                // Fetch REAL quote data to get accurate price AND change percent
-                const quote = await yahooFinance.quote(item.symbol);
-                if (quote && quote.regularMarketPrice) {
-                    return {
-                        symbol: item.symbol,
-                        name: item.name,
-                        price: quote.regularMarketPrice,
-                        changePercent: quote.regularMarketChangePercent || 0
-                    };
-                }
-            } catch(e) {
-                // If quote fails entirely, fall back to just price with 0 change
-                const price = await getStockPrice(item.symbol);
-                if (price) return { symbol: item.symbol, name: item.name, price, changePercent: 0 };
-            }
-            return null;
-        });
+        const symbolsList = randomMenu.map(item => item.symbol);
         
-        const results = await Promise.all(pricePromises);
-        let simulatedMovers = results.filter(r => r !== null);
+        let quoteResults = [];
+        try {
+            // Fetch all 40 quotes in a SINGLE batched request to prevent Yahoo Finance 429 Rate Limiting
+            quoteResults = await yahooFinance.quote(symbolsList);
+        } catch(e) {
+            console.error("Batched Yahoo Quote failed:", e.message);
+        }
+
+        const simulatedMovers = [];
+        
+        for (const item of randomMenu) {
+            const quote = quoteResults.find(q => q.symbol === item.symbol);
+            if (quote && quote.regularMarketPrice) {
+                simulatedMovers.push({
+                    symbol: item.symbol,
+                    name: item.name,
+                    price: quote.regularMarketPrice,
+                    changePercent: quote.regularMarketChangePercent || 0
+                });
+            } else {
+                // Final fallback if batch fails for a specific symbol
+                const price = await getStockPrice(item.symbol);
+                if (price) {
+                    simulatedMovers.push({ symbol: item.symbol, name: item.name, price, changePercent: 0 });
+                }
+            }
+        }
         
         simulatedMovers.sort((a,b) => b.changePercent - a.changePercent);
         
         return { 
             gainers: simulatedMovers.slice(0, 15), 
-            losers: simulatedMovers.slice(simulatedMovers.length - 15).reverse() 
+            losers: simulatedMovers.slice(Math.max(simulatedMovers.length - 15, 0)).reverse() 
         };
     }
 };

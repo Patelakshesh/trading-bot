@@ -235,11 +235,11 @@ const Explore = () => {
                   <div className="glass-card" style={{ textAlign: 'center', padding: '16px' }}>
                     <h4 style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>Current Price</h4>
                     <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff', margin: 0 }}>₹{historyData.quote?.price?.toFixed(2) || 'N/A'}</p>
-                    {historyData.quote?.change !== undefined && (
-                      <span style={{ color: historyData.quote.change >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: '0.9rem' }}>
-                        {historyData.quote.change >= 0 ? '+' : ''}{historyData.quote.change.toFixed(2)} ({historyData.quote.changePercent?.toFixed(2)}%)
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                      <span className={`badge ${historyData.quote?.change >= 0 ? 'buy' : 'sell'}`}>
+                        {historyData.quote?.change >= 0 ? '+' : ''}{historyData.quote?.change?.toFixed(2)} ({historyData.quote?.changePercent?.toFixed(2)}%)
                       </span>
-                    )}
+                    </div>
                   </div>
                   <div className="glass-card" style={{ textAlign: 'center', padding: '16px' }}>
                     <h4 style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>Today's High</h4>
