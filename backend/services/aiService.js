@@ -268,13 +268,24 @@ const getGlobalTop5TradingTips = async (news, movers, budget = null, priceRange 
         if (niftyChange !== null) {
             if (niftyChange <= -0.5) {
                 marketStrategyPrompt = `
-=== TODAY'S MARKET STRATEGY: DIP BUYING ===
+=== TODAY'S MARKET STRATEGY: DIP BUYING MODE ===
 The Nifty 50 is DOWN ${Math.abs(niftyChange).toFixed(2)}% today. This is a DIP BUYING opportunity.
-Your PRIMARY job is to find QUALITY stocks that dropped today ONLY because of overall market weakness — NOT because of any company-specific problem.
-These stocks are temporarily cheap and historically bounce back 3-7% within 1-3 trading days.
-Look specifically in: TOP NSE LOSERS list for stocks with STRONG fundamentals that fell today.
-A stock falling -1% to -3% today when its fundamentals are strong = EXCELLENT buy setup.
-DO NOT recommend stocks that fell due to bad earnings, scandals, or downgrades — those falls are permanent.`;
+
+Your PRIMARY mission: Find stocks that are DOWN today ONLY because the whole market is falling — NOT because of any company-specific problem. These stocks will BOUNCE BACK 4-8% within 1-3 days.
+
+The IDEAL dip buy candidate has ALL of these:
+1. Stock price is DOWN -1% to -5% today (temporary weakness due to market)
+2. RSI is below 45 (oversold, spring loaded to bounce)
+3. The company fundamentals are STRONG (good revenue, no bad news)
+4. Volume today is NORMAL or LOW (means institutions are NOT panic-selling, just market drag)
+5. The stock was in an UPTREND before today's dip
+
+DO NOT recommend stocks that:
+- Fell due to bad earnings, management scandal, or analyst downgrade
+- Are already in a long-term downtrend
+- Have very high volume today (panic sell)
+
+LOOK IN: The TOP LOSERS list provided below. Find the hidden gems that fell because of market weakness only.`;
             } else if (niftyChange >= 0.3) {
                 marketStrategyPrompt = `
 === TODAY'S MARKET STRATEGY: MOMENTUM BUYING ===
@@ -319,14 +330,15 @@ ${movers.losers.slice(0, 6).map(l => `- ${l.symbol} (${l.name}): \u20b9${l.price
 
 === YOUR EXPERT DECISION RULES ===
 
-For each candidate stock, verify ALL 5 gates:
-GATE 1 - MOMENTUM: Clear reason for the stock to move today (news, sector strength, earnings)?
-GATE 2 - TREND (CRITICAL): Is the stock in a long-term uptrend? DO NOT recommend stocks in a long-term downtrend (below 200-day SMA) unless in Dip Buying mode.
-GATE 3 - TECHNICAL: RSI not above 68? Price not at resistance? Setup is safe to enter?
-GATE 4 - RISK/REWARD: Target is at least 1.5x the stop-loss distance?
-GATE 5 - TIMING: Is this the right time to enter right now, at the current time? Or has the move already happened?
+For each candidate stock, verify ALL 6 gates:
+GATE 1 - MOMENTUM: Is there a clear reason this stock will move UP in the next 1-3 days?
+GATE 2 - TREND (CRITICAL): Is the stock in a long-term uptrend (above 200-day SMA)? Never recommend a falling stock.
+GATE 3 - TECHNICAL: RSI not above 68? Price not at resistance? ADX > 20 (NOT ranging/choppy)?
+GATE 4 - RISK/REWARD: Target at least 1.5x the stop-loss distance?
+GATE 5 - TIMING: Right time to enter NOW? Has the move already happened?
+GATE 6 (DIP MODE ONLY): Did the stock fall ONLY because of market weakness today? LOW volume on the dip confirms it is NOT a company problem.
 
-ONLY recommend if it passes ALL 5 GATES. Skip and find a better one if it fails.
+ONLY recommend if it passes ALL applicable GATES. Skip and find a better one if it fails.
 
 Pricing rules:
 - Target = current price + 4% to 7%
