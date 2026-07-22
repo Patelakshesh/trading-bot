@@ -383,10 +383,15 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                                 `✅ <b>VERDICT: BUY NOW</b>\n` +
                                 `Confidence is HIGH. Good trade to enter at ₹${currentPrice}.\n` +
                                 `After buying, type: <code>/bought ${brokerSymbol} ${currentPrice} QUANTITY</code>`;
+                        } else if (analysis.action === 'BUY' && analysis.riskLevel === 'HIGH') {
+                            verdictBlock = `\n${'━'.repeat(28)}\n` +
+                                `⚠️ <b>VERDICT: HIGH-RISK BUY (CATALYST)</b>\n` +
+                                `This is an aggressive, high-risk/high-reward setup. Technicals may be weak, but a catalyst exists. Enter at your own risk at ₹${currentPrice}.\n` +
+                                `After buying, type: <code>/bought ${brokerSymbol} ${currentPrice} QUANTITY</code>`;
                         } else if (analysis.action === 'BUY' && conf < 75) {
                             verdictBlock = `\n${'━'.repeat(28)}\n` +
                                 `⚠️ <b>VERDICT: WAIT — Signal is Weak</b>\n` +
-                                `Confidence is only ${conf}%. Signals are not strong enough. DO NOT buy right now. Wait for a stronger setup.`;
+                                `Confidence is only ${conf}%. Signals are not strong enough for a safe entry. DO NOT buy right now. Wait for a stronger setup.`;
                         } else if (analysis.action === 'HOLD') {
                             verdictBlock = `\n${'━'.repeat(28)}\n` +
                                 `🚫 <b>VERDICT: DO NOT BUY NOW</b>\n` +
