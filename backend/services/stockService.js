@@ -1176,16 +1176,18 @@ const getMarketMovers = async () => {
         for (const item of randomMenu) {
             const quote = quoteResults.find(q => q.symbol === item.symbol);
             if (quote && quote.regularMarketPrice) {
-                simulatedMovers.push({
-                    symbol: item.symbol,
-                    name: item.name,
-                    price: quote.regularMarketPrice,
-                    changePercent: quote.regularMarketChangePercent || 0
-                });
+                if (quote.regularMarketPrice >= 50) { // Global Penny Stock Filter
+                    simulatedMovers.push({
+                        symbol: item.symbol,
+                        name: item.name,
+                        price: quote.regularMarketPrice,
+                        changePercent: quote.regularMarketChangePercent || 0
+                    });
+                }
             } else {
                 // Final fallback if batch fails for a specific symbol
                 const price = await getStockPrice(item.symbol);
-                if (price) {
+                if (price && price >= 50) { // Global Penny Stock Filter
                     simulatedMovers.push({ symbol: item.symbol, name: item.name, price, changePercent: 0 });
                 }
             }
