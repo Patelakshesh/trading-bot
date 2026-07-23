@@ -307,7 +307,7 @@ The user MUST make more than 5% to beat ₹40 brokerage fees, so if there are no
         const prompt = `
 You are an ELITE, AGGRESSIVE short-term quant trader at a top Mumbai fund.
 Your strict mandate is: STRATEGY B (HIGH-BETA MOMENTUM).
-Your ONLY job is to find the BEST 5 INDIAN NSE stocks that will explode 5% to 10% in the next 1-3 days.
+Your ONLY job is to find the BEST 1 to 5 INDIAN NSE stocks that will explode 5% to 10% in the next 1-3 days.
 
 ${marketStrategyPrompt}
 
@@ -345,12 +345,12 @@ GATE 5 - TIMING: Right time to enter NOW? Has the move already happened?
 GATE 6 (DIP MODE ONLY): Did the stock fall ONLY because of market weakness today? LOW volume on the dip confirms it is NOT a company problem.
 GATE 7 (CATALYST OVERRIDE - HIGH RISK): Is there massive positive investor news or market catalysts? If yes, you MAY override technical weakness and recommend as a High-Risk Buy.
 
-⚠️ CRITICAL INSTRUCTION ABOUT THE 'MOVERS' LIST:
-The 'TOP GAINERS/LOSERS' list provided above is just a suggestion. Many of those stocks are choppy, overbought, or dangerous.
-If the stocks in the Movers list DO NOT pass all 6 gates (e.g. they have ADX < 25, or RSI > 68), DO NOT RECOMMEND THEM.
-Instead, IGNORE the Movers list completely and use your own vast knowledge to generate 5 explosive HIGH-BETA Indian NSE stocks that actually pass the gates. NEVER force a bad stock into the top 5.
-
-ONLY recommend if it passes ALL applicable GATES. Skip and find a better one if it fails.
+⚠️ CRITICAL INSTRUCTION ABOUT THE 'MOVERS' LIST (ANTI-HALLUCINATION RULE):
+You MUST ONLY select your stocks from the 'TOP NSE GAINERS TODAY' or 'TOP NSE LOSERS' lists provided above.
+DO NOT use your own knowledge to invent or hallucinate stocks, because you do not have their live real-time ADX data.
+If only 2 stocks from the list pass the strict ADX > 25 gates, then ONLY return those 2 stocks. It is better to return 1 or 2 perfect setups than to hallucinate fake ones!
+NEVER recommend slow, boring stocks like YESBANK or IDFCFIRSTB.
+ONLY recommend if it passes ALL applicable GATES.
 
 Pricing rules (HIGH RISK, HIGH REWARD):
 - Target = current price + 7% to 10% (Explosive targets only)
@@ -359,7 +359,7 @@ Pricing rules (HIGH RISK, HIGH REWARD):
 ${budgetPrompt}
 ${rangePrompt}
 
-Return ONLY a valid JSON array of exactly 5 INDIAN NSE stocks. No markdown, no explanation.
+Return ONLY a valid JSON array of 1 to 5 INDIAN NSE stocks. No markdown, no explanation.
 [
   {
     "symbol": "TICKER.NS",

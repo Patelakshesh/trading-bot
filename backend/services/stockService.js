@@ -146,34 +146,9 @@ const searchSymbol = async (query) => {
 
 const getMarketMovers = async () => {
     try {
-        // Enforce a strict 3-second timeout to prevent Yahoo from hanging the server
-        // Add .catch() to prevent background Unhandled Rejection crashes when the abandoned promise finally fails
-        const fetchScreener = yahooFinance.screener({ scrIds: 'day_gainers', count: 10, region: 'IN' }).catch(e => null);
-        const fetchLosers = yahooFinance.screener({ scrIds: 'day_losers', count: 10, region: 'IN' }).catch(e => null);
-        
-        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
-        
-        const gainersResult = await Promise.race([fetchScreener, timeout]);
-        const losersResult = await Promise.race([fetchLosers, timeout]);
-        
-        if (!gainersResult || !losersResult || !gainersResult.quotes[0]?.symbol.endsWith('.NS')) {
-            throw new Error("Yahoo Rate Limited or Non-IN Stocks - Booting Fallback");
-        }
+        // We no longer use Yahoo Finance Screener because it returns the exact same 10 large-cap stocks all day.
+        // Instead, we directly use our randomized 1,000-stock AI scanner to guarantee infinite variety on every /tip request.
 
-        const mapQuote = (q) => ({
-            symbol: q.symbol,
-            name: q.shortName || q.longName,
-            price: q.regularMarketPrice,
-            changePercent: q.regularMarketChangePercent
-        });
-
-        return {
-            gainers: (gainersResult && gainersResult.quotes) ? gainersResult.quotes.map(mapQuote) : [],
-            losers: (losersResult && losersResult.quotes) ? losersResult.quotes.map(mapQuote) : []
-        };
-    } catch (error) {
-        console.error("Yahoo Screener Blocked/Timed Out. Booting up Fail-Safe Fallback...");
-        // Bypassing Yahoo Block: Massive pool of 100 High-Beta/Volatile Indian stocks (Strategy B)
                 const fallbackData = [
 { symbol: '20MICRONS.NS', name: '20MICRONS' },
 { symbol: '21STCENMGM.NS', name: '21STCENMGM' },
@@ -1183,8 +1158,8 @@ const getMarketMovers = async () => {
             [fallbackData[i], fallbackData[j]] = [fallbackData[j], fallbackData[i]];
         }
 
-        // Take 40 random stocks to process so the AI always gets a fresh, unique menu
-        const randomMenu = fallbackData.slice(0, 40);
+        // Take 80 random stocks to process so the AI always gets a fresh, unique menu
+        const randomMenu = fallbackData.slice(0, 80);
         
         const symbolsList = randomMenu.map(item => item.symbol);
         
@@ -1219,9 +1194,12 @@ const getMarketMovers = async () => {
         simulatedMovers.sort((a,b) => b.changePercent - a.changePercent);
         
         return { 
-            gainers: simulatedMovers.slice(0, 15), 
-            losers: simulatedMovers.slice(Math.max(simulatedMovers.length - 15, 0)).reverse() 
+            gainers: simulatedMovers.slice(0, 40), 
+            losers: simulatedMovers.slice(Math.max(simulatedMovers.length - 40, 0)).reverse() 
         };
+    } catch (err) {
+        console.error("Error in getMarketMovers:", err);
+        return { gainers: [], losers: [] };
     }
 };
 
