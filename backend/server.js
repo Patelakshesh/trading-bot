@@ -495,8 +495,10 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                                 const sma200Value = parseFloat(tech.sma200) || 0;
                                 const livePrice = parseFloat(stk.price) || 0;
                                 
-                                if (adxValue < 20 || rsiValue > 70) {
-                                    return null; // Mathematically unsafe (Choppy or Overbought)
+                                // User requested HIGH MOMENTUM to clear brokerage fees (5%+ moves). 
+                                // ADX > 25 is required for a strong trend. Anything below is choppy/sideways (the 1% up/down they complained about).
+                                if (adxValue < 25 || rsiValue > 75) {
+                                    return null; // Mathematically unsafe (Choppy or Extremely Overbought)
                                 }
                                 
                                 if (sma200Value > 0 && livePrice < sma200Value) {

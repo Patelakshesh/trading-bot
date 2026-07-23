@@ -192,9 +192,9 @@ ${news.length > 0 ? news.slice(0, 5).map(n => `- ${n.title}`).join('\n') : 'No r
 [SIGNAL 11] TREND STRENGTH (ADX — THE MOST IMPORTANT FILTER):
 - ADX Value: ${technicals?.adx || 'Unknown'}
 - Trend Strength: ${technicals?.trendStrength || 'Unknown'}
-  ⚠️ CRITICAL RULE: If ADX < 20 (RANGING/CHOPPY), the stock has NO clear direction.
-  It will go UP then DOWN then UP endlessly without a real trend. This is the #1 cause of losses for short-term traders.
-  If ADX < 20: Output HOLD/DO NOT BUY regardless of all other signals.
+  ⚠️ CRITICAL RULE: If ADX < 25 (RANGING/CHOPPY), the stock has NO clear direction.
+  It will go UP then DOWN then UP endlessly (1% moves) without a real trend. This destroys profit via brokerage fees!
+  If ADX < 25: Output HOLD/DO NOT BUY regardless of all other signals.
 
 ${holding ? `
 [PORTFOLIO CONTEXT: USER ALREADY OWNS THIS STOCK]
@@ -208,16 +208,16 @@ ${holding ? `
 
 === DECISION RULES (HIGH RISK, HIGH REWARD) ===
 - AUTOMATIC REJECT 1: If earnings risk is HIGH (within 5 days) AND sentiment is negative — output HOLD/SELL.
-- AUTOMATIC REJECT 2: If ADX < 20 (RANGING/CHOPPY market) AND there is NO major news catalyst — output HOLD. 
-- 🚀 CATALYST OVERRIDE: If there is massive, highly positive investor/market news (e.g. big contract, government policy, huge earnings), you MAY IGNORE technical weakness (like ADX < 20 or price below 200-SMA) and recommend a HIGH-RISK BUY. Strategy 2 embraces high risk for high reward!
+- AUTOMATIC REJECT 2: If ADX < 25 (RANGING/CHOPPY market) AND there is NO major news catalyst — output HOLD. 
+- 🚀 CATALYST OVERRIDE: If there is massive, highly positive investor/market news (e.g. big contract, government policy, huge earnings), you MAY IGNORE technical weakness (like ADX < 25 or price below 200-SMA) and recommend a HIGH-RISK BUY. Strategy 2 embraces high risk for high reward!
 - If USER ALREADY OWNS IT: Output 'HOLD' if momentum is still building, or 'SELL' if Time-Stop or Take-Profit is hit.
 - BUY if the setup is explosive for Strategy B (e.g., RSI is oversold + Support is near, OR Volume is huge + Breakout, OR Major Positive News Catalyst). Confidence >= 75.
 - HOLD if the setup is completely dead with no news.
 - SELL if signals are explicitly BEARISH.
 
-For BUY: Calculate EXACT price targets for HIGH REWARD:
-- Target: Entry price + 7% to 10% (Explosive swing target)
-- Stop-Loss: Entry price - 4% to 6% (Give it room to breathe)
+For BUY: Calculate EXACT price targets for HIGH REWARD (Must beat ₹40 brokerage fees!):
+- Target: Entry price + 6% to 12% (Explosive swing breakout target)
+- Stop-Loss: Entry price - 4% to 6% (Give it room to breathe during morning volatility)
 
 === OUTPUT (Strict JSON only, no markdown) ===
 {
@@ -291,15 +291,16 @@ LOOK IN: The TOP LOSERS list provided below. Find the hidden gems that fell beca
                 marketStrategyPrompt = `
 === TODAY'S MARKET STRATEGY: MOMENTUM BUYING ===
 The Nifty 50 is UP +${niftyChange.toFixed(2)}% today. This is a MOMENTUM opportunity.
-Your PRIMARY job is to find stocks that are breaking out above resistance levels with high volume.
-Look specifically in: TOP NSE GAINERS list for stocks with strong momentum that can continue 4-7% more.
-Avoid stocks that already jumped 5%+ today — the move may be over. Look for stocks up 1-3% that have more room to run.`;
+Your PRIMARY job is to find HIGH-BETA stocks that are breaking out aggressively above resistance levels with high volume.
+Look specifically in: TOP NSE GAINERS list for stocks with strong momentum (ADX > 25) that can easily continue 5-10% more.
+The user needs large profit margins to cover ₹40 brokerage fees, so AVOID slow, boring stocks that only move 1% a week!`;
             } else {
                 marketStrategyPrompt = `
 === TODAY'S MARKET STRATEGY: SELECTIVE TRADING ===
 The Nifty 50 is flat (${niftyChange >= 0 ? '+' : ''}${niftyChange.toFixed(2)}%) today. Market is sideways.
 Be VERY selective. Only recommend stocks with CRYSTAL CLEAR setups (confidence >= 80).
-Look for stocks with specific catalysts: earnings, news, sector rotation, or breakouts.`;
+Look for stocks with specific catalysts: earnings, news, sector rotation, or aggressive breakouts.
+The user MUST make more than 5% to beat ₹40 brokerage fees, so if there are no explosive setups, reject the bad ones!`;
             }
         }
 
