@@ -339,7 +339,7 @@ ${movers.losers.slice(0, 15).map(l => `- ${l.symbol} (${l.name}): ₹${l.price} 
 For each candidate stock, verify ALL 6 gates:
 GATE 1 - MOMENTUM: Is there a clear reason this stock will move UP in the next 1-3 days?
 GATE 2 - TREND (CRITICAL): Is the stock in a long-term uptrend (above 200-day SMA)? Never recommend a falling stock.
-GATE 3 - TECHNICAL: RSI not above 68? Price not at resistance? ADX > 20 (NOT ranging/choppy)?
+GATE 3 - TECHNICAL: RSI not above 68? Price not at resistance? ADX > 25 (NOT ranging/choppy)?
 GATE 4 - RISK/REWARD: Target at least 1.5x the stop-loss distance?
 GATE 5 - TIMING: Right time to enter NOW? Has the move already happened?
 GATE 6 (DIP MODE ONLY): Did the stock fall ONLY because of market weakness today? LOW volume on the dip confirms it is NOT a company problem.
@@ -347,7 +347,7 @@ GATE 7 (CATALYST OVERRIDE - HIGH RISK): Is there massive positive investor news 
 
 ⚠️ CRITICAL INSTRUCTION ABOUT THE 'MOVERS' LIST:
 The 'TOP GAINERS/LOSERS' list provided above is just a suggestion. Many of those stocks are choppy, overbought, or dangerous.
-If the stocks in the Movers list DO NOT pass all 6 gates (e.g. they have ADX < 20, or RSI > 68), DO NOT RECOMMEND THEM.
+If the stocks in the Movers list DO NOT pass all 6 gates (e.g. they have ADX < 25, or RSI > 68), DO NOT RECOMMEND THEM.
 Instead, IGNORE the Movers list completely and use your own vast knowledge to generate 5 explosive HIGH-BETA Indian NSE stocks that actually pass the gates. NEVER force a bad stock into the top 5.
 
 ONLY recommend if it passes ALL applicable GATES. Skip and find a better one if it fails.
