@@ -2542,7 +2542,9 @@ const getMarketMovers = async () => {
         for (let i = fallbackData.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [fallbackData[i], fallbackData[j]] = [fallbackData[j], fallbackData[i]];
-           // Take 300 random stocks to process so we capture massive 5-10% breakouts from the whole market
+        }
+
+        // Take 300 random stocks to process so we capture massive 5-10% breakouts from the whole market
         const randomMenu = fallbackData.slice(0, 300);
         
         const symbolsList = randomMenu.map(item => item.symbol);
@@ -2560,7 +2562,7 @@ const getMarketMovers = async () => {
         for (const item of randomMenu) {
             const quote = quoteResults.find(q => q.symbol === item.symbol);
             if (quote && quote.regularMarketPrice) {
-                if (quote.regularMarketPrice >= 50 && quote.regularMarketChangePercent > 1.0) { // Global Penny Stock & Low-Mover Filter
+                if (quote.regularMarketPrice >= 50) { // Global Penny Stock Filter
                     simulatedMovers.push({
                         symbol: item.symbol,
                         name: item.name,
