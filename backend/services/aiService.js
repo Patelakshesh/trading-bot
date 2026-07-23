@@ -211,9 +211,9 @@ ${holding ? `
 - AUTOMATIC REJECT 2: If ADX < 25 (RANGING/CHOPPY market) AND there is NO major news catalyst — output HOLD. 
 - 🚀 CATALYST OVERRIDE: If there is massive, highly positive investor/market news (e.g. big contract, government policy, huge earnings), you MAY IGNORE technical weakness (like ADX < 25 or price below 200-SMA) and recommend a HIGH-RISK BUY. Strategy 2 embraces high risk for high reward!
 - If USER ALREADY OWNS IT: Output 'HOLD' if momentum is still building, or 'SELL' if Time-Stop or Take-Profit is hit.
-- BUY if the setup is explosive for Strategy B (e.g., RSI is oversold + Support is near, OR Volume is huge + Breakout, OR Major Positive News Catalyst). Confidence >= 75.
-- HOLD if the setup is completely dead with no news.
-- SELL if signals are explicitly BEARISH.
+- BUY if the setup shows strong HIGH-BETA Momentum (ADX > 25) and is not extremely overbought (RSI < 75). Do NOT reject a stock just because it isn't deeply oversold; in Strategy B, we buy strength and breakouts! Confidence >= 75.
+- HOLD if the setup is choppy (ADX < 25) with no news, or if it is already overbought at strong resistance.
+- SELL if signals are explicitly BEARISH (e.g., MACD cross down + Price below SMA + Negative news).
 
 For BUY: Calculate EXACT price targets for HIGH REWARD (Must beat ₹40 brokerage fees!):
 - Target: Entry price + 6% to 12% (Explosive swing breakout target)
