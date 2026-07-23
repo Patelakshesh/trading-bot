@@ -191,6 +191,26 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             console.error(err);
             bot.sendMessage(chatId, '❌ Failed to update portfolio database. Please check connection.');
         }
+    // 1.5 /fixdb command - Fixes broken symbols in the DB caused by the previous Yahoo Finance search bug
+    bot.onText(/\/fixdb/, async (msg) => {
+        const chatId = msg.chat.id;
+        try {
+            bot.sendMessage(chatId, '🛠️ Scanning your portfolio for broken stock symbols...');
+            const positions = await Portfolio.find({ chatId: chatId.toString() });
+            let fixedCount = 0;
+            for (const pos of positions) {
+                if (!pos.symbol.endsWith('.NS') && !pos.symbol.endsWith('.BO')) {
+                    const oldSymbol = pos.symbol;
+                    pos.symbol = oldSymbol + '.NS';
+                    await pos.save();
+                    fixedCount++;
+                }
+            }
+            bot.sendMessage(chatId, `✅ Database fixed! Corrected ${fixedCount} stock symbols to use the Indian exchange (.NS). Run /profit to see your true P&L!`);
+        } catch (err) {
+            console.error(err);
+            bot.sendMessage(chatId, '❌ Failed to fix the database.');
+        }
     });
 
     // 2. /price command — shows live price + AI target and SL

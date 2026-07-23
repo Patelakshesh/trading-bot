@@ -107,18 +107,24 @@ const searchSymbol = async (query) => {
     try {
         // Strip extensions to force a fuzzy search on the base company name/ticker
         const cleanQuery = query.trim().toUpperCase().replace('.NS', '').replace('.BO', '');
-        
-        let results = await yahooFinance.search(cleanQuery);
-        if (!results.quotes || results.quotes.length === 0) {
-            results = await yahooFinance.search(`${cleanQuery} India`);
-        }
+        // Step 1: Explicitly check for the Indian NSE stock first
+        const nseQuery = `${cleanQuery}.NS`;
+        let results = await yahooFinance.search(nseQuery);
         
         if (results.quotes && results.quotes.length > 0) {
-            // Prioritize Indian stock exchanges (.NS or .BO)
+            const exactNseMatch = results.quotes.find(q => q.symbol === nseQuery);
+            if (exactNseMatch) return exactNseMatch.symbol;
+        }
+
+        // Step 2: Fallback to global search if NSE stock not found
+        results = await yahooFinance.search(cleanQuery);
+        
+        if (results.quotes && results.quotes.length > 0) {
+            // Prioritize Indian stock exchanges (.NS or .BO) just in case
             const indianStock = results.quotes.find(q => q.symbol && (q.symbol.endsWith('.NS') || q.symbol.endsWith('.BO')));
             if (indianStock) return indianStock.symbol;
             
-            // Fallback to the top result if it's not an Indian stock but has a symbol
+            // Fallback to the top result if it's not an Indian stock
             const firstValidStock = results.quotes.find(q => q.symbol);
             if (firstValidStock) return firstValidStock.symbol;
         }
