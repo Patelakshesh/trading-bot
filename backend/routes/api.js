@@ -44,6 +44,15 @@ router.get('/portfolio', async (req, res) => {
     try {
         const holdings = await Portfolio.find({ status: 'HOLDING' }).sort({ createdAt: -1 });
         
+        // AUTO-HEAL DATABASE: Fix any malformed symbols instantly
+        for (const item of holdings) {
+            if (!item.symbol.endsWith('.NS') && !item.symbol.endsWith('.BO')) {
+                item.symbol = item.symbol + '.NS';
+                await item.save();
+                console.log(`[Auto-Heal] Fixed malformed symbol to ${item.symbol}`);
+            }
+        }
+        
         // Fetch current live prices for the dashboard
         const portfolioWithPrices = await Promise.all(holdings.map(async (item) => {
             const currentPrice = await getStockPrice(item.symbol);
@@ -60,11 +69,20 @@ router.get('/portfolio', async (req, res) => {
     }
 });
 
-// Get portfolio sold history (Realized Profits)
+// Get portfolio history (realized gains/losses)
 router.get('/portfolio/history', async (req, res) => {
     try {
-        const soldTrades = await Portfolio.find({ status: 'SOLD' }).sort({ updatedAt: -1 });
-        res.json(soldTrades);
+        const history = await Portfolio.find({ status: 'SOLD' }).sort({ createdAt: -1 });
+        
+        // AUTO-HEAL DATABASE: Fix any malformed symbols instantly
+        for (const item of history) {
+            if (!item.symbol.endsWith('.NS') && !item.symbol.endsWith('.BO')) {
+                item.symbol = item.symbol + '.NS';
+                await item.save();
+            }
+        }
+        
+        res.json(history);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error fetching history' });
@@ -183,6 +201,15 @@ router.get('/logs', async (req, res) => {
 router.get('/watchlist', async (req, res) => {
     try {
         const watchlist = await Watchlist.find().sort({ createdAt: -1 });
+        
+        // AUTO-HEAL DATABASE: Fix any malformed symbols instantly
+        for (const item of watchlist) {
+            if (!item.symbol.endsWith('.NS') && !item.symbol.endsWith('.BO')) {
+                item.symbol = item.symbol + '.NS';
+                await item.save();
+            }
+        }
+        
         const watchlistWithPrices = await Promise.all(watchlist.map(async (item) => {
             const currentPrice = await getStockPrice(item.symbol);
             return {
