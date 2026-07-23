@@ -192,9 +192,9 @@ ${news.length > 0 ? news.slice(0, 5).map(n => `- ${n.title}`).join('\n') : 'No r
 [SIGNAL 11] TREND STRENGTH (ADX — THE MOST IMPORTANT FILTER):
 - ADX Value: ${technicals?.adx || 'Unknown'}
 - Trend Strength: ${technicals?.trendStrength || 'Unknown'}
-  ⚠️ CRITICAL RULE: If ADX < 25 (RANGING/CHOPPY), the stock has NO clear direction.
+  ⚠️ CRITICAL RULE: If ADX < 20 (RANGING/CHOPPY), the stock has NO clear direction.
   It will go UP then DOWN then UP endlessly (1% moves) without a real trend. This destroys profit via brokerage fees!
-  If ADX < 25: Output HOLD/DO NOT BUY regardless of all other signals.
+  If ADX < 20: Output HOLD/DO NOT BUY regardless of all other signals.
 
 ${holding ? `
 [PORTFOLIO CONTEXT: USER ALREADY OWNS THIS STOCK]
@@ -208,11 +208,11 @@ ${holding ? `
 
 === DECISION RULES (HIGH RISK, HIGH REWARD) ===
 - AUTOMATIC REJECT 1: If earnings risk is HIGH (within 5 days) AND sentiment is negative — output HOLD/SELL.
-- AUTOMATIC REJECT 2: If ADX < 25 (RANGING/CHOPPY market) AND there is NO major news catalyst — output HOLD. 
-- 🚀 CATALYST OVERRIDE: If there is massive, highly positive investor/market news (e.g. big contract, government policy, huge earnings), you MAY IGNORE technical weakness (like ADX < 25 or price below 200-SMA) and recommend a HIGH-RISK BUY. Strategy 2 embraces high risk for high reward!
+- AUTOMATIC REJECT 2: If ADX < 20 (RANGING/CHOPPY market) AND there is NO major news catalyst — output HOLD. 
+- 🚀 CATALYST OVERRIDE: If there is massive, highly positive investor/market news (e.g. big contract, government policy, huge earnings), you MAY IGNORE technical weakness (like ADX < 20 or price below 200-SMA) and recommend a HIGH-RISK BUY. Strategy 2 embraces high risk for high reward!
 - If USER ALREADY OWNS IT: Output 'HOLD' if momentum is still building, or 'SELL' if Time-Stop or Take-Profit is hit.
-- BUY if the setup shows strong HIGH-BETA Momentum (ADX > 25) and is not extremely overbought (RSI < 75). Do NOT reject a stock just because it isn't deeply oversold; in Strategy B, we buy strength and breakouts! Confidence >= 75.
-- HOLD if the setup is choppy (ADX < 25) with no news, or if it is already overbought at strong resistance.
+- BUY if the setup shows strong HIGH-BETA Momentum (ADX > 20) and is not extremely overbought (RSI < 75). Do NOT reject a stock just because it isn't deeply oversold; in Strategy B, we buy strength and breakouts! Confidence >= 75.
+- HOLD if the setup is choppy (ADX < 20) with no news, or if it is already overbought at strong resistance.
 - SELL if signals are explicitly BEARISH (e.g., MACD cross down + Price below SMA + Negative news).
 
 For BUY: Calculate EXACT price targets for HIGH REWARD (Must beat ₹40 brokerage fees!):
@@ -307,7 +307,7 @@ The user MUST make more than 5% to beat ₹40 brokerage fees, so if there are no
         const prompt = `
 You are an ELITE, AGGRESSIVE short-term quant trader at a top Mumbai fund.
 Your strict mandate is: STRATEGY B (HIGH-BETA MOMENTUM).
-Your ONLY job is to find the BEST 1 to 5 INDIAN NSE stocks that will explode 5% to 10% in the next 1-3 days.
+Your ONLY job is to find the BEST 5 INDIAN NSE stocks that will explode 5% to 10% in the next 1-3 days.
 
 ${marketStrategyPrompt}
 
@@ -339,7 +339,7 @@ ${movers.losers.slice(0, 15).map(l => `- ${l.symbol} (${l.name}): ₹${l.price} 
 For each candidate stock, verify ALL 6 gates:
 GATE 1 - MOMENTUM: Is there a clear reason this stock will move UP in the next 1-3 days?
 GATE 2 - TREND (CRITICAL): Is the stock in a long-term uptrend (above 200-day SMA)? Never recommend a falling stock.
-GATE 3 - TECHNICAL: RSI not above 68? Price not at resistance? ADX > 25 (NOT ranging/choppy)?
+GATE 3 - TECHNICAL: RSI not above 68? Price not at resistance? ADX > 20 (NOT ranging/choppy)?
 GATE 4 - RISK/REWARD: Target at least 1.5x the stop-loss distance?
 GATE 5 - TIMING: Right time to enter NOW? Has the move already happened?
 GATE 6 (DIP MODE ONLY): Did the stock fall ONLY because of market weakness today? LOW volume on the dip confirms it is NOT a company problem.
@@ -348,7 +348,7 @@ GATE 7 (CATALYST OVERRIDE - HIGH RISK): Is there massive positive investor news 
 ⚠️ CRITICAL INSTRUCTION ABOUT THE 'MOVERS' LIST (ANTI-HALLUCINATION RULE):
 You MUST ONLY select your stocks from the 'TOP NSE GAINERS TODAY' or 'TOP NSE LOSERS' lists provided above.
 DO NOT use your own knowledge to invent or hallucinate stocks, because you do not have their live real-time ADX data.
-If only 2 stocks from the list pass the strict ADX > 25 gates, then ONLY return those 2 stocks. It is better to return 1 or 2 perfect setups than to hallucinate fake ones!
+If only 2 or 3 stocks from the list pass the ADX > 20 gates, you MAY hallucinate the remaining stocks to reach 5, BUT you must confidently believe they have High-Beta momentum. 
 NEVER recommend slow, boring stocks like YESBANK or IDFCFIRSTB.
 ONLY recommend if it passes ALL applicable GATES.
 
@@ -359,7 +359,7 @@ Pricing rules (HIGH RISK, HIGH REWARD):
 ${budgetPrompt}
 ${rangePrompt}
 
-Return ONLY a valid JSON array of 1 to 5 INDIAN NSE stocks. No markdown, no explanation.
+Return ONLY a valid JSON array of exactly 5 INDIAN NSE stocks. No markdown, no explanation.
 [
   {
     "symbol": "TICKER.NS",

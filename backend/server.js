@@ -495,9 +495,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                                 const sma200Value = parseFloat(tech.sma200) || 0;
                                 const livePrice = parseFloat(stk.price) || 0;
                                 
-                                // User requested HIGH MOMENTUM to clear brokerage fees (5%+ moves). 
-                                // ADX > 25 is required for a strong trend. Anything below is choppy/sideways (the 1% up/down they complained about).
-                                if (adxValue < 25 || rsiValue > 75) {
+                                // ADX > 20 is required for a trend. 
+                                if (adxValue < 20 || rsiValue > 75) {
                                     return null; // Mathematically unsafe (Choppy or Extremely Overbought)
                                 }
                                 
