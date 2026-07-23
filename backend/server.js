@@ -191,6 +191,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             console.error(err);
             bot.sendMessage(chatId, '❌ Failed to update portfolio database. Please check connection.');
         }
+    });
+
     // 1.5 /fixdb command - Fixes broken symbols in the DB caused by the previous Yahoo Finance search bug
     bot.onText(/\/fixdb/, async (msg) => {
         const chatId = msg.chat.id;
