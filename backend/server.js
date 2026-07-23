@@ -244,6 +244,15 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         const chatId = msg.chat.id;
         const rawSymbol = match[1]; // Might be undefined if they just typed /tip
         
+        // ⚠️ Morning Volatility Warning (Amateur Hour 9:15 AM - 10:00 AM)
+        let volatilityWarningHTML = '';
+        const now = new Date();
+        const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+        const totalMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+        if (ist.getUTCDay() >= 1 && ist.getUTCDay() <= 5 && totalMin >= 555 && totalMin < 600) {
+            volatilityWarningHTML = `\n\n⚠️ <b>MORNING VOLATILITY (AMATEUR HOUR):</b>\n<i>It is before 10:00 AM. The market is extremely volatile. The AI is highly defensive and may reject good setups due to wild morning swings. Wait until 10:00 AM for stable BUY signals!</i>\n`;
+        }
+        
         let budget = null;
         let priceRange = null;
         let symbolSearch = null;
@@ -436,7 +445,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                         `\n<b>📊 Signal Confidence:</b> ${confBar}\n` +
                         `<b>⚠️ Risk Level:</b> ${riskEmoji}\n\n` +
                         `<b>🧠 Expert Analysis:</b>\n<i>${analysis.rationale}</i>` +
-                        verdictBlock;
+                        verdictBlock +
+                        volatilityWarningHTML;
 
                     await bot.editMessageText(finalMsg, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 } else {
