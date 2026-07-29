@@ -436,4 +436,65 @@ router.get('/stock/history', async (req, res) => {
     }
 });
 
+// ============================================================================
+// PROFESSIONAL POINT 3: CHARTINK LIVE WEBHOOK RECEIVER (Real-time scanners)
+// Chartink fires instant alerts here when 15-Min ORB or Volume Breakouts trigger
+// ============================================================================
+router.post('/webhooks/chartink', async (req, res) => {
+    try {
+        const payload = req.body;
+        console.log("⚡ [CHARTINK WEBHOOK ALERT RECEIVED]:", JSON.stringify(payload));
+
+        // Chartink sends { stocks: "RELIANCE,TCS", trigger_prices: "2980,4100", scan_name: "Intraday Volume Shock" }
+        const scanName = payload.scan_name || "Custom Quant Breakout";
+        const stocks = (payload.stocks || "").split(',').map(s => s.trim()).filter(Boolean);
+        
+        if (stocks.length === 0) {
+            return res.status(400).json({ error: "No symbol provided in Chartink alert payload." });
+        }
+
+        const riskManager = require('../services/riskService');
+        const results = [];
+
+        for (const rawSymbol of stocks) {
+            const symbol = rawSymbol.endsWith('.NS') ? rawSymbol : `${rawSymbol}.NS`;
+            const livePrice = await getStockPrice(symbol) || parseFloat(payload.trigger_prices?.split(',')[0]) || 0;
+            
+            if (livePrice > 0) {
+                // Apply Quant Target (+3.5%) and Stop-Loss (-1.5%) with 1:2.33 Risk/Reward
+                const targetPrice = livePrice * 1.035;
+                const stopLossPrice = livePrice * 0.985;
+
+                // Pass through Risk Shield (Check brokerage hurdles and daily kill-switch)
+                const evaluation = riskManager.evaluateTradeViability(symbol, livePrice, targetPrice, stopLossPrice);
+                results.push({ symbol, livePrice, scanName, riskEvaluation: evaluation });
+            }
+        }
+
+        return res.status(200).json({
+            status: "SUCCESS",
+            message: `Processed ${results.length} alerts from Chartink scanner: '${scanName}'`,
+            processedTrades: results
+        });
+    } catch (err) {
+        console.error("Error handling Chartink webhook:", err);
+        return res.status(500).json({ error: "Internal Error executing webhook alert." });
+    }
+});
+
+// ============================================================================
+// PROFESSIONAL POINT 4: CAPITAL & RISK SHIELD INSPECTOR (Daily Kill Switch)
+// ============================================================================
+router.get('/risk/status', (req, res) => {
+    try {
+        const riskManager = require('../services/riskService');
+        res.json({
+            status: "ACTIVE",
+            shield: riskManager.getKillSwitchStatus()
+        });
+    } catch(e) {
+        res.status(500).json({ error: "Could not fetch Risk Manager status." });
+    }
+});
+
 module.exports = router;
