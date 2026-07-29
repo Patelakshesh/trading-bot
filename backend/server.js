@@ -12,6 +12,7 @@ const { getStockPrice, searchSymbol } = require('./services/stockService');
 const { analyzePortfolio, getStockAnalysis } = require('./services/aiService');
 const { getTechnicalIndicators } = require('./services/technicalService');
 const advancedDataService = require('./services/advancedDataService');
+const intradayService = require('./services/intradayService');
 
 const app = express();
 app.use(cors());
@@ -61,7 +62,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
-        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
+        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/intraday` - Get Top 3 Intraday ORB + VWAP setups (5x margin)\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
     });
 
     // 1. Upgraded /bought command to automatically fetch live price if omitted
@@ -617,6 +618,58 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             }
         }
     });
+
+    // 3B. NEW PROFESSIONAL INTRADAY COMMAND: /intraday (ORB + VWAP Confluence on Nifty 100 with 5x Leverage Math)
+    bot.onText(/\/intraday(?:\s+(.+))?/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const targetArg = match[1] ? match[1].trim() : null;
+
+        const statusMsg = await bot.sendMessage(chatId, `⚡ <b>[INTRADAY QUANT ENGINE]</b>\n\nChecking market time and scanning ultra-liquid Nifty 100 blue-chips for 15-Min ORB + VWAP Breakouts...`, { parse_mode: 'HTML' });
+
+        try {
+            const timeCheck = intradayService.checkIndianMarketTime();
+            if (!timeCheck.isOpen) {
+                await bot.sendMessage(chatId, timeCheck.reason, { parse_mode: 'Markdown' });
+            }
+
+            const result = await intradayService.getIntradaySetups(targetArg, 20000); // Assume standard ₹20k baseline capital
+
+            if (!result.setups || result.setups.length === 0) {
+                await bot.editMessageText(`⚠️ No high-confidence Intraday ORB + VWAP setups active right now among Nifty 100 blue-chips. Remember: Quality over quantity! Re-check after 15 minutes.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                return;
+            }
+
+            let reply = `⚡ <b>PRO INTRADAY ORB + VWAP ROCKETS (MIS 5x LEVERAGE)</b> ⚡\n` +
+                        `<i>⏰ MANDATORY RULE: Close all open trades by 3:10 PM IST! Never hold an MIS position overnight!</i>\n` +
+                        `────────────────────────────\n\n`;
+
+            result.setups.forEach((s, idx) => {
+                const evalData = s.riskEvaluation || {};
+                const financials = evalData.financials || {};
+                const recQty = evalData.recommendedQuantity || "15";
+                const netRR = financials.netRiskRewardRatio || "1 : 2.00";
+                const totalFees = financials.totalFeesAndTaxes || "42.50";
+
+                reply += `<b>${idx + 1}. ${s.symbol} (${s.name})</b> [Confidence: <b>${s.confidence}%</b>]\n` +
+                         `   💰 <b>Live Price:</b> ₹${s.livePrice} (${s.changePercent})\n` +
+                         `   📊 <b>VWAP:</b> ₹${s.vwap} | <b>9:30 AM High:</b> ₹${s.orbHigh}\n` +
+                         `   🔥 <b>Volume Surge:</b> ${s.volumeSurge} of average\n` +
+                         `   🎯 <b>Target (+1.5%):</b> ₹${s.target}\n` +
+                         `   🛑 <b>Tight Stop-Loss (-0.75%):</b> ₹${s.stopLoss}\n` +
+                         `   ⚖️ <b>Recommended Qty (5x Margin):</b> <b>${recQty} Shares</b>\n` +
+                         `   🛡️ <b>Net Risk/Reward:</b> ${netRR} (After ₹${totalFees} tax/brokerage)\n` +
+                         `   💡 <i>Reason: Triple-confluence momentum above VWAP line & Opening Range High with volume expansion!</i>\n` +
+                         `────────────────────────────\n`;
+            });
+
+            reply += `\n<i>📉 Risk Notice: Intraday leverage cuts both ways. Always attach an automated Stop-Loss order simultaneously when buying!</i>`;
+
+            await bot.editMessageText(reply, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+        } catch (err) {
+            console.error("TELEGRAM INTRADAY ERROR:", err.message);
+            await bot.sendMessage(chatId, `⚠️ Could not compute Intraday setups right now. Please try /intraday again shortly.`);
+        }
+    });
     // 4. New /profit command (Total Portfolio Summary)
     bot.onText(/\/(profit|portfolio)/, async (msg) => {
         const chatId = msg.chat.id;
@@ -705,6 +758,9 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             `<code>/tip</code>           — Top 5 best trades right now\n` +
             `<code>/tip 10000</code>     — Top 5 trades for ₹10,000 budget\n` +
             `<code>/tip 100-500</code>   — Top 5 trades priced ₹100-₹500\n\n` +
+            `<b>⚡ INTRADAY ORB QUANT (MIS 5x Margin):</b>\n` +
+            `<code>/intraday</code>         — Top 3 liquid Nifty 100 blue-chip ORB + VWAP rockets\n` +
+            `<code>/intraday RELIANCE</code> — Check ORB & VWAP confluence for a single ticker\n\n` +
             `<b>📈 MARKET DATA:</b>\n` +
             `<code>/movers</code>   — Today's top gainers &amp; losers with targets\n\n` +
             `<b>🏆 PORTFOLIO:</b>\n` +
