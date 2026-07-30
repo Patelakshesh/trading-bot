@@ -635,7 +635,11 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             const result = await intradayService.getIntradaySetups(targetArg, 20000); // Assume standard ₹20k baseline capital
 
             if (!result.setups || result.setups.length === 0) {
-                await bot.editMessageText(`⚠️ No high-confidence Intraday ORB + VWAP setups active right now among Nifty 100 blue-chips. Remember: Quality over quantity! Re-check after 15 minutes.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                if (targetArg) {
+                    await bot.editMessageText(`⚠️ Could not find live Indian market data or a valid quote for symbol <b>"${targetArg.toUpperCase()}"</b>.\n\nPlease verify the ticker symbol (e.g., RELIANCE, TCS, ZOMATO, HDFCBANK) and try again!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                } else {
+                    await bot.editMessageText(`⚠️ No high-confidence Intraday ORB + VWAP setups active right now among Nifty 100 blue-chips. Remember: Quality over quantity! Re-check after 15 minutes.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                }
                 return;
             }
 
@@ -657,7 +661,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                          `📌 <b>Target Stock:</b> <code>${s.symbol}</code> (${s.name})\n` +
                          `────────────────────────────\n\n` +
                          `⚖️ <b>VERDICT:</b> ${s.doubleCheckVerdict}\n` +
-                         `🎯 <b>ACTION ADVIDE:</b> <b>${s.adviceAction}</b> [Confidence: ${s.confidence}%]\n\n` +
+                         `🎯 <b>ACTION ADVICE:</b> <b>${s.adviceAction}</b> [Confidence: ${s.confidence}%]\n\n` +
                          `📊 <b>QUANT METRICS & CONFLUENCE:</b>\n` +
                          `   • <b>Live Price:</b> ₹${s.livePrice} (${s.changePercent} today)\n` +
                          `   • <b>VWAP Institutional Benchmark:</b> ₹${s.vwap} (${s.isAboveVwap ? '✅ Above VWAP' : '❌ BELOW VWAP'})\n` +
