@@ -639,30 +639,64 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 return;
             }
 
-            let reply = `⚡ <b>PRO INTRADAY ORB + VWAP ROCKETS (MIS 5x LEVERAGE)</b> ⚡\n` +
-                        `<i>⏰ MANDATORY RULE: Close all open trades by 3:10 PM IST! Never hold an MIS position overnight!</i>\n` +
-                        `────────────────────────────\n\n`;
+            let reply = "";
+            if (result.timeStatus.chopWarning) {
+                reply += result.timeStatus.chopWarning;
+            }
 
-            result.setups.forEach((s, idx) => {
+            if (targetArg) {
+                // SPECIAL INTRADAY DOUBLE-CHECK VERIFICATION MODE (/intraday SYMBOL)
+                const s = result.setups[0];
                 const evalData = s.riskEvaluation || {};
                 const financials = evalData.financials || {};
                 const recQty = evalData.recommendedQuantity || "15";
                 const netRR = financials.netRiskRewardRatio || "1 : 2.00";
                 const totalFees = financials.totalFeesAndTaxes || "42.50";
 
-                reply += `<b>${idx + 1}. ${s.symbol} (${s.name})</b> [Confidence: <b>${s.confidence}%</b>]\n` +
-                         `   💰 <b>Live Price:</b> ₹${s.livePrice} (${s.changePercent})\n` +
-                         `   📊 <b>VWAP:</b> ₹${s.vwap} | <b>9:30 AM High:</b> ₹${s.orbHigh}\n` +
-                         `   🔥 <b>Volume Surge:</b> ${s.volumeSurge} of average\n` +
-                         `   🎯 <b>Target (+1.5%):</b> ₹${s.target}\n` +
-                         `   🛑 <b>Tight Stop-Loss (-0.75%):</b> ₹${s.stopLoss}\n` +
-                         `   ⚖️ <b>Recommended Qty (5x Margin):</b> <b>${recQty} Shares</b>\n` +
-                         `   🛡️ <b>Net Risk/Reward:</b> ${netRR} (After ₹${totalFees} tax/brokerage)\n` +
-                         `   💡 <i>Reason: Triple-confluence momentum above VWAP line & Opening Range High with volume expansion!</i>\n` +
-                         `────────────────────────────\n`;
-            });
+                reply += `🛡️ <b>INTRADAY DOUBLE-CHECK VERIFICATION</b> 🛡️\n` +
+                         `📌 <b>Target Stock:</b> <code>${s.symbol}</code> (${s.name})\n` +
+                         `────────────────────────────\n\n` +
+                         `⚖️ <b>VERDICT:</b> ${s.doubleCheckVerdict}\n` +
+                         `🎯 <b>ACTION ADVIDE:</b> <b>${s.adviceAction}</b> [Confidence: ${s.confidence}%]\n\n` +
+                         `📊 <b>QUANT METRICS & CONFLUENCE:</b>\n` +
+                         `   • <b>Live Price:</b> ₹${s.livePrice} (${s.changePercent} today)\n` +
+                         `   • <b>VWAP Institutional Benchmark:</b> ₹${s.vwap} (${s.isAboveVwap ? '✅ Above VWAP' : '❌ BELOW VWAP'})\n` +
+                         `   • <b>9:30 AM Opening Range High:</b> ₹${s.orbHigh} (${s.isAboveOrb ? '✅ Breakout Confirmed' : '⚠️ Below Breakout Level'})\n` +
+                         `   • <b>Intraday Volume Intensity:</b> ${s.volumeSurge} of normal average\n\n` +
+                         `💰 <b>TRADE EXECUTION PLAN (If Buying via MIS 5x Margin):</b>\n` +
+                         `   • <b>Recommended Share Qty:</b> <b>${recQty} Shares</b>\n` +
+                         `   • <b>Target Price (+1.5%):</b> ₹${s.target} (Attach immediately!)\n` +
+                         `   • <b>Tight Stop-Loss (-0.75%):</b> ₹${s.stopLoss} (Attach immediately!)\n` +
+                         `   • <b>Net Risk/Reward Ratio:</b> ${netRR} (After ₹${totalFees} tax & brokerage)\n\n` +
+                         `💡 <b>AI QUANT ANALYSIS:</b>\n<i>${s.doubleCheckReason}</i>\n\n` +
+                         `<i>⏰ Rule: Always square off intraday trades before 3:10 PM IST!</i>`;
+            } else {
+                // STANDARD INTRADAY ROCKETS SCANNER (/intraday)
+                reply += `⚡ <b>PRO INTRADAY ORB + VWAP ROCKETS (MIS 5x LEVERAGE)</b> ⚡\n` +
+                         `<i>⏰ MANDATORY RULE: Close all open trades by 3:10 PM IST! Never hold an MIS position overnight!</i>\n` +
+                         `────────────────────────────\n\n`;
 
-            reply += `\n<i>📉 Risk Notice: Intraday leverage cuts both ways. Always attach an automated Stop-Loss order simultaneously when buying!</i>`;
+                result.setups.forEach((s, idx) => {
+                    const evalData = s.riskEvaluation || {};
+                    const financials = evalData.financials || {};
+                    const recQty = evalData.recommendedQuantity || "15";
+                    const netRR = financials.netRiskRewardRatio || "1 : 2.00";
+                    const totalFees = financials.totalFeesAndTaxes || "42.50";
+
+                    reply += `<b>${idx + 1}. ${s.symbol} (${s.name})</b> [Confidence: <b>${s.confidence}%</b>]\n` +
+                             `   💰 <b>Live Price:</b> ₹${s.livePrice} (${s.changePercent})\n` +
+                             `   📊 <b>VWAP:</b> ₹${s.vwap} | <b>9:30 AM High:</b> ₹${s.orbHigh}\n` +
+                             `   🔥 <b>Volume Surge:</b> ${s.volumeSurge} of average\n` +
+                             `   🎯 <b>Target (+1.5%):</b> ₹${s.target}\n` +
+                             `   🛑 <b>Tight Stop-Loss (-0.75%):</b> ₹${s.stopLoss}\n` +
+                             `   ⚖️ <b>Recommended Qty (5x Margin):</b> <b>${recQty} Shares</b>\n` +
+                             `   🛡️ <b>Net Risk/Reward:</b> ${netRR} (After ₹${totalFees} tax/brokerage)\n` +
+                             `   💡 <i>Reason: Triple-confluence momentum above VWAP line & Opening Range High with volume expansion!</i>\n` +
+                             `────────────────────────────\n`;
+                });
+
+                reply += `\n<i>📉 Risk Notice: Intraday leverage cuts both ways. Always attach an automated Stop-Loss order simultaneously when buying!</i>`;
+            }
 
             await bot.editMessageText(reply, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
         } catch (err) {

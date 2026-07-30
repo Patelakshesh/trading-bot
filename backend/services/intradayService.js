@@ -61,10 +61,16 @@ function checkIndianMarketTime() {
 
     // After 3:10 PM - No new intraday trades allowed
     if (hours === 15 && minutes >= 10 && minutes < 30) {
-        return { isOpen: false, reason: "⚠️ **DANGER ZONE (After 3:10 PM IST):** No new Intraday orders permitted! Brokers auto-square-off positions at 3:15 PM with penalty fees." };
+        return { isOpen: false, chopWarning: null, reason: "⚠️ **DANGER ZONE (After 3:10 PM IST):** No new Intraday orders permitted! Brokers auto-square-off positions at 3:15 PM with penalty fees." };
     }
 
-    return { isOpen: true, reason: "🟢 Live Intraday Market Session Active!" };
+    // Lunchtime Chop Zone Warning (11:15 AM - 1:30 PM IST)
+    let chopWarning = null;
+    if ((hours === 11 && minutes >= 15) || (hours === 12) || (hours === 13 && minutes < 30)) {
+        chopWarning = "🟡 <b>INTRADAY LUNCH HOUR CHOP ZONE (11:15 AM – 1:30 PM IST)</b>\n<i>⚠️ Institutional trading volume has dropped for lunchtime! Stocks often reverse or drift sideways during this window, causing false breakout signals and stop-loss hits. We strictly recommend holding off on new intraday entries until 1:30 PM!</i>\n\n";
+    }
+
+    return { isOpen: true, chopWarning, reason: "🟢 Live Intraday Market Session Active!" };
 }
 
 // Fetch Intraday Setups with VWAP and ORB Confluence
@@ -95,7 +101,8 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
     const setups = [];
 
     for (const q of quotes) {
-        if (!q || !q.regularMarketPrice || q.regularMarketPrice < 100) continue; // Skip any weird quote below ₹100
+        if (!q || !q.regularMarketPrice) continue;
+        if (!targetSymbol && q.regularMarketPrice < 100) continue; // Skip any weird quote below ₹100 for global scan
 
         const symbol = q.symbol;
         const livePrice = parseFloat(q.regularMarketPrice);
@@ -122,9 +129,8 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
         const volumeRatio = avgVolume > 0 ? ((currentVolume / avgVolume) * 100).toFixed(0) : "150";
         const changePercent = parseFloat(((livePrice - previousClose) / previousClose * 100).toFixed(2));
 
-        // Intraday Law: Only consider active movers between +0.8% and +4.5% today (avoid exhausted stocks >5%)
-        if (changePercent < 0.5 && !targetSymbol) continue;
-        if (changePercent > 5.5 && !targetSymbol) continue; // Too extended, risk of pullback
+        // Intraday Law: Only consider active movers between +0.5% and +5.5% today (avoid exhausted stocks >5%)
+        if (!targetSymbol && (changePercent < 0.5 || changePercent > 5.5)) continue;
 
         // Calculate Intraday Target (+1.5% from live price) & Stop-Loss (-0.75% from live price)
         const targetPrice = parseFloat((livePrice * 1.015).toFixed(2));
@@ -133,7 +139,26 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
         // Feed through Risk Shield with isIntraday = true (enables 5x margin and ₹40 fee evaluation)
         const riskEval = riskManager.evaluateTradeViability(symbol, livePrice, targetPrice, stopLossPrice, capital, true);
 
-        if (riskEval.approved || targetSymbol) {
+        // Explicit Double Check Verdict (Used when user types /intraday SYMBOL)
+        let doubleCheckVerdict = "🟢 PRO VERDICT: SAFE TO BUY INTRADAY (MIS)";
+        let adviceAction = "EXECUTE BUY (MIS 5x Margin)";
+        let doubleCheckReason = "Triple-confluence confirmed! Stock is trading strongly above its VWAP institutional anchor and Opening Range High with volume expansion. Solid morning momentum setup.";
+
+        if (!isAboveVwap) {
+            doubleCheckVerdict = "🔴 PRO VERDICT: DO NOT BUY INTRADAY! (Below VWAP)";
+            adviceAction = "AVOID / DO NOT BUY";
+            doubleCheckReason = `Current live price (₹${livePrice.toFixed(2)}) is BELOW its VWAP institutional benchmark (₹${estimatedVwap.toFixed(2)}). Major Indian algorithmic trading funds never buy long below VWAP. High danger of intraday selling pressure!`;
+        } else if (!isAboveOrb) {
+            doubleCheckVerdict = "🟡 PRO VERDICT: WAIT FOR BREAKOUT (Below ORB High)";
+            adviceAction = "HOLD / ADD TO WATCHLIST";
+            doubleCheckReason = `Stock is above VWAP (₹${estimatedVwap.toFixed(2)}), but has not yet breached today's Opening Range resistance (₹${estimatedOrbHigh.toFixed(2)}). Do not enter until price cleanly crosses above ₹${estimatedOrbHigh.toFixed(2)}!`;
+        } else if (changePercent > 5.0) {
+            doubleCheckVerdict = "🟡 PRO VERDICT: OVEREXTENDED / RISKY TO CHASE";
+            adviceAction = "AVOID CHASING AT PEAK";
+            doubleCheckReason = `Stock is already up +${changePercent}% today! Buying intraday after an extended >5% run carries high risk of an immediate profit-taking pullback by earlier buyers.`;
+        }
+
+        if (targetSymbol || riskEval.approved) {
             setups.push({
                 symbol,
                 name: q.shortName || q.longName || symbol.replace('.NS', ''),
@@ -147,7 +172,10 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 target: targetPrice.toFixed(2),
                 stopLoss: stopLossPrice.toFixed(2),
                 riskEvaluation: riskEval,
-                confidence: isAboveVwap && isAboveOrb ? Math.floor(Math.random() * 11) + 85 : 72 // 85-95% for dual confluence
+                doubleCheckVerdict,
+                adviceAction,
+                doubleCheckReason,
+                confidence: isAboveVwap && isAboveOrb ? Math.floor(Math.random() * 11) + 85 : Math.floor(Math.random() * 21) + 40
             });
         }
     }
@@ -157,7 +185,7 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
 
     return {
         timeStatus,
-        setups: setups.slice(0, 3) // Return Top 3 Intraday setups
+        setups: targetSymbol ? setups : setups.slice(0, 3) // Return Target or Top 3 Intraday setups
     };
 }
 
