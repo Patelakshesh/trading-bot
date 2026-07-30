@@ -76,15 +76,28 @@ function checkIndianMarketTime() {
 // Fetch Intraday Setups with VWAP and ORB Confluence
 async function getIntradaySetups(targetSymbol = null, capital = 20000) {
     const timeStatus = checkIndianMarketTime();
+
+    // 1. Check Broader Market Status (Nifty 50 Index) to protect against overall market drop
+    try {
+        const niftyQuote = await yahooFinance.quote('^NSEI');
+        if (niftyQuote && niftyQuote.regularMarketChangePercent < -0.15) {
+            const niftyDrop = niftyQuote.regularMarketChangePercent.toFixed(2);
+            timeStatus.chopWarning = (timeStatus.chopWarning || "") + 
+                `🚨 <b>NIFTY 50 BEARISH MARKET ALERT (${niftyDrop}%)</b>\n` +
+                `<i>⚠️ The broader Nifty 50 index is experiencing institutional selling pressure! When the general market falls due to global European/US futures cues, even strong individual stocks suffer pullbacks. Keep stop-losses extra tight today!</i>\n\n`;
+        }
+    } catch (e) {
+        console.warn("Could not retrieve Nifty 50 Index benchmark:", e.message);
+    }
     
-    // Select candidates: either the single target symbol or a random batch of 40 liquid Nifty 100 stocks
+    // Select candidates deterministically without any randomness!
     let candidates = [];
     if (targetSymbol) {
         const cleanSymbol = targetSymbol.toUpperCase().endsWith('.NS') ? targetSymbol.toUpperCase() : `${targetSymbol.toUpperCase()}.NS`;
         candidates = [cleanSymbol];
     } else {
-        // Scan all Nifty 100 symbols in one batched request to guarantee finding top active ORB opportunities
-        candidates = [...NIFTY_100_SYMBOLS].sort(() => 0.5 - Math.random());
+        // Evaluate the full Nifty 100 liquid universe in fixed deterministic order
+        candidates = [...NIFTY_100_SYMBOLS];
     }
 
     console.log(`⚡ [INTRADAY ENGINE] Scanning ${candidates.length} ultra-liquid blue-chip stocks for ORB + VWAP breakouts...`);
@@ -102,7 +115,7 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
 
     for (const q of quotes) {
         if (!q || !q.regularMarketPrice) continue;
-        if (!targetSymbol && q.regularMarketPrice < 100) continue; // Skip any weird quote below ₹100 for global scan
+        if (!targetSymbol && q.regularMarketPrice < 100) continue; // Skip any quote below ₹100 for global scan
 
         const symbol = q.symbol;
         const livePrice = parseFloat(q.regularMarketPrice);
@@ -114,35 +127,34 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
         const avgVolume = parseFloat(q.averageDailyVolume10Day) || parseFloat(q.averageDailyVolume3Month) || currentVolume;
 
         // 1. VWAP ESTIMATION / APPROXIMATION
-        // Typical Price = (High + Low + Price) / 3 weighted against session range
         const typicalPrice = (dayHigh + dayLow + livePrice) / 3;
-        // In live trading without tick data, VWAP anchor rests slightly below day high during trend
         const estimatedVwap = parseFloat(((typicalPrice + openPrice + livePrice) / 3).toFixed(2));
         
         // 2. OPENING RANGE HIGH (ORB) ESTIMATION
-        // Opening range high is typically 60-80% of the movement from Open to current Day High
         const estimatedOrbHigh = parseFloat((openPrice + ((dayHigh - openPrice) * 0.7)).toFixed(2));
 
         // 3. MOMENTUM CONFLUENCE CONDITIONS
-        const isAboveVwap = livePrice >= (estimatedVwap * 0.998); // Allow tiny tolerance
+        const isAboveVwap = livePrice >= (estimatedVwap * 0.998);
         const isAboveOrb = livePrice >= (estimatedOrbHigh * 0.998);
-        const volumeRatio = avgVolume > 0 ? ((currentVolume / avgVolume) * 100).toFixed(0) : "150";
-        const changePercent = parseFloat(((livePrice - previousClose) / previousClose * 100).toFixed(2));
+        const volumeRatioVal = avgVolume > 0 ? (currentVolume / avgVolume) * 100 : 150;
+        const volumeRatio = volumeRatioVal.toFixed(0);
+        const changePercentVal = ((livePrice - previousClose) / previousClose) * 100;
+        const changePercent = parseFloat(changePercentVal.toFixed(2));
 
-        // Intraday Law: Only consider active movers between +0.5% and +5.5% today (avoid exhausted stocks >5%)
+        // Intraday Law: Only consider active movers between +0.5% and +5.5% today
         if (!targetSymbol && (changePercent < 0.5 || changePercent > 5.5)) continue;
 
         // Calculate Intraday Target (+1.5% from live price) & Stop-Loss (-0.75% from live price)
         const targetPrice = parseFloat((livePrice * 1.015).toFixed(2));
         const stopLossPrice = parseFloat((livePrice * 0.9925).toFixed(2));
 
-        // Feed through Risk Shield with isIntraday = true (enables 5x margin and ₹40 fee evaluation)
+        // Feed through Risk Shield with isIntraday = true
         const riskEval = riskManager.evaluateTradeViability(symbol, livePrice, targetPrice, stopLossPrice, capital, true);
 
         // Explicit Double Check Verdict (Used when user types /intraday SYMBOL)
         let doubleCheckVerdict = "🟢 PRO VERDICT: SAFE TO BUY INTRADAY (MIS)";
         let adviceAction = "EXECUTE BUY (MIS 5x Margin)";
-        let doubleCheckReason = "Triple-confluence confirmed! Stock is trading strongly above its VWAP institutional anchor and Opening Range High with volume expansion. Solid morning momentum setup.";
+        let doubleCheckReason = "Triple-confluence confirmed! Stock is trading strongly above its VWAP institutional anchor and Opening Range High with volume expansion. Solid momentum setup.";
 
         if (!isAboveVwap) {
             doubleCheckVerdict = "🔴 PRO VERDICT: DO NOT BUY INTRADAY! (Below VWAP)";
@@ -157,6 +169,18 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             adviceAction = "AVOID CHASING AT PEAK";
             doubleCheckReason = `Stock is already up +${changePercent}% today! Buying intraday after an extended >5% run carries high risk of an immediate profit-taking pullback by earlier buyers.`;
         }
+
+        // DETERMINISTIC QUANTITATIVE SCORE (No Math.random!)
+        // Based on technical momentum structure + volume shock magnitude
+        let quantScore = 55;
+        if (isAboveVwap) quantScore += 20;
+        if (isAboveOrb) quantScore += 15;
+        const volBonus = Math.min(10, Math.floor(volumeRatioVal / 25));
+        quantScore += volBonus;
+        if (quantScore > 97) quantScore = 97;
+
+        // For non-target global scans, strictly require both VWAP and ORB breakout confirmation!
+        if (!targetSymbol && (!isAboveVwap || !isAboveOrb)) continue;
 
         if (targetSymbol || riskEval.approved) {
             setups.push({
@@ -175,17 +199,18 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 doubleCheckVerdict,
                 adviceAction,
                 doubleCheckReason,
-                confidence: isAboveVwap && isAboveOrb ? Math.floor(Math.random() * 11) + 85 : Math.floor(Math.random() * 21) + 40
+                rawScore: (quantScore * 1000) + volumeRatioVal, // Secondary sort by volume shock
+                confidence: quantScore
             });
         }
     }
 
-    // Sort by confidence and volume surge
-    setups.sort((a, b) => b.confidence - a.confidence);
+    // Sort strictly deterministically by Quantitative Momentum Score and Volume Shock
+    setups.sort((a, b) => b.rawScore - a.rawScore);
 
     return {
         timeStatus,
-        setups: targetSymbol ? setups : setups.slice(0, 3) // Return Target or Top 3 Intraday setups
+        setups: targetSymbol ? setups : setups.slice(0, 3)
     };
 }
 
