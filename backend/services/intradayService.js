@@ -3,7 +3,8 @@
 // Specifically built for Nifty 100 Liquid Blue-Chips with SEBI 5x Margin Math
 // ============================================================================
 
-const yahooFinance = require('yahoo-finance2').default;
+const YahooFinance = require('yahoo-finance2').default;
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
 const riskManager = require('./riskService');
 
 // NIFTY 100 ULTRA-LIQUID BLUE-CHIP UNIVERSE (Never trade illiquid small-caps intraday!)
@@ -76,9 +77,8 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
         const cleanSymbol = targetSymbol.toUpperCase().endsWith('.NS') ? targetSymbol.toUpperCase() : `${targetSymbol.toUpperCase()}.NS`;
         candidates = [cleanSymbol];
     } else {
-        // Randomly shuffle Nifty 100 to ensure fresh, unbiased intraday opportunities every scan
-        const shuffled = [...NIFTY_100_SYMBOLS].sort(() => 0.5 - Math.random());
-        candidates = shuffled.slice(0, 35);
+        // Scan all Nifty 100 symbols in one batched request to guarantee finding top active ORB opportunities
+        candidates = [...NIFTY_100_SYMBOLS].sort(() => 0.5 - Math.random());
     }
 
     console.log(`⚡ [INTRADAY ENGINE] Scanning ${candidates.length} ultra-liquid blue-chip stocks for ORB + VWAP breakouts...`);
