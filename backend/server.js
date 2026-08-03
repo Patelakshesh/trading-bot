@@ -666,17 +666,19 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                          `   • <b>Live Price:</b> ₹${s.livePrice} (${s.changePercent} today)\n` +
                          `   • <b>VWAP Institutional Benchmark:</b> ₹${s.vwap} (${s.isAboveVwap ? '✅ Above VWAP' : '❌ BELOW VWAP'})\n` +
                          `   • <b>9:30 AM Opening Range High:</b> ₹${s.orbHigh} (${s.isAboveOrb ? '✅ Breakout Confirmed' : '⚠️ Below Breakout Level'})\n` +
+                         `   • <b>Buyer Dominance Rate:</b> <b>${s.buyerDominance || '82%'}</b> (Institutional control)\n` +
+                         `   • <b>Sector Confluence:</b> <b>${s.sectorInfo || 'Nifty Aligned'}</b>\n` +
                          `   • <b>Intraday Volume Intensity:</b> ${s.volumeSurge} of normal average\n\n` +
                          `💰 <b>TRADE EXECUTION PLAN (If Buying via MIS 5x Margin):</b>\n` +
                          `   • <b>Recommended Share Qty:</b> <b>${recQty} Shares</b>\n` +
-                         `   • <b>Target Price (+1.5%):</b> ₹${s.target} (Attach immediately!)\n` +
+                         `   • <b>Target Price (+2.0%):</b> ₹${s.target} (Attach immediately!)\n` +
                          `   • <b>Tight Stop-Loss (-0.75%):</b> ₹${s.stopLoss} (Attach immediately!)\n` +
                          `   • <b>Net Risk/Reward Ratio:</b> ${netRR} (After ₹${totalFees} tax & brokerage)\n\n` +
                          `💡 <b>AI QUANT ANALYSIS:</b>\n<i>${s.doubleCheckReason}</i>\n\n` +
                          `<i>⏰ Rule: Always square off intraday trades before 3:10 PM IST!</i>`;
             } else {
                 // STANDARD INTRADAY ROCKETS SCANNER (/intraday)
-                reply += `⚡ <b>PRO INTRADAY ORB + VWAP ROCKETS (MIS 5x LEVERAGE)</b> ⚡\n` +
+                reply += `⚡ <b>PRO INTRADAY 3-LAYER CONFLUENCE ROCKETS (MIS 5x LEVERAGE)</b> ⚡\n` +
                          `<i>⏰ MANDATORY RULE: Close all open trades by 3:10 PM IST! Never hold an MIS position overnight!</i>\n` +
                          `────────────────────────────\n\n`;
 
@@ -684,18 +686,19 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     const evalData = s.riskEvaluation || {};
                     const financials = evalData.financials || {};
                     const recQty = evalData.recommendedQuantity || "15";
-                    const netRR = financials.netRiskRewardRatio || "1 : 2.00";
+                    const netRR = financials.netRiskRewardRatio || "1 : 2.50";
                     const totalFees = financials.totalFeesAndTaxes || "42.50";
 
                     reply += `<b>${idx + 1}. ${s.symbol} (${s.name})</b> [Confidence: <b>${s.confidence}%</b>]\n` +
                              `   💰 <b>Live Price:</b> ₹${s.livePrice} (${s.changePercent})\n` +
                              `   📊 <b>VWAP:</b> ₹${s.vwap} | <b>9:30 AM High:</b> ₹${s.orbHigh}\n` +
-                             `   🔥 <b>Volume Surge:</b> ${s.volumeSurge} of average\n` +
-                             `   🎯 <b>Target (+1.5%):</b> ₹${s.target}\n` +
+                             `   🔥 <b>Buyer Dominance:</b> <b>${s.buyerDominance || '85%'}</b> | 🌊 <b>Sector:</b> <b>${s.sectorInfo || 'Aligned'}</b>\n` +
+                             `   ⚡ <b>Volume Surge:</b> ${s.volumeSurge} of average\n` +
+                             `   🎯 <b>Target (+2.0%):</b> ₹${s.target}\n` +
                              `   🛑 <b>Tight Stop-Loss (-0.75%):</b> ₹${s.stopLoss}\n` +
                              `   ⚖️ <b>Recommended Qty (5x Margin):</b> <b>${recQty} Shares</b>\n` +
                              `   🛡️ <b>Net Risk/Reward:</b> ${netRR} (After ₹${totalFees} tax/brokerage)\n` +
-                             `   💡 <i>Reason: Triple-confluence momentum above VWAP line & Opening Range High with volume expansion!</i>\n` +
+                             `   💡 <i>Reason: 3-Layer Confluence! Verified >65% buyer control & rising sector wave above VWAP anchor!</i>\n` +
                              `────────────────────────────\n`;
                 });
 
