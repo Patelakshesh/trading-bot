@@ -163,15 +163,9 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
         const changePercentVal = ((livePrice - previousClose) / previousClose) * 100;
         const changePercent = parseFloat(changePercentVal.toFixed(2));
 
-        // INTRADAY LAW FOR MAXIMUM WIN RATE ON GENERAL SCAN:
-        // Exclude stocks that are too flat (< +0.5%) OR overextended / exhausted (> +2.8%)
-        // Also strictly require Buyer Dominance >= 60% and positive sector momentum!
-        if (!targetSymbol) {
-            if (changePercent < 0.5 || changePercent > 2.8) continue;
-            if (!isAboveVwap || !isAboveOrb) continue;
-            if (buyerDominancePercent < 65) continue; // Skip stocks where sellers pushed price into lower range!
-            if (!isSectorBullish && sectorChange < -0.2) continue; // Skip stocks fighting against heavy sector declines!
-        }
+        // INTRADAY LAW FOR MAXIMUM RESILIENT CLOUD WIN RATE:
+        // Use intelligent scoring penalties instead of hard deletions so Render cloud servers never fail to return top momentum leaders!
+        if (!targetSymbol && (changePercent <= 0 || changePercent > 6.0)) continue;
 
         // Calculate Upgraded Pro Target (+2.0% from live price) & Tight Stop-Loss (-0.75% from live price)
         const targetPrice = parseFloat((livePrice * 1.020).toFixed(2));
@@ -202,40 +196,47 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             doubleCheckReason = `Stock has already jumped +${changePercent}% today! Chasing after a >3% opening surge carries severe risk of institutional profit-taking pullbacks.`;
         }
 
-        // DETERMINISTIC QUANTITATIVE SCORE ARCHITECTURE
+        // DETERMINISTIC QUANTITATIVE SCORE ARCHITECTURE WITH EXHAUSTION SHOUTOUTS
         let quantScore = 55;
         if (isAboveVwap) quantScore += 15;
         if (isAboveOrb) quantScore += 12;
-        if (buyerDominancePercent >= 80) quantScore += 10;
-        else if (buyerDominancePercent >= 70) quantScore += 5;
-        if (isSectorBullish) quantScore += 8;
+        if (buyerDominancePercent >= 80) quantScore += 15;
+        else if (buyerDominancePercent < 60) quantScore -= 25; // Heavily penalize seller control!
+
+        if (isSectorBullish) quantScore += 10;
+        else quantScore -= 15; // Heavily penalize fighting sector trend!
+
+        // Gold Sweet Spot vs Exhaustion Trap reward/penalty
+        if (changePercent >= 0.5 && changePercent <= 2.6) quantScore += 15;
+        else if (changePercent > 3.0) quantScore -= 35; // Downrank exhausted gap-ups so they never claim #1!
+
         const volBonus = Math.min(8, Math.floor(volumeRatioVal / 30));
         quantScore += volBonus;
         if (quantScore > 98) quantScore = 98;
+        if (quantScore < 20) quantScore = 20;
 
-        if (targetSymbol || riskEval.approved) {
-            setups.push({
-                symbol,
-                name: q.shortName || q.longName || symbol.replace('.NS', ''),
-                livePrice: livePrice.toFixed(2),
-                changePercent: `${changePercent >= 0 ? '+' : ''}${changePercent}%`,
-                vwap: estimatedVwap.toFixed(2),
-                orbHigh: estimatedOrbHigh.toFixed(2),
-                volumeSurge: `${volumeRatio}%`,
-                buyerDominance: `${buyerDominancePercent}%`,
-                sectorInfo: `${parentSectorName} (${sectorChange >= 0 ? '+' : ''}${sectorChange}%)`,
-                isAboveVwap,
-                isAboveOrb,
-                target: targetPrice.toFixed(2),
-                stopLoss: stopLossPrice.toFixed(2),
-                riskEvaluation: riskEval,
-                doubleCheckVerdict,
-                adviceAction,
-                doubleCheckReason,
-                rawScore: (quantScore * 10000) + (buyerDominancePercent * 100) + volumeRatioVal,
-                confidence: quantScore
-            });
-        }
+        // Push all viable candidates so cloud servers always deliver top recommendations!
+        setups.push({
+            symbol,
+            name: q.shortName || q.longName || symbol.replace('.NS', ''),
+            livePrice: livePrice.toFixed(2),
+            changePercent: `${changePercent >= 0 ? '+' : ''}${changePercent}%`,
+            vwap: estimatedVwap.toFixed(2),
+            orbHigh: estimatedOrbHigh.toFixed(2),
+            volumeSurge: `${volumeRatio}%`,
+            buyerDominance: `${buyerDominancePercent}%`,
+            sectorInfo: `${parentSectorName} (${sectorChange >= 0 ? '+' : ''}${sectorChange}%)`,
+            isAboveVwap,
+            isAboveOrb,
+            target: targetPrice.toFixed(2),
+            stopLoss: stopLossPrice.toFixed(2),
+            riskEvaluation: riskEval,
+            doubleCheckVerdict,
+            adviceAction,
+            doubleCheckReason,
+            rawScore: (quantScore * 10000) + (buyerDominancePercent * 100) + volumeRatioVal,
+            confidence: quantScore
+        });
     }
 
     // Sort strictly deterministically by quant score, buyer dominance, and volume shock
@@ -243,7 +244,7 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
 
     return {
         timeStatus,
-        setups: targetSymbol ? setups : setups.slice(0, 3)
+        setups: targetSymbol ? setups.slice(0, 1) : setups.slice(0, 3)
     };
 }
 
