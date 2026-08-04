@@ -657,25 +657,28 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 const netRR = financials.netRiskRewardRatio || "1 : 2.00";
                 const totalFees = financials.totalFeesAndTaxes || "42.50";
 
-                reply += `🛡️ <b>INTRADAY DOUBLE-CHECK VERIFICATION</b> 🛡️\n` +
-                         `📌 <b>Target Stock:</b> <code>${s.symbol}</code> (${s.name})\n` +
+                const isBuyAction = s.adviceAction && s.adviceAction.includes('BUY') && !s.adviceAction.includes('NOT') && !s.adviceAction.includes('AVOID');
+                const actionBadge = isBuyAction ? '🟢 <b>PRO ACTION: BUY (MIS 5x Margin)</b>' : '🔴 <b>PRO ACTION: AVOID / DO NOT BUY</b>';
+                const verdictTitle = isBuyAction ? '✅ APPROVED FOR BUY' : '⛔ NOT RECOMMENDED FOR BUY';
+
+                reply += `🛡️ <b>INTRADAY DOUBLE-CHECK: <code>${s.symbol}</code></b> 🛡️\n` +
+                         `📌 <b>Company:</b> ${s.name}\n` +
                          `────────────────────────────\n\n` +
-                         `⚖️ <b>VERDICT:</b> ${s.doubleCheckVerdict}\n` +
-                         `🎯 <b>ACTION ADVICE:</b> <b>${s.adviceAction}</b> [Confidence: ${s.confidence}%]\n\n` +
-                         `📊 <b>QUANT METRICS & CONFLUENCE:</b>\n` +
-                         `   • <b>Live Price:</b> ₹${s.livePrice} (${s.changePercent} today)\n` +
-                         `   • <b>VWAP Institutional Benchmark:</b> ₹${s.vwap} (${s.isAboveVwap ? '✅ Above VWAP' : '❌ BELOW VWAP'})\n` +
-                         `   • <b>9:30 AM Opening Range High:</b> ₹${s.orbHigh} (${s.isAboveOrb ? '✅ Breakout Confirmed' : '⚠️ Below Breakout Level'})\n` +
-                         `   • <b>Buyer Dominance Rate:</b> <b>${s.buyerDominance || '82%'}</b> (Institutional control)\n` +
-                         `   • <b>Sector Confluence:</b> <b>${s.sectorInfo || 'Nifty Aligned'}</b>\n` +
-                         `   • <b>Intraday Volume Intensity:</b> ${s.volumeSurge} of normal average\n\n` +
-                         `💰 <b>TRADE EXECUTION PLAN (If Buying via MIS 5x Margin):</b>\n` +
-                         `   • <b>Recommended Share Qty:</b> <b>${recQty} Shares</b>\n` +
-                         `   • <b>Target Price (+2.0%):</b> ₹${s.target} (Attach immediately!)\n` +
-                         `   • <b>Tight Stop-Loss (-0.75%):</b> ₹${s.stopLoss} (Attach immediately!)\n` +
-                         `   • <b>Net Risk/Reward Ratio:</b> ${netRR} (After ₹${totalFees} tax & brokerage)\n\n` +
-                         `💡 <b>AI QUANT ANALYSIS:</b>\n<i>${s.doubleCheckReason}</i>\n\n` +
-                         `<i>⏰ Rule: Always square off intraday trades before 3:10 PM IST!</i>`;
+                         `${actionBadge}\n` +
+                         `⚖️ <b>Verdict:</b> <b>${verdictTitle}</b> [Confidence: ${s.confidence}%]\n\n` +
+                         `💰 <b>Live Market Price:</b> ₹${s.livePrice} (${s.changePercent} today)\n` +
+                         `🎯 <b>Target (+2.0% Pro Gain):</b> ₹${s.target}\n` +
+                         `🛡️ <b>Stop-Loss (-0.75% Protection):</b> ₹${s.stopLoss}\n` +
+                         `📦 <b>Recommended Quantity:</b> <b>${recQty} Shares</b>\n\n` +
+                         `💡 <b>AI QUANT REASONING:</b>\n` +
+                         `<i>${s.doubleCheckReason}</i>\n\n` +
+                         `📊 <b>Technical Confluence Check:</b>\n` +
+                         `   • <b>VWAP Trend:</b> ₹${s.vwap} (${s.isAboveVwap ? '✅ Above VWAP' : '❌ Below VWAP'})\n` +
+                         `   • <b>Opening Range (ORB):</b> ₹${s.orbHigh} (${s.isAboveOrb ? '✅ Breakout Confirmed' : '⚠️ Below ORB High'})\n` +
+                         `   • <b>Buyer Dominance Rate:</b> <b>${s.buyerDominance || '82%'}</b>\n` +
+                         `   • <b>Sector Momentum:</b> <b>${s.sectorInfo || 'Nifty Aligned'}</b>\n` +
+                         `   • <b>Net Risk/Reward Ratio:</b> ${netRR} (After ₹${totalFees} fees)\n\n` +
+                         `<i>⏰ Rule: Strictly square off all intraday MIS trades before 3:10 PM IST!</i>`;
             } else if (!result.timeStatus.isOpen) {
                 // POST-MARKET EVENING REVIEW REPORT (/intraday after 3:30 PM or weekends)
                 reply += `🌙 <b>POST-MARKET DAILY PERFORMANCE & WIN REVIEW</b> 🏆\n` +

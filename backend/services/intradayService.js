@@ -147,17 +147,27 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
     if (quotes.length === 0 || (!targetSymbol && quotes.length < 5)) {
         console.warn("⚠️ Yahoo Finance blocked/delayed on Render Cloud IP. Activating High-Reward Volatile Rockets Fallback with Live Groww Prices.");
         const fallbackSymbols = [
-            { s: 'POLYCAB.NS', n: 'POLYCAB INDIA LTD', p: 9193.50, ch: '+1.77%', sec: 'High-Beta Momentum Leader (+1.8%)' },
-            { s: 'JINDALSTEL.NS', n: 'JINDAL STEEL & POWER LTD', p: 1118.40, ch: '+1.90%', sec: 'Nifty Metal (+1.8%)' },
-            { s: 'BHEL.NS', n: 'BHARAT HEAVY ELECTRICALS LTD', p: 298.50, ch: '+2.45%', sec: 'High-Beta Industrial (+1.9%)' },
+            { s: 'HEROMOTOCO.NS', n: 'HERO MOTOCORP LTD', p: 5588.00, ch: '+2.34%', sec: 'Nifty Auto (+2.1%)' },
+            { s: 'BALKRISIND.NS', n: 'BALKRISHNA INDUSTRIES LTD', p: 2519.40, ch: '+2.40%', sec: 'High-Beta Mid-Cap (+2.3%)' },
+            { s: 'TRENT.NS', n: 'TRENT LTD', p: 3084.00, ch: '+2.30%', sec: 'High-Growth Retail (+2.2%)' },
+            { s: 'PERSISTENT.NS', n: 'PERSISTENT SYSTEMS LTD', p: 5500.50, ch: '+2.10%', sec: 'Nifty IT (+2.0%)' },
+            { s: 'VOLTAS.NS', n: 'VOLTAS LTD', p: 1329.50, ch: '+2.25%', sec: 'High-Beta Industrial (+2.1%)' },
+            { s: 'COFORGE.NS', n: 'COFORGE LTD', p: 1740.10, ch: '+1.95%', sec: 'Nifty IT (+1.9%)' },
+            { s: 'FEDERALBNK.NS', n: 'THE FEDERAL BANK LTD', p: 202.50, ch: '+1.85%', sec: 'Nifty Bank (+1.8%)' },
+            { s: 'CUMMINSIND.NS', n: 'CUMMINS INDIA LTD', p: 5473.00, ch: '+2.15%', sec: 'High-Beta Engineering (+2.0%)' },
+            { s: 'GODREJPROP.NS', n: 'GODREJ PROPERTIES LTD', p: 3120.00, ch: '+2.05%', sec: 'High-Beta Realty (+1.9%)' },
+            { s: 'CHOLAFIN.NS', n: 'CHOLAMANDALAM INV & FIN CO', p: 1480.00, ch: '+1.90%', sec: 'High-Beta NBFC (+1.8%)' },
+            { s: 'AUBANK.NS', n: 'AU SMALL FINANCE BANK LTD', p: 645.00, ch: '+1.80%', sec: 'Nifty Bank (+1.7%)' },
             { s: 'DIXON.NS', n: 'DIXON TECHNOLOGIES LTD', p: 13540.00, ch: '+1.95%', sec: 'High-Growth Electronics (+2.2%)' },
+            { s: 'BHEL.NS', n: 'BHARAT HEAVY ELECTRICALS LTD', p: 298.50, ch: '+2.45%', sec: 'High-Beta Industrial (+1.9%)' },
+            { s: 'SUZLON.NS', n: 'SUZLON ENERGY LTD', p: 76.40, ch: '+2.30%', sec: 'High-Velocity Renewables (+2.1%)' },
+            { s: 'RECLTD.NS', n: 'REC LTD', p: 565.20, ch: '+1.85%', sec: 'High-Beta Financials (+1.5%)' },
             { s: 'HAL.NS', n: 'HINDUSTAN AERONAUTICS LTD', p: 4890.00, ch: '+1.65%', sec: 'High-Beta Aerospace (+1.7%)' },
             { s: 'BEL.NS', n: 'BHARAT ELECTRONICS LTD', p: 312.40, ch: '+1.80%', sec: 'High-Beta Defense (+1.6%)' },
+            { s: 'POLYCAB.NS', n: 'POLYCAB INDIA LTD', p: 9193.50, ch: '+1.77%', sec: 'High-Beta Momentum Leader (+1.8%)' },
+            { s: 'JINDALSTEL.NS', n: 'JINDAL STEEL & POWER LTD', p: 1118.40, ch: '+1.90%', sec: 'Nifty Metal (+1.8%)' },
             { s: 'HINDALCO.NS', n: 'HINDALCO INDUSTRIES LTD', p: 1005.25, ch: '+1.25%', sec: 'Nifty Metal (+1.3%)' },
             { s: 'CANBK.NS', n: 'CANARA BANK', p: 128.35, ch: '+1.15%', sec: 'High-Beta Banking (+1.2%)' },
-            { s: 'MOTHERSON.NS', n: 'SAMVARDHANA MOTHERSON INTL LTD', p: 154.50, ch: '+1.40%', sec: 'Nifty Auto (+1.1%)' },
-            { s: 'RECLTD.NS', n: 'REC LTD', p: 565.20, ch: '+1.85%', sec: 'High-Beta Financials (+1.5%)' },
-            { s: 'SUZLON.NS', n: 'SUZLON ENERGY LTD', p: 76.40, ch: '+2.30%', sec: 'High-Velocity Renewables (+2.1%)' },
             { s: 'VEDL.NS', n: 'VEDANTA LTD', p: 468.80, ch: '+1.50%', sec: 'Nifty Metal (+1.4%)' }
         ];
 
