@@ -24,7 +24,8 @@ const NIFTY_100_SYMBOLS = [
     'HINDPETRO.NS', 'ICICIGI.NS', 'ICICIPRULI.NS', 'IOC.NS', 'IRCTC.NS',
     'NAUKRI.NS', 'JINDALSTEL.NS', 'MARICO.NS', 'MOTHERSON.NS', 'MUTHOOTFIN.NS',
     'PIDILITIND.NS', 'PFC.NS', 'RECLTD.NS', 'SIEMENS.NS', 'SRF.NS',
-    'TATAPOWER.NS', 'TORNTFARM.NS', 'TRENT.NS', 'TVSMOTOR.NS', 'VEDL.NS'
+    'TATAPOWER.NS', 'TORNTFARM.NS', 'TRENT.NS', 'TVSMOTOR.NS', 'VEDL.NS',
+    'ZOMATO.NS', 'BHEL.NS', 'DIXON.NS', 'HAL.NS', 'BEL.NS', 'POLYCAB.NS', 'SUZLON.NS'
 ];
 
 // MAPPING STOCKS TO THEIR PARENT SECTOR INDICES (The "Rising Tide" Shield)
@@ -238,6 +239,11 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             const changePercentVal = ((livePrice - previousClose) / previousClose) * 100;
             const changePercent = parseFloat(changePercentVal.toFixed(2));
 
+            // STRICT MINUS STOCK FILTER: Exclude red/negative stocks and slow movers (< +0.30%) from scanner output
+            if (!targetSymbol && changePercent < 0.30) {
+                continue;
+            }
+
             // Calculate Upgraded Pro Target (+2.0% from live price) & Tight Stop-Loss (-0.75% from live price)
             const targetPrice = parseFloat((livePrice * 1.020).toFixed(2));
             const stopLossPrice = parseFloat((livePrice * 0.9925).toFixed(2));
@@ -261,43 +267,43 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 doubleCheckVerdict = "🔴 PRO VERDICT: SELLER EXHAUSTION DETECTED!";
                 adviceAction = "AVOID ENTRY";
                 doubleCheckReason = `Despite early morning rises, short-term sellers have taken over today's candle (Buyer Dominance is only ${buyerDominancePercent}%). High probability of pullback!`;
-            } else if (changePercent > 3.2) {
+            } else if (changePercent > 3.5) {
                 doubleCheckVerdict = "🟡 PRO VERDICT: OVEREXTENDED / EXHAUSTED GAP";
                 adviceAction = "AVOID CHASING AT PEAK";
-                doubleCheckReason = `Stock has already jumped +${changePercent}% today! Chasing after a >3% opening surge carries severe risk of institutional profit-taking pullbacks.`;
+                doubleCheckReason = `Stock has already jumped +${changePercent}% today! Chasing after a >3.5% opening surge carries severe risk of institutional profit-taking pullbacks.`;
             }
 
-            // DETERMINISTIC QUANTITATIVE SCORE ARCHITECTURE
+            // DETERMINISTIC QUANTITATIVE SCORE ARCHITECTURE (High-Reward Volatile Rockets Engine)
             let quantScore = 55;
             if (isAboveVwap) quantScore += 15;
             if (isAboveOrb) quantScore += 12;
-            if (buyerDominancePercent >= 80) quantScore += 15;
-            else if (buyerDominancePercent < 60) quantScore -= 25;
+            if (buyerDominancePercent >= 80) quantScore += 18; // Extra weight to preserve high win accuracy on volatile movers
+            else if (buyerDominancePercent < 65) quantScore -= 30;
 
             if (isSectorBullish) quantScore += 10;
             else quantScore -= 15;
 
-            // MOMENTUM VELOCITY BONUS (Prioritize active runners over slow crawlers)
-            if (changePercent >= 1.2 && changePercent <= 2.6) quantScore += 18;
-            else if (changePercent >= 0.5 && changePercent < 1.2) quantScore += 8;
-            else if (changePercent < 0.5) quantScore -= 10; // Penalty for sluggish/unmoving stock
-            else if (changePercent > 3.0) quantScore -= 35;
+            // MOMENTUM VELOCITY BONUS (Prioritize active high-reward runners between +1.0% and +3.5%)
+            if (changePercent >= 1.2 && changePercent <= 3.5) quantScore += 22;
+            else if (changePercent >= 0.5 && changePercent < 1.2) quantScore += 10;
+            else if (changePercent < 0.5) quantScore -= 15;
+            else if (changePercent > 4.2) quantScore -= 40;
 
-            const volBonus = Math.min(8, Math.floor(volumeRatioVal / 30));
+            const volBonus = Math.min(10, Math.floor(volumeRatioVal / 25));
             quantScore += volBonus;
             if (quantScore > 98) quantScore = 98;
             if (quantScore < 20) quantScore = 20;
 
-            // HIGH-BETA MOMENTUM VS. SLOW PSU DEFENSIVE FILTER
-            const slowDefensivePSUs = ['ONGC.NS', 'COALINDIA.NS', 'NTPC.NS', 'POWERGRID.NS', 'IOC.NS', 'BPCL.NS', 'GAIL.NS', 'HINDUNILVR.NS', 'ITC.NS'];
-            const highBetaLeaders = ['CANBK.NS', 'HINDALCO.NS', 'MOTHERSON.NS', 'TRENT.NS', 'ICICIBANK.NS', 'TATAMOTORS.NS', 'RELIANCE.NS', 'INFY.NS', 'SBIN.NS', 'GRASIM.NS', 'BAJFINANCE.NS', 'AXISBANK.NS'];
+            // HIGH-REWARD VOLATILE FLYERS VS. SLOW MEGA-CAP DEFENSIVE FILTER
+            const slowMegaCaps = ['ONGC.NS', 'COALINDIA.NS', 'NTPC.NS', 'POWERGRID.NS', 'IOC.NS', 'BPCL.NS', 'GAIL.NS', 'HINDUNILVR.NS', 'ITC.NS', 'TCS.NS', 'RELIANCE.NS', 'ASIANPAINT.NS', 'BRITANNIA.NS', 'DABUR.NS', 'COLPAL.NS'];
+            const highRewardFlyers = ['ZOMATO.NS', 'BHEL.NS', 'DIXON.NS', 'HAL.NS', 'BEL.NS', 'POLYCAB.NS', 'SUZLON.NS', 'CANBK.NS', 'HINDALCO.NS', 'MOTHERSON.NS', 'TRENT.NS', 'TATAMOTORS.NS', 'RECLTD.NS', 'PFC.NS', 'VEDL.NS', 'JINDALSTEL.NS', 'DLF.NS', 'ADANIENT.NS', 'ADANIPORTS.NS'];
 
             let rawScoreCalc = (quantScore * 10000) + (buyerDominancePercent * 100) + volumeRatioVal;
-            if (slowDefensivePSUs.includes(symbol.toUpperCase())) {
-                rawScoreCalc -= 250000; // Demote slow defensive commodity/PSU stocks for intraday MIS
+            if (slowMegaCaps.includes(symbol.toUpperCase())) {
+                rawScoreCalc -= 500000; // Demote slow mega-caps that only move ~0.8% in a day
             }
-            if (highBetaLeaders.includes(symbol.toUpperCase()) || ['Nifty Bank', 'Nifty Auto', 'Nifty Metal', 'Nifty IT'].includes(parentSectorName)) {
-                rawScoreCalc += 150000; // Elevate high-beta, fast-moving growth sectors
+            if (highRewardFlyers.includes(symbol.toUpperCase()) || ['Nifty Bank', 'Nifty Metal', 'Nifty Auto', 'Nifty IT'].includes(parentSectorName)) {
+                rawScoreCalc += 350000; // Elevate volatile high-reward breakouts
             }
 
             setups.push({
