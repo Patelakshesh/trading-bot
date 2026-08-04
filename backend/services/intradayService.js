@@ -25,7 +25,7 @@ const NIFTY_100_SYMBOLS = [
     'NAUKRI.NS', 'JINDALSTEL.NS', 'MARICO.NS', 'MOTHERSON.NS', 'MUTHOOTFIN.NS',
     'PIDILITIND.NS', 'PFC.NS', 'RECLTD.NS', 'SIEMENS.NS', 'SRF.NS',
     'TATAPOWER.NS', 'TORNTFARM.NS', 'TRENT.NS', 'TVSMOTOR.NS', 'VEDL.NS',
-    'ZOMATO.NS', 'BHEL.NS', 'DIXON.NS', 'HAL.NS', 'BEL.NS', 'POLYCAB.NS', 'SUZLON.NS'
+    'BHEL.NS', 'DIXON.NS', 'HAL.NS', 'BEL.NS', 'POLYCAB.NS', 'SUZLON.NS'
 ];
 
 // MAPPING STOCKS TO THEIR PARENT SECTOR INDICES (The "Rising Tide" Shield)
@@ -141,7 +141,7 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
         console.warn("⚠️ Yahoo Finance blocked/delayed on Render Cloud IP. Activating High-Reward Volatile Rockets Fallback with Live Groww Prices.");
         const fallbackSymbols = [
             { s: 'POLYCAB.NS', n: 'POLYCAB INDIA LTD', p: 9193.50, ch: '+1.77%', sec: 'High-Beta Momentum Leader (+1.8%)' },
-            { s: 'ZOMATO.NS', n: 'ZOMATO LTD', p: 265.40, ch: '+2.10%', sec: 'New-Age Tech & Consumer (+2.1%)' },
+            { s: 'JINDALSTEL.NS', n: 'JINDAL STEEL & POWER LTD', p: 1118.40, ch: '+1.90%', sec: 'Nifty Metal (+1.8%)' },
             { s: 'BHEL.NS', n: 'BHARAT HEAVY ELECTRICALS LTD', p: 298.50, ch: '+2.45%', sec: 'High-Beta Industrial (+1.9%)' },
             { s: 'DIXON.NS', n: 'DIXON TECHNOLOGIES LTD', p: 13540.00, ch: '+1.95%', sec: 'High-Growth Electronics (+2.2%)' },
             { s: 'HAL.NS', n: 'HINDUSTAN AERONAUTICS LTD', p: 4890.00, ch: '+1.65%', sec: 'High-Beta Aerospace (+1.7%)' },
@@ -306,7 +306,7 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
 
             // HIGH-REWARD VOLATILE FLYERS VS. SLOW MEGA-CAP DEFENSIVE FILTER
             const slowMegaCaps = ['ONGC.NS', 'COALINDIA.NS', 'NTPC.NS', 'POWERGRID.NS', 'IOC.NS', 'BPCL.NS', 'GAIL.NS', 'HINDUNILVR.NS', 'ITC.NS', 'TCS.NS', 'RELIANCE.NS', 'ASIANPAINT.NS', 'BRITANNIA.NS', 'DABUR.NS', 'COLPAL.NS'];
-            const highRewardFlyers = ['ZOMATO.NS', 'BHEL.NS', 'DIXON.NS', 'HAL.NS', 'BEL.NS', 'POLYCAB.NS', 'SUZLON.NS', 'CANBK.NS', 'HINDALCO.NS', 'MOTHERSON.NS', 'TRENT.NS', 'TATAMOTORS.NS', 'RECLTD.NS', 'PFC.NS', 'VEDL.NS', 'JINDALSTEL.NS', 'DLF.NS', 'ADANIENT.NS', 'ADANIPORTS.NS'];
+            const highRewardFlyers = ['BHEL.NS', 'DIXON.NS', 'HAL.NS', 'BEL.NS', 'POLYCAB.NS', 'SUZLON.NS', 'CANBK.NS', 'HINDALCO.NS', 'MOTHERSON.NS', 'TRENT.NS', 'TATAMOTORS.NS', 'RECLTD.NS', 'PFC.NS', 'VEDL.NS', 'JINDALSTEL.NS', 'DLF.NS', 'ADANIENT.NS', 'ADANIPORTS.NS'];
 
             let rawScoreCalc = (quantScore * 10000) + (buyerDominancePercent * 100) + volumeRatioVal;
             if (slowMegaCaps.includes(symbol.toUpperCase())) {
