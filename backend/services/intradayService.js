@@ -281,13 +281,9 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 doubleCheckVerdict = "🔴 PRO VERDICT: SELLER EXHAUSTION DETECTED!";
                 adviceAction = "AVOID ENTRY";
                 doubleCheckReason = `Despite early morning rises, short-term sellers have taken over today's candle (Buyer Dominance is only ${buyerDominancePercent}%). High probability of pullback!`;
-            } else if (changePercent > 3.5) {
-                doubleCheckVerdict = "🟡 PRO VERDICT: OVEREXTENDED / EXHAUSTED GAP";
-                adviceAction = "AVOID CHASING AT PEAK";
-                doubleCheckReason = `Stock has already jumped +${changePercent}% today! Chasing after a >3.5% opening surge carries severe risk of institutional profit-taking pullbacks.`;
             }
 
-            // DETERMINISTIC QUANTITATIVE SCORE ARCHITECTURE (High-Reward Volatile Rockets Engine)
+            // DETERMINISTIC QUANTITATIVE SCORE ARCHITECTURE (Option B: Uncapped High-Momentum Breakout Engine)
             let quantScore = 55;
             if (isAboveVwap) quantScore += 15;
             if (isAboveOrb) quantScore += 12;
@@ -297,11 +293,11 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             if (isSectorBullish) quantScore += 10;
             else quantScore -= 15;
 
-            // MOMENTUM VELOCITY BONUS (Prioritize active high-reward runners between +1.0% and +3.5%)
-            if (changePercent >= 1.2 && changePercent <= 3.5) quantScore += 22;
-            else if (changePercent >= 0.5 && changePercent < 1.2) quantScore += 10;
-            else if (changePercent < 0.5) quantScore -= 15;
-            else if (changePercent > 4.2) quantScore -= 40;
+            // UNCAPPED HIGH-MOMENTUM BONUS (Option B: Reward high-velocity breakout leaders without artificial price ceilings)
+            if (changePercent >= 2.0) quantScore += 25; // Massive reward for fast-moving breakout rockets!
+            else if (changePercent >= 1.0 && changePercent < 2.0) quantScore += 18;
+            else if (changePercent >= 0.30 && changePercent < 1.0) quantScore += 10;
+            else if (changePercent < 0.30) quantScore -= 25; // Demote sluggish/unmoving stock
 
             const volBonus = Math.min(10, Math.floor(volumeRatioVal / 25));
             quantScore += volBonus;
