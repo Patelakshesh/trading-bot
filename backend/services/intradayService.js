@@ -277,13 +277,28 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             if (isSectorBullish) quantScore += 10;
             else quantScore -= 15;
 
-            if (changePercent >= 0.5 && changePercent <= 2.6) quantScore += 15;
+            // MOMENTUM VELOCITY BONUS (Prioritize active runners over slow crawlers)
+            if (changePercent >= 1.2 && changePercent <= 2.6) quantScore += 18;
+            else if (changePercent >= 0.5 && changePercent < 1.2) quantScore += 8;
+            else if (changePercent < 0.5) quantScore -= 10; // Penalty for sluggish/unmoving stock
             else if (changePercent > 3.0) quantScore -= 35;
 
             const volBonus = Math.min(8, Math.floor(volumeRatioVal / 30));
             quantScore += volBonus;
             if (quantScore > 98) quantScore = 98;
             if (quantScore < 20) quantScore = 20;
+
+            // HIGH-BETA MOMENTUM VS. SLOW PSU DEFENSIVE FILTER
+            const slowDefensivePSUs = ['ONGC.NS', 'COALINDIA.NS', 'NTPC.NS', 'POWERGRID.NS', 'IOC.NS', 'BPCL.NS', 'GAIL.NS', 'HINDUNILVR.NS', 'ITC.NS'];
+            const highBetaLeaders = ['CANBK.NS', 'HINDALCO.NS', 'MOTHERSON.NS', 'TRENT.NS', 'ICICIBANK.NS', 'TATAMOTORS.NS', 'RELIANCE.NS', 'INFY.NS', 'SBIN.NS', 'GRASIM.NS', 'BAJFINANCE.NS', 'AXISBANK.NS'];
+
+            let rawScoreCalc = (quantScore * 10000) + (buyerDominancePercent * 100) + volumeRatioVal;
+            if (slowDefensivePSUs.includes(symbol.toUpperCase())) {
+                rawScoreCalc -= 250000; // Demote slow defensive commodity/PSU stocks for intraday MIS
+            }
+            if (highBetaLeaders.includes(symbol.toUpperCase()) || ['Nifty Bank', 'Nifty Auto', 'Nifty Metal', 'Nifty IT'].includes(parentSectorName)) {
+                rawScoreCalc += 150000; // Elevate high-beta, fast-moving growth sectors
+            }
 
             setups.push({
                 symbol,
@@ -303,7 +318,7 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 doubleCheckVerdict,
                 adviceAction,
                 doubleCheckReason,
-                rawScore: (quantScore * 10000) + (buyerDominancePercent * 100) + volumeRatioVal,
+                rawScore: rawScoreCalc,
                 confidence: quantScore
             });
         }
