@@ -63,8 +63,11 @@ async function getRealGrowwMetrics(symbol) {
         const prevClose = data.dayChange ? (ltp - data.dayChange) : ltp;
         const changePercentVal = prevClose > 0 ? ((ltp - prevClose) / prevClose) * 100 : 0;
         
-        // CIRCUIT SHIELD: Reject stocks frozen at upper/lower circuit with zero buyers or sellers
-        const isCircuitLocked = (sellQty === 0 || buyQty === 0 || (data.highPriceRange && ltp >= data.highPriceRange * 0.999));
+        // CIRCUIT SHIELD: Reject stocks frozen at upper/lower circuit with zero buyers or sellers (during market hours)
+        const marketStatus = checkIndianMarketTime();
+        const isCircuitLocked = marketStatus.isOpen 
+            ? (sellQty === 0 || buyQty === 0 || (data.highPriceRange && ltp >= data.highPriceRange * 0.999))
+            : (data.highPriceRange && ltp >= data.highPriceRange * 0.999);
         
         return {
             price: ltp,
@@ -215,11 +218,11 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 continue;
             }
 
-            // FILTER 2: MOMENTUM DISCOVERY (No restrictive gap-up block! Capture stocks gaining between +0.35% and +4.2%)
+            // FILTER 2: MOMENTUM CONVICTION FLOOR (Strict +1.25% floor to remove slow gainers, ceiling at +4.25% to stop chasing tops)
             if (!targetSymbol) {
-                if (changeVal < 0.35 || changeVal > 4.2) continue;
-                if (buyerDominance !== null && buyerDominance < 48) {
-                    console.log(`[Order Book] Skipping ${sym}: Seller heavy control detected (Buyer Dominance: ${buyerDominance}%).`);
+                if (changeVal < 1.25 || changeVal > 4.25) continue;
+                if (buyerDominance !== null && buyerDominance < 53) {
+                    console.log(`[Order Book] Skipping ${sym}: Insufficient buyer control (Buyer Dominance: ${buyerDominance}% < 53%).`);
                     continue;
                 }
             }
@@ -332,7 +335,8 @@ async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
             if (!targetSymbol && isCircuitLocked) continue;
 
             // JULY 30 RULE 1: Change percent strictly between +0.5% and +5.5%
-            if (!targetSymbol && (changeVal < 0.5 || changeVal > 5.5)) continue;
+            // JULY 30 RULE 1: Must demonstrate clean momentum between +1.25% and +4.25%
+            if (!targetSymbol && (changeVal < 1.25 || changeVal > 4.25)) continue;
 
             const vwapAnchor = parseFloat(((high + low + price) / 3).toFixed(2));
             const isAboveVwap = price >= vwapAnchor * 0.998;
@@ -438,11 +442,12 @@ async function getTop10MarketSetups(capital = 20000) {
                 continue;
             }
 
-            // FILTER 2: STRICT GAIN CAP (< 4.50%). Reject anything >= 4.5% to protect against buying late into 5% pumps!
-            if (changeVal < 0.35 || changeVal >= 4.50) continue;
+            // FILTER 2: STRICT MOMENTUM WINDOW (+1.25% to < 4.50%). Remove stagnant <1.25% movers and over-extended >=4.5% tops!
+            if (changeVal < 1.25 || changeVal >= 4.50) continue;
 
-            // FILTER 3: ORDER BOOK QUALITY (Require buyer dominance >= 48%)
-            if (buyerDominance !== null && buyerDominance < 48) {
+            // FILTER 3: INSTITUTIONAL ORDER BOOK MANDATE (Require real buyer dominance >= 53%)
+            if (buyerDominance !== null && buyerDominance < 53) {
+                console.log(`[Top 10 Shield] Skipping ${sym}: Buyer dominance below 53% (${buyerDominance}%).`);
                 continue;
             }
 
@@ -544,8 +549,11 @@ async function getCombinedMasterSetups(capital = 20000) {
     if (top10Result.setups) top10Result.setups.forEach(x => addPick(x, "Top 10 All-Cap", "🌟"));
 
     const allCandidates = Array.from(map.values()).sort((a, b) => {
+        // Boost high-conviction momentum (>1.5% day gain and strong buyer dominance) over slow giants
+        const aBoost = (parseFloat(a.changePercent) >= 1.5 ? 200 : 0) + (parseInt(a.buyerDominance) >= 55 ? 150 : 0);
+        const bBoost = (parseFloat(b.changePercent) >= 1.5 ? 200 : 0) + (parseInt(b.buyerDominance) >= 55 ? 150 : 0);
         if (b.sources.length !== a.sources.length) return b.sources.length - a.sources.length;
-        return (b.combinedScore || 0) - (a.combinedScore || 0);
+        return ((b.combinedScore || 0) + bBoost) - ((a.combinedScore || 0) + aBoost);
     });
 
     const topPicks = allCandidates.slice(0, 3);
