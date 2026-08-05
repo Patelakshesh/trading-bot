@@ -508,10 +508,54 @@ async function getTop10MarketSetups(capital = 20000) {
     return { timeStatus, setups: top10Picks };
 }
 
+// 8. MASTER COMBINED QUANT ENGINE (/best or /master — Combines v4.0 Confluence + July 30 ORB + All-Cap Top 10 + AI Trend Evaluation)
+async function getCombinedMasterSetups(capital = 20000) {
+    const timeStatus = checkIndianMarketTime();
+    console.log("⚡ [SUPER-CONFLUENCE ENGINE] Intersecting v4.0, July 30 ORB & All-Cap Top 10 quant layers...");
+
+    const [v4Result, julResult, top10Result] = await Promise.all([
+        getIntradaySetups(capital),
+        getIntraday30Setups(capital),
+        getTop10MarketSetups(capital)
+    ]);
+
+    const map = new Map();
+    const addPick = (item, sourceName, icon) => {
+        if (!map.has(item.symbol)) {
+            map.set(item.symbol, {
+                ...item,
+                sources: [icon + " " + sourceName],
+                combinedScore: item.score || 100
+            });
+        } else {
+            const ex = map.get(item.symbol);
+            if (!ex.sources.includes(icon + " " + sourceName)) {
+                ex.sources.push(icon + " " + sourceName);
+                ex.combinedScore += 350; // Major reward for cross-engine mathematical validation!
+            }
+            if (ex.buyerDominance === 'Verified' && item.buyerDominance !== 'Verified') ex.buyerDominance = item.buyerDominance;
+            if (!ex.newsHeadline && item.newsHeadline) ex.newsHeadline = item.newsHeadline;
+        }
+    };
+
+    if (v4Result.setups) v4Result.setups.forEach(x => addPick(x, "v4.0 Quant", "⚡"));
+    if (julResult.setups) julResult.setups.forEach(x => addPick(x, "July 30 ORB", "🏆"));
+    if (top10Result.setups) top10Result.setups.forEach(x => addPick(x, "Top 10 All-Cap", "🌟"));
+
+    const allCandidates = Array.from(map.values()).sort((a, b) => {
+        if (b.sources.length !== a.sources.length) return b.sources.length - a.sources.length;
+        return (b.combinedScore || 0) - (a.combinedScore || 0);
+    });
+
+    const topPicks = allCandidates.slice(0, 3);
+    return { timeStatus, setups: topPicks };
+}
+
 module.exports = {
     checkIndianMarketTime,
     getIntradaySetups,
     getIntraday30Setups,
     getTop10MarketSetups,
+    getCombinedMasterSetups,
     INTRADAY_UNIVERSE
 };

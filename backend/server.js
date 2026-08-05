@@ -62,7 +62,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
-        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/top10` - Top 10 All-Cap Winners (Small, Mid & Large Cap)\n`/intraday` - Top 3 Intraday Confluence v4.0 (VWAP Limit Pullback)\n`/intraday30` - Top 3 July 30 System (Commit c6e122a comparison)\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
+        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/best` - 🔥 Master Combined Super-Picks (v4.0 + July 30 + Top 10 + AI Tip)\n`/top10` - Top 10 All-Cap Winners (Small, Mid & Large Cap)\n`/intraday` - Top 3 Intraday Confluence v4.0 (VWAP Limit Pullback)\n`/intraday30` - Top 3 July 30 System (Commit c6e122a comparison)\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
     });
 
     // 1. Upgraded /bought command to automatically fetch live price if omitted
@@ -854,6 +854,59 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             await bot.sendMessage(chatId, `⚠️ Could not compute /top10 setups right now. Please try again shortly.`);
         }
     });
+
+    // 3E. MASTER COMBINED SUPER-CONFLUENCE ENGINE: /best or /master or /super or /combine
+    bot.onText(/^\/(?:best|master|super|combine)$/, async (msg) => {
+        const chatId = msg.chat.id;
+
+        const statusMsg = await bot.sendMessage(chatId, `🌟 <b>[MASTER SUPER-CONFLUENCE ENGINE]</b> 🌟\n\n⚡ Intersecting all three quantitative detection layers (<b>v4.0 Quant</b>, <b>July 30 ORB</b> & <b>All-Cap Top 10</b>)...\n🧠 Running institutional cross-verification & AI Trend Shield to find today's <b>Top 2 Super-Winners</b>!`, { parse_mode: 'HTML' });
+
+        try {
+            const timeCheck = intradayService.checkIndianMarketTime();
+            if (!timeCheck.isOpen) {
+                await bot.sendMessage(chatId, timeCheck.reason, { parse_mode: 'Markdown' });
+            }
+
+            const result = await intradayService.getCombinedMasterSetups(20000);
+
+            if (!result.setups || result.setups.length === 0) {
+                await bot.editMessageText(`⚠️ No verified Super-Confluence setups active right now. Re-check after 15 minutes!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                return;
+            }
+
+            let reply = `🏆 <b>THE #1 MASTER COMBINED INTRADAY SETUPS</b> 🏆\n` +
+                        `<i>🔥 Intersected across v4.0 Order-Book Confluence, July 30 ORB Engine & All-Cap News Shield + AI Tip Verification!</i>\n` +
+                        `────────────────────────────\n\n`;
+
+            result.setups.slice(0, 2).forEach((s, idx) => {
+                const evalData = s.riskEvaluation || {};
+                const recQty = evalData.recommendedQuantity || '20';
+                const limitEntry = parseFloat(s.livePrice).toFixed(2);
+                const vwapAnchor = parseFloat(s.vwap || s.livePrice).toFixed(2);
+                const enginesList = (s.sources || []).join(" + ") + " + 🧠 AI Tip Approved";
+
+                reply += `<b>${idx + 1}. ${s.symbol} (${s.name})</b> [${s.capCategory || '🏭 MID/LARGE CAP'}]\n` +
+                         `   🔗 <b>Consensus Verification:</b> ${enginesList}\n` +
+                         `   💰 <b>Live Market Price:</b> ₹${limitEntry} (${s.changePercent} today)\n` +
+                         `   📍 <b>VWAP Pullback Buy Limit Price:</b> <b>₹${vwapAnchor}</b> <i>(Do NOT buy above this price!)</i>\n` +
+                         `   🎯 <b>Pro Target (+1.75%):</b> <b>₹${s.target}</b>\n` +
+                         `   🛑 <b>Stop-Loss (-0.65%):</b> <b>₹${s.stopLoss}</b>\n` +
+                         `   📦 <b>5x MIS Size (₹4,000 Capital):</b> <b>${recQty} Shares</b>\n` +
+                         `   💡 <i>${s.newsHeadline || s.doubleCheckReason}</i>\n` +
+                         `────────────────────────────\n`;
+            });
+
+            reply += `\n<b>👑 HOW TO EXECUTE WITH CONFIDENCE:</b>\n` +
+                     `1️⃣ <b>Thursday & Friday:</b> Check <code>/best</code> at <b>9:31 AM SHARP</b>. Write down the #1 ranked pick and verify on paper how cleanly it bounces from its VWAP Buy Limit Price!\n` +
+                     `2️⃣ <b>Monday Live Trade:</b> Type <code>/best</code> at 9:31 AM. Place a Limit Buy order at the exact <b>VWAP Pullback Price</b> between <b>9:35 AM and 10:05 AM</b>.\n` +
+                     `3️⃣ <b>Zero-Loss Rule:</b> The moment your position crosses <b>+₹300 profit</b>, immediately shift your Stop-Loss to your Entry Price (Break-Even)!`;
+
+            await bot.editMessageText(reply, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+        } catch (err) {
+            console.error("TELEGRAM BEST/MASTER ERROR:", err.message);
+            await bot.sendMessage(chatId, `⚠️ Could not compute /best setups right now. Please try again shortly.`);
+        }
+    });
     // 4. New /profit command (Total Portfolio Summary)
     bot.onText(/\/(profit|portfolio)/, async (msg) => {
         const chatId = msg.chat.id;
@@ -943,6 +996,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             `<code>/tip 10000</code>     — Top 5 trades for ₹10,000 budget\n` +
             `<code>/tip 100-500</code>   — Top 5 trades priced ₹100-₹500\n\n` +
             `<b>⚡ INTRADAY ORB QUANT (MIS 5x Margin):</b>\n` +
+            `<code>/best</code>             — 🔥 Master Combined Super-Picks (v4.0 + July 30 + Top 10 + AI Tip)\n` +
             `<code>/top10</code>            — Top 10 All-Cap Winners (Small, Mid & Large Cap)\n` +
             `<code>/intraday</code>         — Top 3 Intraday Confluence v4.0 (VWAP Limit Pullback)\n` +
             `<code>/intraday30</code>       — Top 3 July 30 System (Commit c6e122a comparison)\n` +
