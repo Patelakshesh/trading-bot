@@ -512,14 +512,34 @@ async function getTop10MarketSetups(capital = 20000) {
         }
     }
 
-    // Sort by Total Confluence Score and guarantee Top 10 picks
+    // Sort all verified candidates by Total Confluence Score
     verifiedSetups.sort((a, b) => b.score - a.score);
-    const top10Picks = verifiedSetups.slice(0, 10);
+
+    // Explicitly select Top 3 from EACH market cap category (3 Large, 3 Mid, 3 Small)
+    const largeCaps = verifiedSetups.filter(s => s.capCategory === '🏢 LARGE CAP').slice(0, 3);
+    const midCaps = verifiedSetups.filter(s => s.capCategory === '🏭 MID CAP').slice(0, 3);
+    const smallCaps = verifiedSetups.filter(s => s.capCategory === '🌱 SMALL CAP').slice(0, 3);
+
+    let top10Picks = [...largeCaps, ...midCaps, ...smallCaps];
+
+    // If fewer than 9 total picks found across categories, fill available slots with highest-scoring remaining runners!
+    if (top10Picks.length < 9 && verifiedSetups.length > top10Picks.length) {
+        const addedSyms = new Set(top10Picks.map(s => s.symbol));
+        for (const cand of verifiedSetups) {
+            if (!addedSyms.has(cand.symbol) && top10Picks.length < 10) {
+                top10Picks.push(cand);
+                addedSyms.add(cand.symbol);
+            }
+        }
+    }
+
+    // Re-sort the final balanced selection cleanly by score
+    top10Picks.sort((a, b) => b.score - a.score);
 
     if (top10Picks.length > 0) {
         dailyTop10Cache.timestamp = Date.now();
         dailyTop10Cache.setups = top10Picks;
-        console.log(`⚡ [TOP 10 LIVE REFRESH] Updated Top ${top10Picks.length} All-Cap leaders.`);
+        console.log(`⚡ [TOP 10 LIVE REFRESH] Updated balanced All-Cap leaders (${largeCaps.length} Large, ${midCaps.length} Mid, ${smallCaps.length} Small).`);
     }
 
     return { timeStatus, setups: top10Picks };
