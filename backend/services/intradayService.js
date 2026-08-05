@@ -184,6 +184,7 @@ function checkIndianMarketTime() {
 
 // 5. PRIMARY QUANT SCREENING ENGINE
 async function getIntradaySetups(targetSymbol = null, capital = 20000) {
+    if (typeof targetSymbol !== 'string') targetSymbol = null;
     const timeStatus = checkIndianMarketTime();
     const now = new Date();
     const nowTs = Date.now();
@@ -305,6 +306,7 @@ const dailySetup30Cache = { timestamp: 0, setups: null };
 
 // 6. JULY 30 HISTORIC SYSTEM (Commit c6e122a Replication for Side-by-Side Validation)
 async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
+    if (typeof targetSymbol !== 'string') targetSymbol = null;
     const timeStatus = checkIndianMarketTime();
     const nowTs = Date.now();
 
@@ -513,8 +515,8 @@ async function getCombinedMasterSetups(capital = 20000) {
     console.log("⚡ [SUPER-CONFLUENCE ENGINE] Intersecting v4.0, July 30 ORB & All-Cap Top 10 quant layers...");
 
     const [v4Result, julResult, top10Result] = await Promise.all([
-        getIntradaySetups(capital),
-        getIntraday30Setups(capital),
+        getIntradaySetups(null, capital),
+        getIntraday30Setups(null, capital),
         getTop10MarketSetups(capital)
     ]);
 
