@@ -360,9 +360,9 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                     continue;
                 }
 
-                // Volatility-Adjusted Target & Stop-Loss: +2.8% target vs -1.0% stop buffer to guarantee > 1 : 2 Net Risk/Reward after brokerage fees!
-                const targetP = parseFloat((liveP * 1.028).toFixed(2));
-                const stopLossP = parseFloat((liveP * 0.990).toFixed(2));
+                // Volatility-Adjusted Target & Stop-Loss: Realistic +1.75% target vs -0.65% stop buffer to clear > 1 : 1.5 Net Risk/Reward without exceeding daily ATR range!
+                const targetP = parseFloat((liveP * 1.0175).toFixed(2));
+                const stopLossP = parseFloat((liveP * 0.9935).toFixed(2));
                 const riskEval = riskManager.evaluateTradeViability(fb.s, liveP, targetP, stopLossP, capital, true);
                 
                 // Perform Anti-Bull Trap Peer Correlation Check & Real Indian News Inspection
@@ -468,10 +468,10 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 continue;
             }
 
-            // VOLATILITY-ADJUSTED TARGET & STOP-LOSS: +2.8% target vs -1.0% stop buffer for > 1 : 2 Net Risk/Reward
+            // VOLATILITY-ADJUSTED TARGET & STOP-LOSS: Realistic +1.75% target vs -0.65% stop buffer without ATR exhaustion
             const isHighBeta = highRewardFlyers.includes(symbol.toUpperCase()) || changePercent > 2.0;
-            const targetMult = isHighBeta ? 1.028 : 1.022;
-            const stopLossMult = isHighBeta ? 0.990 : 0.9925;
+            const targetMult = isHighBeta ? 1.018 : 1.016;
+            const stopLossMult = isHighBeta ? 0.9935 : 0.9945;
             const targetPrice = parseFloat((livePrice * targetMult).toFixed(2));
             const stopLossPrice = parseFloat((livePrice * stopLossMult).toFixed(2));
 
