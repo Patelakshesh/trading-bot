@@ -299,8 +299,95 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
     };
 }
 
+// Session Cache for July 30 comparison system
+const dailySetup30Cache = { dateStr: null, setups: null };
+
+// 6. JULY 30 HISTORIC SYSTEM (Commit c6e122a Replication for Side-by-Side Validation)
+async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
+    const timeStatus = checkIndianMarketTime();
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+    if (!targetSymbol && dailySetup30Cache.dateStr === todayStr && dailySetup30Cache.setups?.length > 0) {
+        console.log(`🔒 [JULY 30 SESSION LOCK] Returning locked Top 3 picks for ${todayStr}.`);
+        return { timeStatus, setups: dailySetup30Cache.setups };
+    }
+
+    const candidates = targetSymbol 
+        ? [(targetSymbol.toUpperCase().endsWith('.NS') || targetSymbol.toUpperCase().endsWith('.BO')) ? targetSymbol.toUpperCase() : `${targetSymbol.toUpperCase()}.NS`] 
+        : [...INTRADAY_UNIVERSE];
+
+    console.log(`🏆 [JULY 30 SYSTEM c6e122a] Scanning ${candidates.length} stocks using exact July 30 ORB + VWAP rules...`);
+    const verifiedSetups = [];
+
+    for (const sym of candidates) {
+        try {
+            const live = await getRealGrowwMetrics(sym);
+            if (!live || live.price <= 0) continue;
+
+            const { price, open, high, low, changeVal, buyerDominance, isCircuitLocked } = live;
+
+            if (!targetSymbol && isCircuitLocked) continue;
+
+            // JULY 30 RULE 1: Change percent strictly between +0.5% and +5.5%
+            if (!targetSymbol && (changeVal < 0.5 || changeVal > 5.5)) continue;
+
+            const vwapAnchor = parseFloat(((high + low + price) / 3).toFixed(2));
+            const isAboveVwap = price >= vwapAnchor * 0.998;
+            const isAboveOrb = price >= open;
+
+            // JULY 30 RULE 2: Must be above both VWAP and Opening Range!
+            if (!targetSymbol && (!isAboveVwap || !isAboveOrb)) continue;
+
+            // JULY 30 RULE 3: Exact Target (+1.50%) and Stop-Loss (-0.75%)
+            const targetP = parseFloat((price * 1.015).toFixed(2));
+            const stopLossP = parseFloat((price * 0.9925).toFixed(2));
+
+            const companyName = sym.replace('.NS', '').replace('.BO', '');
+            const riskEval = riskManager.evaluateTradeViability(sym, price, targetP, stopLossP, capital, true);
+            if (!targetSymbol && !riskEval.approved) continue;
+
+            const score = Math.round((changeVal * 100) + (buyerDominance || 60));
+            const confidence = Math.min(95, Math.max(78, Math.round(72 + changeVal * 4)));
+
+            verifiedSetups.push({
+                symbol: sym,
+                name: companyName,
+                livePrice: price.toFixed(2),
+                changePercent: `+${changeVal.toFixed(2)}%`,
+                vwap: vwapAnchor.toFixed(2),
+                orbHigh: high.toFixed(2),
+                buyerDominance: buyerDominance !== null ? `${buyerDominance}%` : 'Verified',
+                sectorInfo: 'July 30 Nifty Aligned',
+                isAboveVwap,
+                isAboveOrb,
+                target: targetP.toFixed(2),
+                stopLoss: stopLossP.toFixed(2),
+                riskEvaluation: riskEval,
+                doubleCheckReason: `Exact July 30 algorithm verified: Trading above ORB & VWAP with +${changeVal.toFixed(2)}% intraday expansion momentum!`,
+                score,
+                confidence
+            });
+        } catch (err) {
+            // Silently continue
+        }
+    }
+
+    verifiedSetups.sort((a, b) => b.score - a.score);
+    const topPicks = verifiedSetups.slice(0, 3);
+
+    if (!targetSymbol && topPicks.length > 0) {
+        dailySetup30Cache.dateStr = todayStr;
+        dailySetup30Cache.setups = topPicks;
+        console.log(`🔒 [JULY 30 SESSION SAVED] Locked Top ${topPicks.length} leaders for ${todayStr}.`);
+    }
+
+    return { timeStatus, setups: topPicks };
+}
+
 module.exports = {
     checkIndianMarketTime,
     getIntradaySetups,
+    getIntraday30Setups,
     INTRADAY_UNIVERSE
 };

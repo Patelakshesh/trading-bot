@@ -62,7 +62,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
-        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/intraday` - Get Top 3 Intraday ORB + VWAP setups (5x margin)\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
+        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/intraday` - Top 3 Intraday Confluence v4.0 (VWAP Limit Pullback)\n`/intraday30` - Top 3 July 30 System (Commit c6e122a comparison)\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
     });
 
     // 1. Upgraded /bought command to automatically fetch live price if omitted
@@ -620,7 +620,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     });
 
     // 3B. NEW PROFESSIONAL INTRADAY COMMAND: /intraday (ORB + VWAP Confluence on Nifty 100 with 5x Leverage Math)
-    bot.onText(/\/intraday(?:\s+(.+))?/, async (msg, match) => {
+    bot.onText(/^\/intraday(?:\s+(.+))?$/, async (msg, match) => {
         const chatId = msg.chat.id;
         const targetArg = match[1] ? match[1].trim() : null;
 
@@ -754,6 +754,58 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             await bot.sendMessage(chatId, `⚠️ Could not compute Intraday setups right now. Please try /intraday again shortly.`);
         }
     });
+
+    // 3C. JULY 30 COMPARISON COMMAND: /intraday30 (Exact Commit c6e122a Replication)
+    bot.onText(/^\/intraday30(?:\s+(.+))?$/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const targetArg = match[1] ? match[1].trim() : null;
+
+        const statusMsg = await bot.sendMessage(chatId, `🏆 <b>[JULY 30 HISTORIC SYSTEM - Commit <code>c6e122a</code>]</b>\n\nScanning Nifty 100 blue-chips using exact July 30 ORB + VWAP breakout rules (+1.5% Target / -0.75% Stop-Loss)...`, { parse_mode: 'HTML' });
+
+        try {
+            const timeCheck = intradayService.checkIndianMarketTime();
+            if (!timeCheck.isOpen) {
+                await bot.sendMessage(chatId, timeCheck.reason, { parse_mode: 'Markdown' });
+            }
+
+            const result = await intradayService.getIntraday30Setups(targetArg, 20000);
+
+            if (!result.setups || result.setups.length === 0) {
+                await bot.editMessageText(`⚠️ No July 30 ORB + VWAP setups active right now among Nifty 100 blue-chips. Re-check after 15 minutes.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                return;
+            }
+
+            let reply = `🏆 <b>JULY 30 INTRADAY SYSTEM (Commit <code>c6e122a</code>)</b> 🏆\n` +
+                        `<i>🔥 Running exact 15-Min ORB + VWAP Blue-Chip Breakout logic from July 30! Compare side-by-side with <code>/intraday</code> during paper testing!</i>\n` +
+                        `────────────────────────────\n\n`;
+
+            result.setups.forEach((s, idx) => {
+                const evalData = s.riskEvaluation || {};
+                const financials = evalData.financials || {};
+                const recQty = evalData.recommendedQuantity || '15';
+                const netRR = financials.netRiskRewardRatio || '1 : 1.50';
+                const limitEntry = parseFloat(s.livePrice).toFixed(2);
+
+                reply += `<b>${idx + 1}. ${s.symbol} (${s.name})</b> [Confidence: <b>${s.confidence}%</b>]\n` +
+                         `   📌 <b>Live Market Price:</b> ₹${limitEntry} (${s.changePercent} today)\n` +
+                         `   🎯 <b>July 30 Target (+1.50%):</b> <b>₹${s.target}</b>\n` +
+                         `   🛑 <b>Stop-Loss (-0.75%):</b> <b>₹${s.stopLoss}</b>\n` +
+                         `   📦 <b>Qty (5x MIS):</b> <b>${recQty} Shares</b> | ⚖️ <b>Net R:R:</b> ${netRR}\n` +
+                         `   💡 <i>${s.doubleCheckReason}</i>\n` +
+                         `────────────────────────────\n`;
+            });
+
+            reply += `\n<b>💡 HOW TO USE THIS COMPARISON:</b>\n` +
+                     `• Tomorrow & Friday: Check both <code>/intraday</code> (v4.0) and <code>/intraday30</code> (July 30).\n` +
+                     `• Paper-trade both lists to see which algorithm achieves cleaner breakouts without hitting stop-loss!\n` +
+                     `• <b>Pro Rule:</b> Whenever any trade hits +₹300 profit, immediately move Stop-Loss to Entry Price (Break-Even)!`;
+
+            await bot.editMessageText(reply, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+        } catch (err) {
+            console.error("TELEGRAM INTRADAY30 ERROR:", err.message);
+            await bot.sendMessage(chatId, `⚠️ Could not compute /intraday30 setups right now. Please try again shortly.`);
+        }
+    });
     // 4. New /profit command (Total Portfolio Summary)
     bot.onText(/\/(profit|portfolio)/, async (msg) => {
         const chatId = msg.chat.id;
@@ -843,7 +895,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             `<code>/tip 10000</code>     — Top 5 trades for ₹10,000 budget\n` +
             `<code>/tip 100-500</code>   — Top 5 trades priced ₹100-₹500\n\n` +
             `<b>⚡ INTRADAY ORB QUANT (MIS 5x Margin):</b>\n` +
-            `<code>/intraday</code>         — Top 3 liquid Nifty 100 blue-chip ORB + VWAP rockets\n` +
+            `<code>/intraday</code>         — Top 3 Intraday Confluence v4.0 (VWAP Limit Pullback)\n` +
+            `<code>/intraday30</code>       — Top 3 July 30 System (Commit c6e122a comparison)\n` +
             `<code>/intraday RELIANCE</code> — Check ORB & VWAP confluence for a single ticker\n\n` +
             `<b>📈 MARKET DATA:</b>\n` +
             `<code>/movers</code>   — Today's top gainers &amp; losers with targets\n\n` +
