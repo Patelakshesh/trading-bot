@@ -218,9 +218,9 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 continue;
             }
 
-            // FILTER 2: MOMENTUM CONVICTION FLOOR (Strict +1.25% floor to remove slow gainers, ceiling at +4.25% to stop chasing tops)
+            // FILTER 2: EARLY ACCUMULATION SWEET SPOT (+0.40% to +2.20%). Captures emerging breakouts before afternoon resistance!
             if (!targetSymbol) {
-                if (changeVal < 1.25 || changeVal > 4.25) continue;
+                if (changeVal < 0.40 || changeVal > 2.20) continue;
                 if (timeStatus.isOpen && buyerDominance !== null && buyerDominance < 53) {
                     console.log(`[Order Book] Skipping ${sym}: Insufficient buyer control (Buyer Dominance: ${buyerDominance}% < 53%).`);
                     continue;
@@ -255,11 +255,13 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 continue;
             }
 
-            // CONFLUENCE SCORING SYSTEM
+            // EARLY ACCUMULATION SCORING ENGINE: Reward high buyer dominance, volume velocity, and early launchpad (+0.5% to +1.6%)
             const domScore = buyerDominance !== null ? buyerDominance : 60;
             const newsScore = newsCheck.status === 'POSITIVE' ? 250 : 50;
-            const score = Math.round((changeVal * 150) + (domScore * 10) + newsScore);
-            const confidence = Math.min(92, Math.max(75, Math.round(68 + changeVal * 3 + (domScore - 50) * 0.5)));
+            const sweetSpotBonus = (changeVal >= 0.50 && changeVal <= 1.60) ? 200 : 80;
+            const volScore = Math.min(150, Math.round((volume || 200000) / 20000));
+            const score = Math.round((domScore * 20) + sweetSpotBonus + newsScore + volScore);
+            const confidence = Math.min(94, Math.max(78, Math.round(72 + (domScore - 50) * 0.8 + (changeVal >= 0.50 && changeVal <= 1.60 ? 8 : 0))));
 
             verifiedSetups.push({
                 symbol: sym,
@@ -334,8 +336,8 @@ async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
 
             if (!targetSymbol && isCircuitLocked) continue;
 
-            // JULY 30 RULE 1: Change percent strictly between +1.25% and +5.50%
-            if (!targetSymbol && (changeVal < 1.25 || changeVal > 5.5)) continue;
+            // JULY 30 RULE 1: Change percent strictly between +0.40% and +2.20% (Protected from chasing late-stage tops!)
+            if (!targetSymbol && (changeVal < 0.40 || changeVal > 2.20)) continue;
 
             // JULY 30 EXACT VWAP ESTIMATION FORMULA (Commit c6e122a)
             const typicalPrice = (high + low + price) / 3;
@@ -359,10 +361,11 @@ async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
             const riskEval = riskManager.evaluateTradeViability(sym, price, targetP, stopLossP, capital, true);
             if (!targetSymbol && !riskEval.approved) continue;
 
-            // JULY 30 EXACT DETERMINISTIC QUANTITATIVE SCORE FORMULA
+            // JULY 30 EXACT DETERMINISTIC QUANTITATIVE SCORE FORMULA (With Early Accumulation Advantage)
             let quantScore = 55;
             if (isAboveVwap) quantScore += 20;
             if (isAboveOrb) quantScore += 15;
+            if (changeVal >= 0.50 && changeVal <= 1.60) quantScore += 8; // Early breakout launchpad bonus
             const volBonus = Math.min(10, Math.floor((live.volume || 150000) / 50000));
             quantScore += volBonus;
             if (quantScore > 97) quantScore = 97;
@@ -453,8 +456,8 @@ async function getTop10MarketSetups(capital = 20000) {
                 continue;
             }
 
-            // FILTER 2: STRICT MOMENTUM WINDOW (+1.25% to < 4.50%). Remove stagnant <1.25% movers and over-extended >=4.5% tops!
-            if (changeVal < 1.25 || changeVal >= 4.50) continue;
+            // FILTER 2: EARLY ACCUMULATION SWEET SPOT (+0.40% to +2.20%). Captures confirmed early order-book runners!
+            if (changeVal < 0.40 || changeVal > 2.20) continue;
 
             // FILTER 3: INSTITUTIONAL ORDER BOOK MANDATE (Require real buyer dominance >= 53% during active market hours)
             if (timeStatus.isOpen && buyerDominance !== null && buyerDominance < 53) {
@@ -485,8 +488,9 @@ async function getTop10MarketSetups(capital = 20000) {
 
             const domScore = buyerDominance !== null ? buyerDominance : 60;
             const newsScore = newsCheck.status === 'POSITIVE' ? 300 : 80;
-            const score = Math.round((changeVal * 160) + (domScore * 12) + newsScore + (Math.min(volume, 5000000) / 50000));
-            const confidence = Math.min(96, Math.max(76, Math.round(70 + changeVal * 3.5 + (domScore - 50) * 0.4)));
+            const sweetSpotBonus = (changeVal >= 0.50 && changeVal <= 1.60) ? 250 : 100;
+            const score = Math.round((domScore * 22) + sweetSpotBonus + newsScore + (Math.min(volume, 5000000) / 40000));
+            const confidence = Math.min(96, Math.max(76, Math.round(74 + (domScore - 50) * 0.6 + (changeVal >= 0.50 && changeVal <= 1.60 ? 7 : 0))));
 
             verifiedSetups.push({
                 symbol: sym,
@@ -580,9 +584,11 @@ async function getCombinedMasterSetups(capital = 20000) {
     if (top10Result.setups) top10Result.setups.forEach(x => addPick(x, "Top 10 All-Cap", "🌟"));
 
     const allCandidates = Array.from(map.values()).sort((a, b) => {
-        // Boost high-conviction momentum (>1.5% day gain and strong buyer dominance) over slow giants
-        const aBoost = (parseFloat(a.changePercent) >= 1.5 ? 200 : 0) + (parseInt(a.buyerDominance) >= 55 ? 150 : 0);
-        const bBoost = (parseFloat(b.changePercent) >= 1.5 ? 200 : 0) + (parseInt(b.buyerDominance) >= 55 ? 150 : 0);
+        // Boost Early Accumulation Sweet Spot (+0.5% to +1.8%) and strong order-book buyer dominance
+        const aGain = parseFloat((a.changePercent || '').replace('+', '').replace('%', '')) || 1.0;
+        const bGain = parseFloat((b.changePercent || '').replace('+', '').replace('%', '')) || 1.0;
+        const aBoost = ((aGain >= 0.50 && aGain <= 1.80) ? 300 : 0) + (parseInt(a.buyerDominance) >= 55 ? 200 : 0);
+        const bBoost = ((bGain >= 0.50 && bGain <= 1.80) ? 300 : 0) + (parseInt(b.buyerDominance) >= 55 ? 200 : 0);
         if (b.sources.length !== a.sources.length) return b.sources.length - a.sources.length;
         return ((b.combinedScore || 0) + bBoost) - ((a.combinedScore || 0) + aBoost);
     });
