@@ -62,7 +62,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
-        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/intraday` - Top 3 Intraday Confluence v4.0 (VWAP Limit Pullback)\n`/intraday30` - Top 3 July 30 System (Commit c6e122a comparison)\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
+        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/top10` - Top 10 All-Cap Winners (Small, Mid & Large Cap)\n`/intraday` - Top 3 Intraday Confluence v4.0 (VWAP Limit Pullback)\n`/intraday30` - Top 3 July 30 System (Commit c6e122a comparison)\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
     });
 
     // 1. Upgraded /bought command to automatically fetch live price if omitted
@@ -806,6 +806,54 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             await bot.sendMessage(chatId, `⚠️ Could not compute /intraday30 setups right now. Please try again shortly.`);
         }
     });
+
+    // 3D. ALL-CAP MARKET TOP 10 SCANNER: /top10 (Small, Mid & Large Cap Winners with News & <4.5% Circuit Shield)
+    bot.onText(/^\/(?:top10|market10|allcaps)$/, async (msg) => {
+        const chatId = msg.chat.id;
+
+        const statusMsg = await bot.sendMessage(chatId, `🌟 <b>[ALL-CAP TOP 10 QUANT ENGINE]</b>\n\nScanning Indian Market across <b>Small Cap, Mid Cap & Large Cap</b> liquid leaders...\n🛡️ <i>Filter Active: Excludes low volume pumps & stocks up >= 4.5% to prevent buying exhausted moves!</i>`, { parse_mode: 'HTML' });
+
+        try {
+            const timeCheck = intradayService.checkIndianMarketTime();
+            if (!timeCheck.isOpen) {
+                await bot.sendMessage(chatId, timeCheck.reason, { parse_mode: 'Markdown' });
+            }
+
+            const result = await intradayService.getTop10MarketSetups(20000);
+
+            if (!result.setups || result.setups.length === 0) {
+                await bot.editMessageText(`⚠️ No verified All-Cap momentum leaders active right now. Re-check after 15 minutes!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                return;
+            }
+
+            let reply = `🌟 <b>TOP 10 ALL-CAP MARKET WINNERS</b> 🌟\n` +
+                        `<i>🔥 Filtered across Large, Mid & Small Caps with Live Order-Book & Domestic News Verification! (Capped below +4.5% to reject pump traps!)</i>\n` +
+                        `────────────────────────────\n\n`;
+
+            result.setups.forEach((s, idx) => {
+                const evalData = s.riskEvaluation || {};
+                const recQty = evalData.recommendedQuantity || '15';
+                const limitEntry = parseFloat(s.livePrice).toFixed(2);
+
+                reply += `<b>${idx + 1}. ${s.symbol} (${s.name})</b> [${s.capCategory}]\n` +
+                         `   💰 <b>Price:</b> ₹${limitEntry} (${s.changePercent}) | 🔥 <b>Buyers:</b> ${s.buyerDominance}\n` +
+                         `   🎯 <b>Target (+1.8%):</b> ₹${s.target} | 🛑 <b>SL (-0.65%):</b> ₹${s.stopLoss}\n` +
+                         `   📦 <b>5x MIS Size:</b> ${recQty} Shares | ⭐ <b>Confidence:</b> ${s.confidence}%\n` +
+                         `   💡 <i>${s.newsHeadline || s.doubleCheckReason}</i>\n` +
+                         `────────────────────────────\n`;
+            });
+
+            reply += `\n<b>💡 HOW TO USE THIS MASTER LIST TO COMPOUND ₹4,000 → ₹10,000:</b>\n` +
+                     `• <b>Thursday & Friday (Paper Test):</b> Run <code>/top10</code>, <code>/intraday</code>, and <code>/intraday30</code> at 9:31 AM. Note how cleanly these Small/Mid cap news runners perform without risking capital!\n` +
+                     `• <b>Monday Morning (Execution):</b> Pick only the <b>#1 Ranked Leader</b> from this Top 10 list! Place a Limit Buy Order at VWAP between 9:35 AM and 10:05 AM.\n` +
+                     `• <b>Zero-Loss Rule:</b> As soon as profit touches +₹300, immediately move Stop-Loss to Entry Price (Break-Even)! Never let a green trade turn red!`;
+
+            await bot.editMessageText(reply, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+        } catch (err) {
+            console.error("TELEGRAM TOP10 ERROR:", err.message);
+            await bot.sendMessage(chatId, `⚠️ Could not compute /top10 setups right now. Please try again shortly.`);
+        }
+    });
     // 4. New /profit command (Total Portfolio Summary)
     bot.onText(/\/(profit|portfolio)/, async (msg) => {
         const chatId = msg.chat.id;
@@ -895,6 +943,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             `<code>/tip 10000</code>     — Top 5 trades for ₹10,000 budget\n` +
             `<code>/tip 100-500</code>   — Top 5 trades priced ₹100-₹500\n\n` +
             `<b>⚡ INTRADAY ORB QUANT (MIS 5x Margin):</b>\n` +
+            `<code>/top10</code>            — Top 10 All-Cap Winners (Small, Mid & Large Cap)\n` +
             `<code>/intraday</code>         — Top 3 Intraday Confluence v4.0 (VWAP Limit Pullback)\n` +
             `<code>/intraday30</code>       — Top 3 July 30 System (Commit c6e122a comparison)\n` +
             `<code>/intraday RELIANCE</code> — Check ORB & VWAP confluence for a single ticker\n\n` +
