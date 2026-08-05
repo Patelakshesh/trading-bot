@@ -221,7 +221,7 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             // FILTER 2: MOMENTUM CONVICTION FLOOR (Strict +1.25% floor to remove slow gainers, ceiling at +4.25% to stop chasing tops)
             if (!targetSymbol) {
                 if (changeVal < 1.25 || changeVal > 4.25) continue;
-                if (buyerDominance !== null && buyerDominance < 53) {
+                if (timeStatus.isOpen && buyerDominance !== null && buyerDominance < 53) {
                     console.log(`[Order Book] Skipping ${sym}: Insufficient buyer control (Buyer Dominance: ${buyerDominance}% < 53%).`);
                     continue;
                 }
@@ -456,8 +456,8 @@ async function getTop10MarketSetups(capital = 20000) {
             // FILTER 2: STRICT MOMENTUM WINDOW (+1.25% to < 4.50%). Remove stagnant <1.25% movers and over-extended >=4.5% tops!
             if (changeVal < 1.25 || changeVal >= 4.50) continue;
 
-            // FILTER 3: INSTITUTIONAL ORDER BOOK MANDATE (Require real buyer dominance >= 53%)
-            if (buyerDominance !== null && buyerDominance < 53) {
+            // FILTER 3: INSTITUTIONAL ORDER BOOK MANDATE (Require real buyer dominance >= 53% during active market hours)
+            if (timeStatus.isOpen && buyerDominance !== null && buyerDominance < 53) {
                 console.log(`[Top 10 Shield] Skipping ${sym}: Buyer dominance below 53% (${buyerDominance}%).`);
                 continue;
             }
