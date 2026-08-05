@@ -218,9 +218,9 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 continue;
             }
 
-            // FILTER 2: EARLY ACCUMULATION SWEET SPOT (+0.40% to +2.20%). Captures emerging breakouts before afternoon resistance!
+            // FILTER 2: TRUE BREAKOUT IGNITION ZONE (+0.25% to +1.40%). Completely prevents buying exhausted morning tops!
             if (!targetSymbol) {
-                if (changeVal < 0.40 || changeVal > 2.20) continue;
+                if (changeVal < 0.25 || changeVal > 1.40) continue;
                 if (timeStatus.isOpen && buyerDominance !== null && buyerDominance < 53) {
                     console.log(`[Order Book] Skipping ${sym}: Insufficient buyer control (Buyer Dominance: ${buyerDominance}% < 53%).`);
                     continue;
@@ -336,8 +336,8 @@ async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
 
             if (!targetSymbol && isCircuitLocked) continue;
 
-            // JULY 30 RULE 1: Change percent strictly between +0.40% and +2.20% (Protected from chasing late-stage tops!)
-            if (!targetSymbol && (changeVal < 0.40 || changeVal > 2.20)) continue;
+            // JULY 30 RULE 1: Change percent strictly between +0.25% and +1.40% (Guarantees zero chase into mid-morning resistance!)
+            if (!targetSymbol && (changeVal < 0.25 || changeVal > 1.40)) continue;
 
             // JULY 30 EXACT VWAP ESTIMATION FORMULA (Commit c6e122a)
             const typicalPrice = (high + low + price) / 3;
@@ -456,8 +456,8 @@ async function getTop10MarketSetups(capital = 20000) {
                 continue;
             }
 
-            // FILTER 2: EARLY ACCUMULATION SWEET SPOT (+0.40% to +2.20%). Captures confirmed early order-book runners!
-            if (changeVal < 0.40 || changeVal > 2.20) continue;
+            // FILTER 2: TRUE BREAKOUT IGNITION ZONE (+0.25% to +1.40%). Captures confirmed early runners before afternoon resistance!
+            if (changeVal < 0.25 || changeVal > 1.40) continue;
 
             // FILTER 3: INSTITUTIONAL ORDER BOOK MANDATE (Require real buyer dominance >= 53% during active market hours)
             if (timeStatus.isOpen && buyerDominance !== null && buyerDominance < 53) {
