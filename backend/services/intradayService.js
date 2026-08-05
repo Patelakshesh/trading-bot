@@ -36,8 +36,9 @@ const PEER_GROUPS = [
     ['DLF', 'ULTRACEMCO', 'GRASIM', 'TITAN', 'ASIANPAINT', 'BRITANNIA', 'HINDUNILVR', 'ZOMATO']
 ];
 
-// Session Cache: locks today's top momentum runners to prevent random daytime shuffling
-const dailySetupCache = { dateStr: null, setups: null };
+// Smart Rolling Cache (2-minute buffer to prevent API spam while dynamically discovering 10:00 AM breakouts)
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes live refresh interval
+const dailySetupCache = { timestamp: 0, setups: null };
 
 // 1. LIVE GROWW ORDER-BOOK & LIQUIDITY SCANNER
 async function getRealGrowwMetrics(symbol) {
@@ -185,11 +186,11 @@ function checkIndianMarketTime() {
 async function getIntradaySetups(targetSymbol = null, capital = 20000) {
     const timeStatus = checkIndianMarketTime();
     const now = new Date();
-    const todayStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+    const nowTs = Date.now();
 
-    // SESSION LOCK: Return locked Top 3 picks for consistent execution during the trading day!
-    if (!targetSymbol && dailySetupCache.dateStr === todayStr && dailySetupCache.setups?.length > 0) {
-        console.log(`🔒 [SESSION LOCK] Returning today's locked Top 3 Intraday leaders for ${todayStr}.`);
+    // SMART ROLLING BUFFER: Re-scan market cleanly every 2 minutes to catch evolving 9:45-10:15 AM breakouts!
+    if (!targetSymbol && nowTs < dailySetupCache.timestamp + CACHE_TTL_MS && dailySetupCache.setups?.length > 0) {
+        console.log(`⏱️ [LIVE BUFFER] Returning active 2-minute scan window (next live refresh shortly)...`);
         return { timeStatus, setups: dailySetupCache.setups };
     }
 
@@ -286,11 +287,11 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
     verifiedSetups.sort((a, b) => b.score - a.score);
     const topPicks = verifiedSetups.slice(0, 3);
 
-    // Lock session cache for today
+    // Update rolling scan buffer
     if (!targetSymbol && topPicks.length > 0) {
-        dailySetupCache.dateStr = todayStr;
+        dailySetupCache.timestamp = Date.now();
         dailySetupCache.setups = topPicks;
-        console.log(`🔒 [SESSION SAVED] Locked today's Top ${topPicks.length} leaders for ${todayStr}.`);
+        console.log(`⚡ [LIVE REFRESH] Updated active Top ${topPicks.length} leaders for current market window.`);
     }
 
     return {
@@ -299,17 +300,16 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
     };
 }
 
-// Session Cache for July 30 comparison system
-const dailySetup30Cache = { dateStr: null, setups: null };
+// Rolling cache for July 30 comparison system
+const dailySetup30Cache = { timestamp: 0, setups: null };
 
 // 6. JULY 30 HISTORIC SYSTEM (Commit c6e122a Replication for Side-by-Side Validation)
 async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
     const timeStatus = checkIndianMarketTime();
-    const now = new Date();
-    const todayStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+    const nowTs = Date.now();
 
-    if (!targetSymbol && dailySetup30Cache.dateStr === todayStr && dailySetup30Cache.setups?.length > 0) {
-        console.log(`🔒 [JULY 30 SESSION LOCK] Returning locked Top 3 picks for ${todayStr}.`);
+    if (!targetSymbol && nowTs < dailySetup30Cache.timestamp + CACHE_TTL_MS && dailySetup30Cache.setups?.length > 0) {
+        console.log(`⏱️ [JULY 30 BUFFER] Returning active scan window.`);
         return { timeStatus, setups: dailySetup30Cache.setups };
     }
 
@@ -377,9 +377,9 @@ async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
     const topPicks = verifiedSetups.slice(0, 3);
 
     if (!targetSymbol && topPicks.length > 0) {
-        dailySetup30Cache.dateStr = todayStr;
+        dailySetup30Cache.timestamp = Date.now();
         dailySetup30Cache.setups = topPicks;
-        console.log(`🔒 [JULY 30 SESSION SAVED] Locked Top ${topPicks.length} leaders for ${todayStr}.`);
+        console.log(`⚡ [JULY 30 LIVE REFRESH] Updated Top ${topPicks.length} breakout runners.`);
     }
 
     return { timeStatus, setups: topPicks };
@@ -408,16 +408,15 @@ const SMALL_CAPS = [
 ];
 
 const ALL_CAP_UNIVERSE = [...LARGE_CAPS, ...MID_CAPS, ...SMALL_CAPS];
-const dailyTop10Cache = { dateStr: null, setups: null };
+const dailyTop10Cache = { timestamp: 0, setups: null };
 
 // 7. ALL-CAP MARKET TOP 10 SCANNER (/top10 — Small, Mid & Large Cap Winners with News & Circuit Shield)
 async function getTop10MarketSetups(capital = 20000) {
     const timeStatus = checkIndianMarketTime();
-    const now = new Date();
-    const todayStr = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+    const nowTs = Date.now();
 
-    if (dailyTop10Cache.dateStr === todayStr && dailyTop10Cache.setups?.length > 0) {
-        console.log(`🔒 [TOP 10 SESSION LOCK] Returning locked All-Cap Top 10 leaders for ${todayStr}.`);
+    if (nowTs < dailyTop10Cache.timestamp + CACHE_TTL_MS && dailyTop10Cache.setups?.length > 0) {
+        console.log(`⏱️ [TOP 10 BUFFER] Returning active scan window.`);
         return { timeStatus, setups: dailyTop10Cache.setups };
     }
 
@@ -500,9 +499,9 @@ async function getTop10MarketSetups(capital = 20000) {
     const top10Picks = verifiedSetups.slice(0, 10);
 
     if (top10Picks.length > 0) {
-        dailyTop10Cache.dateStr = todayStr;
+        dailyTop10Cache.timestamp = Date.now();
         dailyTop10Cache.setups = top10Picks;
-        console.log(`🔒 [TOP 10 SESSION SAVED] Locked Top ${top10Picks.length} leaders for ${todayStr}.`);
+        console.log(`⚡ [TOP 10 LIVE REFRESH] Updated Top ${top10Picks.length} All-Cap leaders.`);
     }
 
     return { timeStatus, setups: top10Picks };
