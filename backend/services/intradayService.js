@@ -130,6 +130,7 @@ async function getRealGrowwMetrics(symbol) {
                 }
                 const prevClose = parseFloat(data.dayChange ? (gPrice - data.dayChange) : (data.previousClose || gPrice * 0.985));
                 const changeVal = prevClose > 0 ? ((gPrice - prevClose) / prevClose) * 100 : 0;
+                const isCircuitLocked = (sellQty === 0 || buyQty === 0 || (data.highPriceRange && gPrice >= data.highPriceRange * 0.999) || (gPrice === parseFloat(data.open) && gPrice === parseFloat(data.high) && gPrice === parseFloat(data.low)));
                 return {
                     price: gPrice,
                     high: parseFloat(data.high || gPrice * 1.01),
@@ -139,7 +140,8 @@ async function getRealGrowwMetrics(symbol) {
                     volume: parseFloat(data.volume || 0),
                     buyQty,
                     sellQty,
-                    orderBookBuyerDominance
+                    orderBookBuyerDominance,
+                    isCircuitLocked
                 };
             }
         }
@@ -266,6 +268,7 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 let chVal = parseFloat(fb.ch.replace('%', ''));
                 let buyerDominanceVal = 78; // Conservative fallback default
                 let realOrderBookVerified = false;
+                let isCircuit = false;
 
                 const growwMetrics = await getRealGrowwMetrics(fb.s);
                 if (growwMetrics) {
@@ -276,10 +279,18 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                         buyerDominanceVal = growwMetrics.orderBookBuyerDominance;
                         realOrderBookVerified = true;
                     }
+                    if (growwMetrics.isCircuitLocked) isCircuit = true;
                 }
 
-                // STRICT FILTER: Eliminate minus/sluggish price changes (< +0.30%)
-                if (!targetSymbol && (chVal < 0.30 || isNaN(chVal))) {
+                // UPPER CIRCUIT LOCK SHIELD: Reject un-tradeable stocks with zero sellers!
+                if (!targetSymbol && isCircuit) {
+                    console.warn(`[Circuit Lock Shield] Excluding ${fb.s} due to Upper Circuit lock or 0 sell orders (Un-tradeable)!`);
+                    continue;
+                }
+
+                // GOLDILOCKS MOMENTUM WINDOW: Eliminate sluggish movers (< +0.40%) or overly extended runners (> +4.20%)
+                if (!targetSymbol && (chVal < 0.40 || chVal > 4.20 || isNaN(chVal))) {
+                    console.warn(`[Goldilocks Filter] Excluding ${fb.s} outside breakout safe window (${chVal}%).`);
                     continue;
                 }
 
@@ -351,20 +362,22 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             const currentVolume = parseFloat(q.regularMarketVolume || q.volume) || 0;
             const avgVolume = parseFloat(q.averageDailyVolume10Day || q.averageVolume) || parseFloat(q.averageDailyVolume3Month) || currentVolume;
 
-            // REAL ORDER-BOOK DEPTH CHECK VIA GROWW LIVE
+            // REAL ORDER-BOOK & CIRCUIT LOCK DEPTH CHECK VIA GROWW LIVE
             let buyerDominancePercent = 75;
             let orderBookVerified = false;
+            let isCircuitLocked = false;
             const growwMetrics = await getRealGrowwMetrics(symbol);
             if (growwMetrics) {
                 if (growwMetrics.orderBookBuyerDominance !== null) {
                     buyerDominancePercent = growwMetrics.orderBookBuyerDominance;
                     orderBookVerified = true;
                 }
+                if (growwMetrics.isCircuitLocked) isCircuitLocked = true;
             } else {
-                // Fallback to high/low bar positioning if order book is unreachable
                 const totalRange = dayHigh - dayLow;
                 const buyerDominanceRatio = totalRange > 0 ? ((livePrice - dayLow) / totalRange) * 100 : 75;
                 buyerDominancePercent = Math.min(100, Math.max(0, parseFloat(buyerDominanceRatio.toFixed(0))));
+                if (totalRange === 0 && livePrice > previousClose) isCircuitLocked = true;
             }
 
             // 1. VWAP & OPENING RANGE HIGH (ORB) APPROXIMATION
@@ -385,8 +398,8 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             const changePercentVal = ((livePrice - previousClose) / previousClose) * 100;
             const changePercent = parseFloat(changePercentVal.toFixed(2));
 
-            // STRICT MINUS STOCK FILTER: Exclude red stocks, sluggish movers (< +0.30%), or seller-heavy order books
-            if (!targetSymbol && (changePercent < 0.30 || (orderBookVerified && buyerDominancePercent < 55))) {
+            // UPPER CIRCUIT LOCK SHIELD & GOLDILOCKS WINDOW (No un-tradeable stocks, no sluggish movers <+0.4%, no extended tops >+4.2%)
+            if (!targetSymbol && (isCircuitLocked || changePercent < 0.40 || changePercent > 4.20 || (orderBookVerified && buyerDominancePercent < 55))) {
                 continue;
             }
 
