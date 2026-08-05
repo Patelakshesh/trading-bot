@@ -714,32 +714,38 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
 
                 reply += `\n<i>🌅 Get ready for tomorrow at 9:31 AM sharp! When the market opens, this command automatically switches back to Live Execution Buy Orders with precise share sizing & automated Target/Stop-Loss levels!</i>`;
             } else {
-                // STANDARD LIVE INTRADAY ROCKETS SCANNER (/intraday during 9:15 AM - 3:30 PM IST)
-                reply += `⚡ <b>PRO INTRADAY 3-LAYER CONFLUENCE ROCKETS (MIS 5x LEVERAGE)</b> ⚡\n` +
-                         `<i>⏰ MANDATORY RULE: Close all open trades by 3:10 PM IST! Never hold an MIS position overnight!</i>\n` +
+                // VWAP PULLBACK PRECISION ENTRY GUIDE (9:40-10:05 AM window — NOT at 9:31 AM spike!)
+                reply += `⚡ <b>INTRADAY VWAP PULLBACK ENTRY GUIDE</b> ⚡\n` +
+                         `<i>🚨 DO NOT buy at 9:31 AM spike! Wait for the pullback between 9:40–10:05 AM and place a LIMIT order at the VWAP price shown below!</i>\n` +
                          `────────────────────────────\n\n`;
 
                 result.setups.forEach((s, idx) => {
                     const evalData = s.riskEvaluation || {};
                     const financials = evalData.financials || {};
-                    const recQty = evalData.recommendedQuantity || "15";
-                    const netRR = financials.netRiskRewardRatio || "1 : 2.50";
-                    const totalFees = financials.totalFeesAndTaxes || "42.50";
+                    const recQty = evalData.recommendedQuantity || '15';
+                    const netRR = financials.netRiskRewardRatio || '1 : 2.00';
+                    const totalFees = financials.totalFeesAndTaxes || '55.00';
+                    const limitEntry = parseFloat(s.vwap || s.livePrice).toFixed(2);
+                    const targetPct = ((parseFloat(s.target) - parseFloat(s.livePrice)) / parseFloat(s.livePrice) * 100).toFixed(1);
 
                     reply += `<b>${idx + 1}. ${s.symbol} (${s.name})</b> [Confidence: <b>${s.confidence}%</b>]\n` +
-                             `   💰 <b>Live Price:</b> ₹${s.livePrice} (${s.changePercent})\n` +
-                             `   📊 <b>VWAP:</b> ₹${s.vwap} | <b>9:30 AM High:</b> ₹${s.orbHigh}\n` +
-                             `   🔥 <b>Buyer Dominance:</b> <b>${s.buyerDominance || '85%'}</b> | 🌊 <b>Sector:</b> <b>${s.sectorInfo || 'Aligned'}</b>\n` +
-                             `   ⚡ <b>Volume Surge:</b> ${s.volumeSurge} of average\n` +
-                             `   🎯 <b>Target (+2.0%):</b> ₹${s.target}\n` +
-                             `   🛑 <b>Tight Stop-Loss (-0.75%):</b> ₹${s.stopLoss}\n` +
-                             `   ⚖️ <b>Recommended Qty (5x Margin):</b> <b>${recQty} Shares</b>\n` +
-                             `   🛡️ <b>Net Risk/Reward:</b> ${netRR} (After ₹${totalFees} tax/brokerage)\n` +
-                             `   💡 <i>Reason: 3-Layer Confluence! Verified >65% buyer control & rising sector wave above VWAP anchor!</i>\n` +
+                             `   ⚠️ <b>Current Spike (DO NOT BUY NOW):</b> ₹${s.livePrice} (${s.changePercent})\n` +
+                             `   ✅ <b>VWAP LIMIT BUY Price:</b> <b>₹${limitEntry}</b> ← Enter this in Groww\n` +
+                             `   ⏰ <b>Entry Window:</b> <b>9:40 AM – 10:05 AM ONLY</b>\n` +
+                             `   🎯 <b>Profit Target:</b> ₹${s.target} (+${targetPct}%)\n` +
+                             `   🛑 <b>Stop-Loss:</b> ₹${s.stopLoss} (Place simultaneously!)\n` +
+                             `   📦 <b>Qty (5x MIS):</b> <b>${recQty} Shares</b> | ⚖️ <b>Net R:R:</b> ${netRR}\n` +
+                             `   🔥 <b>Buyers:</b> ${s.buyerDominance} | 🌊 <b>Sector:</b> ${s.sectorInfo}\n` +
+                             `   💡 <i>${s.doubleCheckReason}</i>\n` +
                              `────────────────────────────\n`;
                 });
 
-                reply += `\n<i>📉 Risk Notice: Intraday leverage cuts both ways. Always attach an automated Stop-Loss order simultaneously when buying!</i>`;
+                reply += `\n<b>📋 HOW TO EXECUTE IN GROWW (3 Steps):</b>\n` +
+                         `<b>Step 1:</b> Open Groww → Search stock → Tap BUY → Select <b>MIS</b>\n` +
+                         `<b>Step 2:</b> Change to <b>LIMIT</b> order → Enter the VWAP price above\n` +
+                         `<b>Step 3:</b> Set Stop-Loss simultaneously → Confirm\n` +
+                         `<i>⏰ Not filled by 10:05 AM → Cancel. Never chase the price higher!</i>\n` +
+                         `<i>🔒 Close ALL positions before 3:05 PM IST. No exceptions!</i>`;
             }
 
             await bot.editMessageText(reply, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
