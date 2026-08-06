@@ -218,10 +218,10 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 continue;
             }
 
-            // FILTER 2: ULTRA-CONFLUENCE PROFIT MAKER ZONE (+0.20% to +1.20% & No Arbitrage Financials/PSUs). Eliminates morning fakeouts!
+            // FILTER 2: MID & SMALL CAP HIGH-PROFIT IGNITION ZONE (+0.25% to +1.55% & Zero Arbitrage Drag)
             if (!targetSymbol) {
-                if (changeVal < 0.20 || changeVal > 1.20) continue;
-                if (/BANK|SBI|BHEL|BEL|ONGC|NTPC|POWER|SOUTH|YES|SUZLON|KARUR|BAJ|FIN|HDFC|ICICI|CELLO|LT|CHOLA|MUTHOOT/i.test(sym)) continue;
+                if (changeVal < 0.25 || changeVal > 1.55) continue;
+                if (/BANK|SBI|BHEL|BEL|ONGC|NTPC|POWER|SOUTH|YES|SUZLON|KARUR|BAJ|FIN|HDFC|ICICI|CELLO|LT|CHOLA|MUTHOOT|ANGEL|CAMS|CDSL|BSE|RVNL|MCX|MAZDOCK|COCHINSHIP|HAL/i.test(sym)) continue;
                 if (timeStatus.isOpen && buyerDominance !== null && buyerDominance < 53) {
                     console.log(`[Order Book] Skipping ${sym}: Insufficient buyer control (Buyer Dominance: ${buyerDominance}% < 53%).`);
                     continue;
@@ -256,13 +256,15 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
                 continue;
             }
 
-            // EARLY ACCUMULATION SCORING ENGINE: Reward high buyer dominance, volume velocity, and early launchpad (+0.5% to +1.6%)
+            // EARLY ACCUMULATION SCORING ENGINE: Massive priority bonus for explosive Mid & Small Cap high-growth runners!
+            const isLargeCap = /RELIANCE|TCS|HDFCBANK|ICICIBANK|INFY|SBI|BHARTIARTL|ITC|LT|TATAMOTORS|M&M|SUNPHARMA|TITAN|BAJFINANCE|ASIANPAINT|WIPRO|HCLTECH|POWERGRID|TATASTEEL|ZOMATO|TATACONSUM|DIVISLAB|CIPLA|ULTRACEMCO|COALINDIA|APOLLOHOSP|GRASIM|HINDALCO/i.test(sym);
+            const midSmallCapBonus = !isLargeCap ? 5000 : 0; // Ensures explosive Mid/Small Caps are surfaced first!
             const domScore = buyerDominance !== null ? buyerDominance : 60;
             const newsScore = newsCheck.status === 'POSITIVE' ? 250 : 50;
-            const sweetSpotBonus = (changeVal >= 0.50 && changeVal <= 1.60) ? 200 : 80;
+            const sweetSpotBonus = (changeVal >= 0.40 && changeVal <= 1.45) ? 200 : 80;
             const volScore = Math.min(150, Math.round((volume || 200000) / 20000));
-            const score = Math.round((domScore * 20) + sweetSpotBonus + newsScore + volScore);
-            const confidence = Math.min(94, Math.max(78, Math.round(72 + (domScore - 50) * 0.8 + (changeVal >= 0.50 && changeVal <= 1.60 ? 8 : 0))));
+            const score = Math.round((domScore * 20) + sweetSpotBonus + newsScore + volScore + midSmallCapBonus);
+            const confidence = Math.min(96, Math.max(78, Math.round(74 + (domScore - 50) * 0.8 + (!isLargeCap ? 8 : 0))));
 
             verifiedSetups.push({
                 symbol: sym,
@@ -337,8 +339,8 @@ async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
 
             if (!targetSymbol && isCircuitLocked) continue;
 
-            // JULY 30 RULE 1: Change percent strictly between +0.20% and +1.20% (Guarantees zero chase into mid-morning resistance!)
-            if (!targetSymbol && (changeVal < 0.20 || changeVal > 1.20 || /BANK|SBI|BHEL|BEL|ONGC|NTPC|POWER|SOUTH|YES|SUZLON|KARUR|BAJ|FIN|HDFC|ICICI|CELLO|LT|CHOLA|MUTHOOT/i.test(sym))) continue;
+            // JULY 30 RULE 1: Change percent strictly between +0.25% and +1.55% (Captures explosive mid-cap runners before afternoon resistance!)
+            if (!targetSymbol && (changeVal < 0.25 || changeVal > 1.55 || /BANK|SBI|BHEL|BEL|ONGC|NTPC|POWER|SOUTH|YES|SUZLON|KARUR|BAJ|FIN|HDFC|ICICI|CELLO|LT|CHOLA|MUTHOOT|ANGEL|CAMS|CDSL|BSE|RVNL|MCX|MAZDOCK|COCHINSHIP|HAL/i.test(sym))) continue;
 
             // JULY 30 EXACT VWAP ESTIMATION FORMULA (Commit c6e122a)
             const typicalPrice = (high + low + price) / 3;
@@ -362,14 +364,15 @@ async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
             const riskEval = riskManager.evaluateTradeViability(sym, price, targetP, stopLossP, capital, true);
             if (!targetSymbol && !riskEval.approved) continue;
 
-            // JULY 30 EXACT DETERMINISTIC QUANTITATIVE SCORE FORMULA (With Early Accumulation Advantage)
-            let quantScore = 55;
+            // QUANTITATIVE SCORE FORMULA: Heavy Quantitative Priority for Explosive Mid & Small Cap Runners!
+            const isLargeCap = /RELIANCE|TCS|HDFCBANK|ICICIBANK|INFY|SBI|BHARTIARTL|ITC|LT|TATAMOTORS|M&M|SUNPHARMA|TITAN|BAJFINANCE|ASIANPAINT|WIPRO|HCLTECH|POWERGRID|TATASTEEL|ZOMATO|TATACONSUM|DIVISLAB|CIPLA|ULTRACEMCO|COALINDIA|APOLLOHOSP|GRASIM|HINDALCO/i.test(sym);
+            let quantScore = !isLargeCap ? 85 : 55; // Huge 30-point baseline boost for Mid & Small Caps!
             if (isAboveVwap) quantScore += 20;
             if (isAboveOrb) quantScore += 15;
-            if (changeVal >= 0.50 && changeVal <= 1.60) quantScore += 8; // Early breakout launchpad bonus
+            if (changeVal >= 0.35 && changeVal <= 1.45) quantScore += 10; // Sweet spot launchpad bonus
             const volBonus = Math.min(10, Math.floor((live.volume || 150000) / 50000));
             quantScore += volBonus;
-            if (quantScore > 97) quantScore = 97;
+            if (quantScore > 98) quantScore = 98;
 
             verifiedSetups.push({
                 symbol: sym,
@@ -379,14 +382,14 @@ async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
                 vwap: estimatedVwap.toFixed(2),
                 orbHigh: estimatedOrbHigh.toFixed(2),
                 buyerDominance: buyerDominance !== null ? `${buyerDominance}%` : 'Verified',
-                sectorInfo: 'July 30 c6e122a Aligned',
+                sectorInfo: !isLargeCap ? 'High-Profit Mid/Small Cap Runner' : 'July 30 c6e122a Aligned',
                 isAboveVwap,
                 isAboveOrb,
                 target: targetP.toFixed(2),
                 stopLoss: stopLossP.toFixed(2),
                 riskEvaluation: riskEval,
-                doubleCheckReason: `Exact July 30 c6e122a algorithm verified: Trading above 15-Minute ORB (₹${estimatedOrbHigh.toFixed(2)}) & VWAP (₹${estimatedVwap.toFixed(2)})!`,
-                score: (quantScore * 1000) + Math.round((changeVal * 100)),
+                doubleCheckReason: `Exact algorithm verified: Trading above 15-Min ORB (₹${estimatedOrbHigh.toFixed(2)}) & VWAP (₹${estimatedVwap.toFixed(2)})!`,
+                score: (quantScore * 1000) + (!isLargeCap ? 50000 : 0) + Math.round((changeVal * 100)),
                 confidence: quantScore
             });
         } catch (err) {
@@ -457,8 +460,8 @@ async function getTop10MarketSetups(capital = 20000) {
                 continue;
             }
 
-            // FILTER 2: ULTRA-CONFLUENCE PROFIT MAKER ZONE (+0.20% to +1.20%). Captures pure high-growth tech & industrial runners!
-            if (changeVal < 0.20 || changeVal > 1.20 || /BANK|SBI|BHEL|BEL|ONGC|NTPC|POWER|SOUTH|YES|SUZLON|KARUR|BAJ|FIN|HDFC|ICICI|CELLO|LT|CHOLA|MUTHOOT/i.test(sym)) continue;
+            // FILTER 2: MID & SMALL CAP HIGH-PROFIT IGNITION ZONE (+0.25% to +1.55%). Captures high-growth tech & industrial runners!
+            if (changeVal < 0.25 || changeVal > 1.55 || /BANK|SBI|BHEL|BEL|ONGC|NTPC|POWER|SOUTH|YES|SUZLON|KARUR|BAJ|FIN|HDFC|ICICI|CELLO|LT|CHOLA|MUTHOOT|ANGEL|CAMS|CDSL|BSE|RVNL|MCX|MAZDOCK|COCHINSHIP|HAL/i.test(sym)) continue;
 
             // FILTER 3: INSTITUTIONAL ORDER BOOK MANDATE (Require real buyer dominance >= 53% during active market hours)
             if (timeStatus.isOpen && buyerDominance !== null && buyerDominance < 53) {
