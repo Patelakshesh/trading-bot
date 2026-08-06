@@ -906,7 +906,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     bot.onText(/^\/(?:best|master|super|combine)$/, async (msg) => {
         const chatId = msg.chat.id;
 
-        const statusMsg = await bot.sendMessage(chatId, `🌟 <b>[MASTER SUPER-CONFLUENCE ENGINE]</b> 🌟\n\n⚡ Intersecting all three quantitative detection layers (<b>v4.0 Quant</b>, <b>July 30 ORB</b> & <b>All-Cap Top 10</b>)...\n🧠 Running institutional cross-verification & AI Trend Shield to find today's <b>Top 2 Super-Winners</b>!`, { parse_mode: 'HTML' });
+        const statusMsg = await bot.sendMessage(chatId, `🌟 <b>[MASTER SUPER-CONFLUENCE ENGINE]</b> 🌟\n\n⚡ Intersecting all three quantitative detection layers (<b>v4.0 Quant</b>, <b>July 30 ORB</b> & <b>All-Cap Top 10</b>)...\n🧠 Running institutional cross-verification & AI Trend Shield to find today's <b>Top 5 Super-Winners</b>!`, { parse_mode: 'HTML' });
 
         try {
             const timeCheck = intradayService.checkIndianMarketTime();
@@ -921,11 +921,11 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 return;
             }
 
-            let reply = `🏆 <b>THE #1 MASTER COMBINED INTRADAY SETUPS</b> 🏆\n` +
+            let reply = `🏆 <b>THE #1 MASTER COMBINED INTRADAY SETUPS (TOP 5)</b> 🏆\n` +
                         `<i>🔥 Intersected across v4.0 Order-Book Confluence, July 30 ORB Engine & All-Cap News Shield + AI Tip Verification!</i>\n` +
                         `────────────────────────────\n\n`;
 
-            result.setups.slice(0, 2).forEach((s, idx) => {
+            result.setups.slice(0, 5).forEach((s, idx) => {
                 const evalData = s.riskEvaluation || {};
                 const recQty = evalData.recommendedQuantity || '20';
                 const limitEntry = parseFloat(s.livePrice).toFixed(2);
@@ -944,7 +944,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             });
 
             reply += `\n<b>👑 HOW TO EXECUTE WITH CONFIDENCE:</b>\n` +
-                     `1️⃣ <b>Thursday & Friday:</b> Check <code>/best</code> at <b>9:31 AM SHARP</b>. Write down the #1 ranked pick and verify on paper how cleanly it bounces from its VWAP Buy Limit Price!\n` +
+                     `1️⃣ <b>Thursday & Friday:</b> Check <code>/best</code> at <b>9:31 AM SHARP</b>. Write down your preferred leader and verify on paper how cleanly it bounces from its VWAP Buy Limit Price!\n` +
                      `2️⃣ <b>Monday Live Trade:</b> Type <code>/best</code> at 9:31 AM. Place a Limit Buy order at the exact <b>VWAP Pullback Price</b> between <b>9:35 AM and 10:05 AM</b>.\n` +
                      `3️⃣ <b>Zero-Loss Rule:</b> The moment your position crosses <b>+₹300 profit</b>, immediately shift your Stop-Loss to your Entry Price (Break-Even)!`;
 
