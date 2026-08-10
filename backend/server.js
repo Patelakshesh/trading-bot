@@ -6,6 +6,9 @@ const cron = require('node-cron');
 const TelegramBot = require('node-telegram-bot-api').default || require('node-telegram-bot-api');
 
 const Portfolio = require('./models/Portfolio');
+const Watchlist = require('./models/Watchlist');
+const Admin = require('./models/Admin');
+const TradeLog = require('./models/TradeLog');
 const AnalysisLog = require('./models/AnalysisLog');
 const { getLatestNews } = require('./services/newsService');
 const { getStockPrice, searchSymbol } = require('./services/stockService');
@@ -1464,6 +1467,16 @@ cron.schedule('*/15 * * * *', async () => {
                 for (let chatId of allUsers) {
                     if (chatId !== 'UI_USER') bot.sendMessage(chatId, tipMsg, {parse_mode: 'HTML'});
                 }
+
+                // Log the trade in MongoDB
+                await TradeLog.create({
+                    strategy: 'intraday_v4',
+                    symbol: bestSetup.symbol,
+                    entryPrice: parseFloat(bestSetup.livePrice),
+                    targetPrice: parseFloat(bestSetup.target),
+                    stopLossPrice: parseFloat(bestSetup.stopLoss),
+                    predictiveScore: bestSetup.score
+                });
             }
         }
 
@@ -1484,11 +1497,91 @@ cron.schedule('*/15 * * * *', async () => {
                     for (let chatId of allUsers) {
                         if (chatId !== 'UI_USER') bot.sendMessage(chatId, fnoMsg, {parse_mode: 'HTML'});
                     }
+
+                    // Extract prices via simple regex fallback (since message structure is fixed)
+                    let entry = 0, target = 0, sl = 0;
+                    try {
+                        const priceMatches = fnoMsg.match(/₹[\d.]+/g);
+                        if (priceMatches && priceMatches.length >= 3) {
+                            entry = parseFloat(priceMatches[0].replace('₹', ''));
+                            target = parseFloat(priceMatches[1].replace('₹', ''));
+                            sl = parseFloat(priceMatches[2].replace('₹', ''));
+                        }
+                    } catch(e) {}
+                    
+                    if (entry > 0) {
+                        await TradeLog.create({
+                            strategy: 'fno',
+                            symbol: asset.toUpperCase(),
+                            entryPrice: entry,
+                            targetPrice: target,
+                            stopLossPrice: sl
+                        });
+                    }
                 }
             }
         }
     } catch (err) {
         console.error('Error in Auto-Notification CRON:', err);
+    }
+});
+
+// =========================================================================
+// 🎯 TRADE LOGGER & TRAILING STOP-LOSS AUTO-CHECKER (Runs every 10 mins)
+// =========================================================================
+cron.schedule('*/10 * * * *', async () => {
+    try {
+        const pendingTrades = await TradeLog.find({ outcome: 'PENDING' });
+        if (pendingTrades.length === 0) return;
+
+        console.log(`[TradeLog] Checking ${pendingTrades.length} pending signals...`);
+        const { getStockPrice } = require('./services/stockService');
+
+        for (const trade of pendingTrades) {
+            const currentPrice = await getStockPrice(trade.symbol);
+            if (!currentPrice || isNaN(currentPrice)) continue;
+
+            const timeHeld = Date.now() - trade.signalTime.getTime();
+            
+            // 1. Check Trailing Stop-Loss (If up +1%, move SL to Entry)
+            if (currentPrice >= trade.entryPrice * 1.01 && trade.stopLossPrice < trade.entryPrice) {
+                console.log(`[TradeLog] ${trade.symbol} is up >1%. Trailing SL moved to entry (₹${trade.entryPrice})`);
+                trade.stopLossPrice = trade.entryPrice;
+                await trade.save();
+            }
+
+            // 2. Check Hit Target
+            if (currentPrice >= trade.targetPrice) {
+                trade.outcome = 'WIN';
+                trade.exitPrice = currentPrice;
+                trade.exitTime = Date.now();
+                trade.pnlAmount = currentPrice - trade.entryPrice;
+                trade.pnlPercent = ((currentPrice - trade.entryPrice) / trade.entryPrice) * 100;
+                await trade.save();
+                console.log(`🏆 [TradeLog] WIN: ${trade.symbol} hit target!`);
+            }
+            // 3. Check Hit Stop Loss
+            else if (currentPrice <= trade.stopLossPrice) {
+                trade.outcome = 'LOSS';
+                trade.exitPrice = currentPrice;
+                trade.exitTime = Date.now();
+                trade.pnlAmount = currentPrice - trade.entryPrice;
+                trade.pnlPercent = ((currentPrice - trade.entryPrice) / trade.entryPrice) * 100;
+                await trade.save();
+                console.log(`💔 [TradeLog] LOSS: ${trade.symbol} hit stop-loss!`);
+            }
+            // 4. Timeout Check (End of day expiry for intraday)
+            else if (timeHeld > 8 * 60 * 60 * 1000) { 
+                trade.outcome = 'TIMEOUT';
+                trade.exitPrice = currentPrice;
+                trade.exitTime = Date.now();
+                trade.pnlAmount = currentPrice - trade.entryPrice;
+                trade.pnlPercent = ((currentPrice - trade.entryPrice) / trade.entryPrice) * 100;
+                await trade.save();
+            }
+        }
+    } catch (err) {
+        console.error('[TradeLog] Error in tracker:', err);
     }
 });
 

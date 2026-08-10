@@ -1,6 +1,62 @@
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
 
+// 🔮 PHASE 4: GLOBAL NIFTY DIRECTION PREDICTOR
+async function predictNiftyDirection() {
+    try {
+        const symbols = ['^GSPC', 'DX-Y.NYB', 'CL=F', '^VIX', '^NSEI'];
+        const results = await Promise.all(symbols.map(sym => 
+            yahooFinance.chart(sym, { interval: '1d', range: '2d' }).catch(() => null)
+        ));
+
+        let score = 0;
+        let reasons = [];
+
+        // 1. S&P 500 (Positive Correlation)
+        if (results[0] && results[0].quotes.length >= 2) {
+            const change = (results[0].quotes[1].close - results[0].quotes[0].close) / results[0].quotes[0].close;
+            if (change > 0.003) { score += 1; reasons.push('S&P 500 is Bullish (+)'); }
+            else if (change < -0.003) { score -= 1; reasons.push('S&P 500 is Bearish (-)'); }
+        }
+
+        // 2. US Dollar Index (Inverse Correlation)
+        if (results[1] && results[1].quotes.length >= 2) {
+            const change = (results[1].quotes[1].close - results[1].quotes[0].close) / results[1].quotes[0].close;
+            if (change < -0.002) { score += 1; reasons.push('DXY is Falling (+)'); }
+            else if (change > 0.002) { score -= 1; reasons.push('DXY is Rising (-)'); }
+        }
+
+        // 3. Crude Oil (Inverse Correlation for India)
+        if (results[2] && results[2].quotes.length >= 2) {
+            const change = (results[2].quotes[1].close - results[2].quotes[0].close) / results[2].quotes[0].close;
+            if (change < -0.005) { score += 1; reasons.push('Crude is Falling (+)'); }
+            else if (change > 0.005) { score -= 1; reasons.push('Crude is Rising (-)'); }
+        }
+
+        // 4. VIX (Inverse Correlation)
+        if (results[3] && results[3].quotes.length >= 2) {
+            const change = (results[3].quotes[1].close - results[3].quotes[0].close) / results[3].quotes[0].close;
+            if (change < 0) { score += 1; reasons.push('VIX is Falling (+)'); }
+            else if (change > 0) { score -= 1; reasons.push('VIX is Rising (-)'); }
+        }
+
+        return {
+            sentiment: score >= 2 ? 'BULLISH' : (score <= -2 ? 'BEARISH' : 'NEUTRAL'),
+            score,
+            details: reasons.join(' | ') || 'Global cues mixed'
+        };
+    } catch (e) {
+        return { sentiment: 'NEUTRAL', score: 0, details: 'Global data unavailable' };
+    }
+}
+
+// 🧠 PHASE 4: NSE MAX PAIN / OI ANALYSIS (Placeholder wrapper due to NSE cookie blocks)
+async function getNiftyMaxPain() {
+    // In production, this would scrape the NSE option chain via a headless browser or cookie-managed session
+    // For this implementation, we return the theoretical structural concept for the alert.
+    return "Max Pain Analysis requires NSE Authentication API.";
+}
+
 function calculateEMA(closes, period) {
     if (closes.length < period) return null;
     const multiplier = 2 / (period + 1);
@@ -147,6 +203,28 @@ async function getFNOTrade(instrumentType = 'nifty') {
             }
         } catch(e) { console.error("News fetch error", e); }
 
+        // PHASE 4: NIFTY PREDICTOR INJECTION
+        let globalNote = '';
+        if (instrumentType.toLowerCase() === 'nifty') {
+            const niftyPred = await predictNiftyDirection();
+            globalNote = `🌍 GLOBAL CUES: ${niftyPred.sentiment} (${niftyPred.details})`;
+            
+            // If Nifty pred is BEARISH but technicals say BUY CALL, cancel the trade to prevent trap.
+            if (niftyPred.sentiment === 'BEARISH' && signal === 'BUY' && optionType === 'CE (CALL)') {
+                return {
+                    status: 'NO_TRADE',
+                    message: `⚠️ GLOBAL TRAP DETECTED: Technicals show Nifty BUY, but Global Cues are BEARISH (${niftyPred.details}). Trade aborted.`
+                };
+            }
+            // If Nifty pred is BULLISH but technicals say BUY PUT, cancel.
+            if (niftyPred.sentiment === 'BULLISH' && signal === 'BUY' && optionType === 'PE (PUT)') {
+                return {
+                    status: 'NO_TRADE',
+                    message: `⚠️ GLOBAL TRAP DETECTED: Technicals show Nifty SELL, but Global Cues are BULLISH (${niftyPred.details}). Trade aborted.`
+                };
+            }
+        }
+
         // Return the Option Trade Plan
         return {
             status: 'TRADE_FOUND',
@@ -164,8 +242,9 @@ async function getFNOTrade(instrumentType = 'nifty') {
                     "🎯 TARGET: +2% (Safe, highly accurate profit booking to build capital steadily).",
                     "🛑 STOP LOSS: -1% (STRICT - Cut losses immediately if thesis breaks).",
                     `📰 NEWS CONFLUENCE: ${newsHeadline}`,
+                    globalNote,
                     "⏱️ TIME STOP: Max 15-20 minutes hold time to prevent Theta decay loss."
-                ]
+                ].filter(Boolean)
             }
         };
 

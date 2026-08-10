@@ -7,14 +7,14 @@
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
 const riskManager = require('./riskService');
-const { EMA, ATR } = require('technicalindicators');
+const { EMA, ATR, bullishhammer, bullishengulfingpattern } = require('technicalindicators');
 
 // ==========================================
-// 🧠 PHASE 1 MATH VERIFICATION ENGINE
+// 🧠 PHASE 1, 3 & 5 MATH VERIFICATION ENGINE
 // ==========================================
 async function validateIntradayMath(symbol, currentPrice, currentVolume) {
     try {
-        // 1. Fetch Intraday 5-min chart for EMA Trend
+        // 1. Fetch Intraday 5-min chart for EMA Trend, VWAP, and Patterns
         const d5m = await yahooFinance.chart(symbol, { interval: '5m', range: '1d' }).catch(() => null);
         
         // 2. Fetch Daily chart for ATR and Volume Avg
@@ -50,6 +50,37 @@ async function validateIntradayMath(symbol, currentPrice, currentVolume) {
              return { valid: false, reason: `Volume is too weak (${volumeRatio.toFixed(2)}x of avg). Fake breakout risk.` };
         }
 
+        // PHASE 3: TRUE VWAP CALCULATION
+        let cumulativeTPV = 0;
+        let cumulativeVolume = 0;
+        for (const candle of d5m.quotes) {
+            if (candle.high !== null && candle.low !== null && candle.close !== null && candle.volume !== null) {
+                const typicalPrice = (candle.high + candle.low + candle.close) / 3;
+                cumulativeTPV += typicalPrice * candle.volume;
+                cumulativeVolume += candle.volume;
+            }
+        }
+        const trueVwap = cumulativeVolume > 0 ? (cumulativeTPV / cumulativeVolume) : currentPrice;
+
+        // PHASE 5: CANDLE PATTERN RECOGNITION (Last 3 candles)
+        const recentCandles = d5m.quotes.slice(-3);
+        const inputForPatterns = {
+            open: recentCandles.map(c => c.open),
+            high: recentCandles.map(c => c.high),
+            low: recentCandles.map(c => c.low),
+            close: recentCandles.map(c => c.close)
+        };
+        
+        let patternStr = "";
+        try {
+            const isEngulfing = bullishengulfingpattern(inputForPatterns);
+            if (isEngulfing) patternStr += "Bullish Engulfing";
+            const isHammer = bullishhammer(inputForPatterns);
+            if (isHammer) patternStr += (patternStr ? " & " : "") + "Hammer";
+        } catch(e) {}
+        
+        const patternBonus = patternStr !== "" ? ` | 📈 Pattern: ${patternStr}` : "";
+
         // PRIORITY 5: ATR Dynamic Targets
         const highs = daily.quotes.map(q => q.high).filter(h => h !== null);
         const lows = daily.quotes.map(q => q.low).filter(l => l !== null);
@@ -74,12 +105,13 @@ async function validateIntradayMath(symbol, currentPrice, currentVolume) {
 
         return { 
             valid: true, 
-            reason: `Intraday EMA Trend Confirmed ✅ | Vol Ratio: ${volumeRatio.toFixed(2)}x`, 
+            reason: `Intraday EMA Trend Confirmed ✅ | Vol Ratio: ${volumeRatio.toFixed(2)}x${patternBonus}`, 
             targetP: parseFloat(atrTarget.toFixed(2)), 
-            stopLossP: parseFloat(atrSL.toFixed(2)) 
+            stopLossP: parseFloat(atrSL.toFixed(2)),
+            trueVwap: parseFloat(trueVwap.toFixed(2))
         };
     } catch (e) {
-        return { valid: true, reason: 'Fallback to Standard Target (Math Check Error)', targetP: parseFloat((currentPrice * 1.02).toFixed(2)), stopLossP: parseFloat((currentPrice * 0.99).toFixed(2)) };
+        return { valid: true, reason: 'Fallback to Standard Target (Math Check Error)', targetP: parseFloat((currentPrice * 1.02).toFixed(2)), stopLossP: parseFloat((currentPrice * 0.99).toFixed(2)), trueVwap: currentPrice };
     }
 }
 
@@ -646,10 +678,18 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
         for (const pick of topPicks) {
             const mathEval = await validateIntradayMath(pick.symbol, parseFloat(pick.livePrice), parseInt((pick.volumeSurge || '0').replace(/\D/g,'')) * 10000 || 500000);
             if (mathEval.valid) {
-                // Apply ATR dynamic targets
+                // Apply ATR dynamic targets and true VWAP
                 pick.target = mathEval.targetP.toFixed(2);
                 pick.stopLoss = mathEval.stopLossP.toFixed(2);
+                pick.vwap = mathEval.trueVwap.toFixed(2); // Replace estimated VWAP with True VWAP
+                pick.isAboveVwap = parseFloat(pick.livePrice) >= (mathEval.trueVwap * 0.998);
                 pick.doubleCheckReason += ` | ${mathEval.reason}`;
+                
+                // If it's no longer above true VWAP, we might reject it
+                if (!pick.isAboveVwap) {
+                    console.log(`❌ [MATH REJECT] ${pick.symbol}: Below TRUE VWAP (${pick.vwap})`);
+                    continue;
+                }
                 // Re-evaluate risk with new ATR targets
                 pick.riskEvaluation = riskManager.evaluateTradeViability(pick.symbol, parseFloat(pick.livePrice), mathEval.targetP, mathEval.stopLossP, capital, true);
                 if (pick.riskEvaluation.approved) {
