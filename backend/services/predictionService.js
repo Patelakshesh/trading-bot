@@ -1,17 +1,28 @@
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
-const { RSI, MACD, EMA, BollingerBands } = require('technicalindicators');
+const { RSI, MACD, EMA, SMA, BollingerBands } = require('technicalindicators');
 
 const { INTRADAY_UNIVERSE } = require('./intradayService');
 
 async function calculatePredictionScore(symbol) {
     try {
-        const daily = await yahooFinance.chart(symbol, { interval: '1d', range: '3mo' }).catch(() => null);
-        if (!daily || !daily.quotes || daily.quotes.length < 50) return null;
+        // Fetch 1y data to calculate 200-SMA
+        const daily = await yahooFinance.chart(symbol, { interval: '1d', range: '1y' }).catch(() => null);
+        if (!daily || !daily.quotes || daily.quotes.length < 200) return null;
 
         const quotes = daily.quotes.filter(q => q.close !== null);
         const closes = quotes.map(q => q.close);
         const volumes = quotes.map(q => q.volume);
+        
+        // STEP 4 Fix: 200-SMA Macro Trend Shield
+        const sma200 = SMA.calculate({ period: 200, values: closes });
+        if (sma200.length > 0) {
+            const currentSma200 = sma200[sma200.length - 1];
+            const currentClose = closes[closes.length - 1];
+            if (currentClose < currentSma200) {
+                return null; // Reject: Trading below 200-SMA (Bearish Macro Trend)
+            }
+        }
         
         let score = 0;
         let reasons = [];

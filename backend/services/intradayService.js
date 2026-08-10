@@ -1075,7 +1075,9 @@ async function getCombinedMasterSetups(capital = 20000) {
     if (julResult.setups) julResult.setups.forEach(x => addPick(x, "July 30 ORB", "🏆"));
     if (top10Result.setups) top10Result.setups.forEach(x => addPick(x, "Top 10 All-Cap", "🌟"));
 
-    const allCandidates = Array.from(map.values()).sort((a, b) => {
+    const allCandidates = Array.from(map.values())
+        .filter(c => c.sources.length >= 2) // STEP 1: Strict 2-Engine Consensus Rule
+        .sort((a, b) => {
         const aGain = parseFloat((a.changePercent || '').replace('+', '').replace('%', '')) || 1.0;
         const bGain = parseFloat((b.changePercent || '').replace('+', '').replace('%', '')) || 1.0;
         const aBoost = ((aGain >= 0.50 && aGain <= 1.80) ? 300 : 0) + (parseInt(a.buyerDominance) >= 55 ? 200 : 0);
