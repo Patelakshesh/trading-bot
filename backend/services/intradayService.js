@@ -7,6 +7,81 @@
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
 const riskManager = require('./riskService');
+const { EMA, ATR } = require('technicalindicators');
+
+// ==========================================
+// 🧠 PHASE 1 MATH VERIFICATION ENGINE
+// ==========================================
+async function validateIntradayMath(symbol, currentPrice, currentVolume) {
+    try {
+        // 1. Fetch Intraday 5-min chart for EMA Trend
+        const d5m = await yahooFinance.chart(symbol, { interval: '5m', range: '1d' }).catch(() => null);
+        
+        // 2. Fetch Daily chart for ATR and Volume Avg
+        const daily = await yahooFinance.chart(symbol, { interval: '1d', range: '1mo' }).catch(() => null);
+        
+        if (!d5m || !daily || !d5m.quotes || !daily.quotes || d5m.quotes.length < 15 || daily.quotes.length < 14) {
+            return { valid: true, reason: 'Fallback to Standard Target (API Data Insufficient)', targetP: parseFloat((currentPrice * 1.02).toFixed(2)), stopLossP: parseFloat((currentPrice * 0.99).toFixed(2)) };
+        }
+
+        const m5Closes = d5m.quotes.map(q => q.close).filter(c => c !== null);
+        
+        // PRIORITY 2: Intraday 5-min EMA Confirmation
+        const ema9 = EMA.calculate({ period: 9, values: m5Closes });
+        const ema21 = EMA.calculate({ period: 21, values: m5Closes });
+        
+        if (ema9.length > 0 && ema21.length > 0) {
+            const currentEma9 = ema9[ema9.length - 1];
+            const currentEma21 = ema21[ema21.length - 1];
+            if (currentEma9 <= currentEma21) {
+                return { valid: false, reason: 'Intraday 5-min trend is BEARISH (EMA9 <= EMA21).' };
+            }
+        }
+
+        // PRIORITY 4: Volume Spike Detection
+        const dailyVols = daily.quotes.map(q => q.volume).filter(v => v !== null).slice(-10);
+        const avgVol10d = dailyVols.length > 0 ? dailyVols.reduce((a, b) => a + b, 0) / dailyVols.length : 1;
+        const volumeRatio = currentVolume / avgVol10d;
+        
+        // For early morning (before 10:30), volume will naturally be lower than full daily average, 
+        // so we don't strictly block it, but we log it.
+        const timeH = new Date().getHours();
+        if (timeH >= 11 && volumeRatio < 0.25) {
+             return { valid: false, reason: `Volume is too weak (${volumeRatio.toFixed(2)}x of avg). Fake breakout risk.` };
+        }
+
+        // PRIORITY 5: ATR Dynamic Targets
+        const highs = daily.quotes.map(q => q.high).filter(h => h !== null);
+        const lows = daily.quotes.map(q => q.low).filter(l => l !== null);
+        const closes = daily.quotes.map(q => q.close).filter(c => c !== null);
+        
+        const atrVals = ATR.calculate({ high: highs, low: lows, close: closes, period: 14 });
+        let atrTarget = currentPrice * 1.02;
+        let atrSL = currentPrice * 0.99;
+        
+        if (atrVals.length > 0) {
+            const currentAtr = atrVals[atrVals.length - 1];
+            // Target = 1.5x ATR, SL = 0.75x ATR
+            atrTarget = currentPrice + (currentAtr * 1.5);
+            atrSL = currentPrice - (currentAtr * 0.75);
+            
+            // Safety rails: Cap between 1% and 3.5% target
+            const maxTarget = currentPrice * 1.035;
+            const minTarget = currentPrice * 1.01;
+            atrTarget = Math.min(maxTarget, Math.max(minTarget, atrTarget));
+            atrSL = currentPrice - ((atrTarget - currentPrice) / 2); // Maintain 1:2 RR
+        }
+
+        return { 
+            valid: true, 
+            reason: `Intraday EMA Trend Confirmed ✅ | Vol Ratio: ${volumeRatio.toFixed(2)}x`, 
+            targetP: parseFloat(atrTarget.toFixed(2)), 
+            stopLossP: parseFloat(atrSL.toFixed(2)) 
+        };
+    } catch (e) {
+        return { valid: true, reason: 'Fallback to Standard Target (Math Check Error)', targetP: parseFloat((currentPrice * 1.02).toFixed(2)), stopLossP: parseFloat((currentPrice * 0.99).toFixed(2)) };
+    }
+}
 
 // COMPLETE 191-STOCK MASTER UNIVERSE (Large Cap, Mid Cap & Small Cap High-Alpha Leaders)
 const LARGE_CAPS = [
@@ -562,9 +637,32 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
     }
 
     verifiedSetups.sort((a, b) => b.score - a.score);
-    const topPicks = verifiedSetups.slice(0, 5); // Ensure Top 5 picks
+    let topPicks = verifiedSetups.slice(0, 15); // Take top 15 for deep math verification
 
     if (!targetSymbol && topPicks.length > 0) {
+        console.log(`⏱️ [MATH VERIFICATION] Running deep EMA/ATR validation on top ${topPicks.length} candidates...`);
+        const mathVerifiedPicks = [];
+        
+        for (const pick of topPicks) {
+            const mathEval = await validateIntradayMath(pick.symbol, parseFloat(pick.livePrice), parseInt((pick.volumeSurge || '0').replace(/\D/g,'')) * 10000 || 500000);
+            if (mathEval.valid) {
+                // Apply ATR dynamic targets
+                pick.target = mathEval.targetP.toFixed(2);
+                pick.stopLoss = mathEval.stopLossP.toFixed(2);
+                pick.doubleCheckReason += ` | ${mathEval.reason}`;
+                // Re-evaluate risk with new ATR targets
+                pick.riskEvaluation = riskManager.evaluateTradeViability(pick.symbol, parseFloat(pick.livePrice), mathEval.targetP, mathEval.stopLossP, capital, true);
+                if (pick.riskEvaluation.approved) {
+                    mathVerifiedPicks.push(pick);
+                }
+            } else {
+                console.log(`❌ [MATH REJECT] ${pick.symbol}: ${mathEval.reason}`);
+            }
+            if (mathVerifiedPicks.length >= 5) break; // Stop when we have 5 perfect setups
+        }
+        
+        topPicks = mathVerifiedPicks;
+
         dailySetupCache.timestamp = Date.now();
         dailySetupCache.setups = topPicks;
         console.log(`⚡ [LIVE REFRESH] Updated active Top ${topPicks.length} leaders for current market window.`);
