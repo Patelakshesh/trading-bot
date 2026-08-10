@@ -1071,6 +1071,34 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         }
     });
 
+    // 4.5. New /predict command (Tomorrow's Movers)
+    bot.onText(/\/(predict)/, async (msg) => {
+        const chatId = msg.chat.id;
+        bot.sendMessage(chatId, `🔮 **PREDICTION ENGINE RUNNING...**\nScanning 191 stocks using RSI, MACD, Volume Spikes, and Bollinger Bands. This takes ~30 seconds...`, {parse_mode: 'Markdown'});
+        
+        try {
+            const { generateTomorrowPredictions } = require('./services/predictionService');
+            const predictions = await generateTomorrowPredictions();
+            
+            if (!predictions || predictions.length === 0) {
+                return bot.sendMessage(chatId, `No strong momentum setups detected for tomorrow.`);
+            }
+
+            let reply = `🔮 <b>TOMORROW'S PREDICTED MOVERS</b> 🔮\n\n`;
+            predictions.forEach((p, idx) => {
+                reply += `<b>${idx + 1}. ${p.symbol}</b> (Score: ${p.score}/100)\n` +
+                         `   💰 Close: ₹${p.close}\n` +
+                         `   ⚡ Catalyst: ${p.reasons}\n\n`;
+            });
+            reply += `<i>💡 Watch these stocks at 9:15 AM tomorrow for breakout continuation!</i>`;
+            
+            bot.sendMessage(chatId, reply, {parse_mode: 'HTML'});
+        } catch (error) {
+            console.error('Error generating predictions:', error);
+            bot.sendMessage(chatId, `❌ Error scanning for predictions.`);
+        }
+    });
+
     // 5. /help — Full command list
     bot.onText(/\/(start|help)/, (msg) => {
         const chatId = msg.chat.id;
@@ -1576,6 +1604,37 @@ cron.schedule('15 3 * * 1-5', async () => {
         }
     } catch (err) {
         console.error('[Morning Bell] Error:', err);
+    }
+}, { timezone: 'UTC' });
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔮 EVENING PREDICTION SCORE (Runs every day at 8:30 PM IST)
+// Cron time in UTC: 20:30 IST is 15:00 UTC
+cron.schedule('0 15 * * 1-5', async () => {
+    if (!bot) return;
+    try {
+        console.log('[Prediction CRON] Running Evening Predictor...');
+        const allUsers = await Portfolio.distinct('chatId');
+        const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
+        if (telegramUsers.length === 0) return;
+
+        const { generateTomorrowPredictions } = require('./services/predictionService');
+        const predictions = await generateTomorrowPredictions();
+        
+        if (predictions && predictions.length > 0) {
+            let reply = `🔮 <b>TOMORROW'S TOP ${predictions.length} PREDICTED MOVERS</b> 🔮\n\n`;
+            predictions.forEach((p, idx) => {
+                reply += `<b>${idx + 1}. ${p.symbol}</b> (Score: ${p.score}/100)\n` +
+                         `   💰 Close: ₹${p.close}\n` +
+                         `   ⚡ Catalyst: ${p.reasons}\n\n`;
+            });
+            reply += `<i>💡 Get ready! The /intraday scanner will hunt for these specific tickers at the 9:15 AM open tomorrow!</i>`;
+            
+            for (let chatId of telegramUsers) {
+                bot.sendMessage(chatId, reply, {parse_mode: 'HTML'});
+            }
+        }
+    } catch (err) {
+        console.error('[Prediction CRON] Error:', err);
     }
 }, { timezone: 'UTC' });
 // ─────────────────────────────────────────────────────────────────────────────
