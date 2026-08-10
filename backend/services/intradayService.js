@@ -499,10 +499,10 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             const pullbackFromHigh = ((high - price) / high) * 100;
             if (!targetSymbol && pullbackFromHigh > 1.00) continue; 
 
-            // FILTER 2: 30-DAY EMPIRICAL PROFIT MAKER ZONE (+0.30% to +2.50% & Zero Arbitrage Drag)
+            // FILTER 2: 30-DAY EMPIRICAL PROFIT MAKER ZONE (+0.30% to +2.50%)
             if (!targetSymbol) {
                 if (changeVal < 0.30 || changeVal > 2.50) continue;
-                if (/BANK|SBI|BHEL|BEL|ONGC|NTPC|POWER|SOUTH|YES|SUZLON|KARUR|BAJ|FIN|HDFC|ICICI|CELLO|LT|CHOLA|MUTHOOT|ANGEL|CAMS|CDSL|BSE|RVNL|MCX|MAZDOCK|COCHINSHIP|HAL/i.test(sym)) continue;
+                // Removed toxic sector regex ban to allow banking & finance momentum trades
                 if (timeStatus.isOpen && buyerDominance !== null && buyerDominance < 51) continue;
             }
 
@@ -518,7 +518,7 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             // 🎯 REALISTIC INTRADAY SCALP TARGETS (2.0% Target / 1.0% Stop Loss)
             const targetP = parseFloat((price * 1.02).toFixed(2));
             const stopLossP = parseFloat((price * 0.99).toFixed(2));
-            const vwapAnchor = parseFloat(((high + low + price) / 3).toFixed(2));
+            const estimatedVWAP = parseFloat(((high + low + price) / 3).toFixed(2)); // NOTE: True VWAP requires tick-level API data
 
             const riskEval = riskManager.evaluateTradeViability(sym, price, targetP, stopLossP, capital, true);
             if (!targetSymbol && !riskEval.approved) continue;
@@ -530,14 +530,17 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             const sweetSpotBonus = (changeVal >= 0.40 && changeVal <= 1.45) ? 300 : 50;
             const volScore = Math.min(150, Math.round((volume || 200000) / 20000));
             const score = Math.round((domScore * 20) + sweetSpotBonus + newsScore + volScore + midSmallCapBonus);
-            const confidence = Math.min(96, Math.max(78, Math.round(74 + (domScore - 50) * 0.8 + (!isLargeCap ? 8 : 0))));
+            
+            // Honest Confidence Label (Replaces fabricated percentages)
+            const confidence = (domScore >= 65 && changeVal >= 0.5 && changeVal <= 1.5) ? 'STRONG'
+                             : (domScore >= 55) ? 'MODERATE' : 'SPECULATIVE';
 
             verifiedSetups.push({
                 symbol: sym,
                 name: companyName,
                 livePrice: price.toFixed(2),
                 changePercent: `+${changeVal.toFixed(2)}%`,
-                vwap: vwapAnchor.toFixed(2),
+                vwap: estimatedVWAP.toFixed(2),
                 orbHigh: high.toFixed(2),
                 volumeSurge: `${Math.round(Math.max(15, changeVal * 12))}% above daily avg`,
                 buyerDominance: buyerDominance !== null ? `${buyerDominance}%` : 'Verified >55%',
