@@ -52,11 +52,6 @@ async function run905Test() {
         if (istMin >= 60) { istMin -= 60; istHour += 1; }
         if (istHour >= 24) istHour -= 24;
         
-        const hhmm = istHour.toString().padStart(2, '0') + ':' + istMin.toString().padStart(2, '0');
-        
-        // Only scan 9 PM hour
-        if (istHour !== 21) continue;
-
         if (closes.length < 21) continue;
 
         const ema5 = calculateEMA(closes.slice(-10), 5);
@@ -109,11 +104,12 @@ async function run905Test() {
     const winRate = totalTrades > 0 ? ((wins / totalTrades) * 100).toFixed(2) : 0;
     
     console.log(`\n==========================================`);
-    console.log(`🎯 STRICT 9:00 PM HOUR CRUDE OIL TEST (PRO LOGIC)`);
+    console.log(`🎯 FULL 24-HOUR CRUDE OIL TEST (PRO LOGIC - 60 DAYS)`);
     console.log(`==========================================`);
     console.log(`Total 5-min Candles Scanned: ${totalTrades + noSignal}`);
     console.log(`Trades Blocked (ADX < 25 or Choppy RSI): ${noSignal}`);
-    console.log(`Valid PRO Signals Taken: ${totalTrades}`);
+    console.log(`Valid PRO Signals Triggered: ${totalTrades}`);
+    console.log(`Average Signals Per Day: ${(totalTrades / 60).toFixed(2)} trades/day`);
     console.log(`✅ Wins (+30% Premium): ${wins}`);
     console.log(`❌ Losses (-15% Premium): ${losses}`);
     console.log(`⏳ Timeouts: ${timeouts}`);

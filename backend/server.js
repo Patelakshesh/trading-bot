@@ -734,25 +734,11 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                     const livePriceNum = parseFloat(s.livePrice) || 1000;
                     const morningEntryNum = s.orbHigh ? parseFloat(s.orbHigh) * 0.994 : livePriceNum * 0.985;
                     const shareQty = Math.floor(25000 / morningEntryNum) || 10;
-                    const grossGain = Math.round(shareQty * (livePriceNum - morningEntryNum));
-                    const netWin = Math.max(150, grossGain - 40);
-
-                    let profitStatus = '';
-                    if (approxChangeVal >= 1.8) {
-                        profitStatus = `✅ +₹${Math.max(450, netWin)} Net Profit Achieved! (+2.0% Pro Target Hit)`;
-                    } else if (approxChangeVal >= 0.8) {
-                        profitStatus = `✅ +₹${netWin} Net Profit Achieved! (+${approxChangeVal.toFixed(1)}% Momentum Run)`;
-                    } else {
-                        profitStatus = `🟡 Sideways Consolidation / Controlled Scratch (-₹180)`;
-                    }
-
-                    reply += `<b>${idx + 1}. ${s.symbol} (${s.name})</b> [AI Confidence: <b>${s.confidence}%</b>]\n` +
-                             `   📌 <b>9:31 AM Opening Breakout Level:</b> ~₹${morningEntryNum.toFixed(2)} (Qty: ${shareQty} shares)\n` +
-                             `   🚀 <b>Intraday Closing Price Reached:</b> ₹${s.livePrice} (<b>${s.changePercent} total move!</b>)\n` +
-                             `   🔥 <b>Buyer Dominance Rate:</b> <b>${s.buyerDominance || '100%'}</b> | 🌊 <b>Sector Wave:</b> <b>${s.sectorInfo || 'Aligned'}</b>\n` +
-                             `   💰 <b>Simulated Win Result (₹5k Account via 5x MIS):</b>\n` +
-                             `       👉 <b>${profitStatus}</b>\n` +
-                             `   💡 <i>Daily Review Verdict: Institutional buyer momentum verified at opening bell carried this pick cleanly into winning profit territory today!</i>\n` +
+                    reply += `<b>${idx + 1}. ${s.symbol} (${s.name})</b>\n` +
+                             `   📌 <b>Signal Price:</b> ₹${livePriceNum.toFixed(2)}\n` +
+                             `   🚀 <b>End of Day Change:</b> <b>${s.changePercent}</b>\n` +
+                             `   🔥 <b>Buyer Dominance:</b> <b>${s.buyerDominance || 'N/A'}</b>\n` +
+                             `   📊 <b>System Note:</b> Post-market review (Real P&L requires checking your broker).\n` +
                              `────────────────────────────\n`;
                 });
 
