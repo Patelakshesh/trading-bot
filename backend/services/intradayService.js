@@ -24,7 +24,7 @@ async function validateIntradayMath(symbol, currentPrice, currentVolume) {
         const d1h = await yahooFinance.chart(symbol, { interval: '1h', range: '5d' }).catch(() => null);
         
         if (!d5m || !daily || !d1h || !d5m.quotes || !daily.quotes || !d1h.quotes || d5m.quotes.length < 15 || daily.quotes.length < 14) {
-            return { valid: true, reason: 'Fallback to Standard Target (API Data Insufficient)', targetP: parseFloat((currentPrice * 1.02).toFixed(2)), stopLossP: parseFloat((currentPrice * 0.99).toFixed(2)), trueVwap: currentPrice };
+            return { valid: false, reason: 'Rejected: Yahoo Finance API data insufficient or rate-limited. Safety block active.', targetP: 0, stopLossP: 0, trueVwap: currentPrice };
         }
 
         const m5Closes = d5m.quotes.map(q => q.close).filter(c => c !== null);
@@ -75,11 +75,11 @@ async function validateIntradayMath(symbol, currentPrice, currentVolume) {
         }
         const trueVwap = cumulativeVolume > 0 ? (cumulativeTPV / cumulativeVolume) : currentPrice;
 
-        // STEP 2: 2-Candle VWAP Confirmation (Prevent Whipsaws)
-        const recent2Closes = d5m.quotes.slice(-2).map(c => c.close).filter(c => c !== null);
-        if (recent2Closes.length === 2) {
-            if (recent2Closes[0] < trueVwap || recent2Closes[1] < trueVwap) {
-                return { valid: false, reason: 'Rejected: Needs 2 consecutive 5m candles closed above True VWAP.' };
+        // STEP 2: 2-Candle VWAP Confirmation (Prevent Whipsaws - use CLOSED candles only)
+        const closedCandles = d5m.quotes.slice(-3, -1).map(c => c.close).filter(c => c !== null);
+        if (closedCandles.length === 2) {
+            if (closedCandles[0] < trueVwap || closedCandles[1] < trueVwap) {
+                return { valid: false, reason: 'Rejected: Needs 2 consecutive FULLY CLOSED 5m candles above True VWAP.' };
             }
         }
 
@@ -132,7 +132,7 @@ async function validateIntradayMath(symbol, currentPrice, currentVolume) {
             trueVwap: parseFloat(trueVwap.toFixed(2))
         };
     } catch (e) {
-        return { valid: true, reason: 'Fallback to Standard Target (Math Check Error)', targetP: parseFloat((currentPrice * 1.02).toFixed(2)), stopLossP: parseFloat((currentPrice * 0.99).toFixed(2)), trueVwap: currentPrice };
+        return { valid: false, reason: 'Rejected: Math Check Error / API Timeout. Safety block active.', targetP: 0, stopLossP: 0, trueVwap: currentPrice };
     }
 }
 
@@ -1084,7 +1084,38 @@ async function getCombinedMasterSetups(capital = 20000) {
         return ((b.combinedScore || 0) + bBoost) - ((a.combinedScore || 0) + aBoost);
     });
 
-    const topPicks = allCandidates.slice(0, 5); // Ensure Top 5 Master Super-Winners returned
+    const rawPicks = allCandidates.slice(0, 15); 
+    const verifiedPicks = [];
+
+    console.log(`⏱️ [/best MATH VERIFICATION] Running deep EMA/VWAP/ATR validation on combined candidates...`);
+    for (const pick of rawPicks) {
+        // Run deep math validation on the combined picks
+        const mathEval = await validateIntradayMath(pick.symbol, parseFloat(pick.livePrice), parseInt((pick.volumeSurge || '0').replace(/\D/g,'')) * 10000 || 500000);
+        
+        if (mathEval.valid) {
+            pick.target = mathEval.targetP.toFixed(2);
+            pick.stopLoss = mathEval.stopLossP.toFixed(2);
+            pick.vwap = mathEval.trueVwap.toFixed(2);
+            pick.isAboveVwap = parseFloat(pick.livePrice) >= (mathEval.trueVwap * 0.998);
+            
+            if (!pick.isAboveVwap) {
+                console.log(`❌ [/best MATH REJECT] ${pick.symbol}: Below TRUE VWAP (${pick.vwap})`);
+                continue;
+            }
+            
+            pick.doubleCheckReason = `(Master Engine Verified) | ${mathEval.reason} | Sources: ${pick.sources.join(', ')}`;
+            pick.riskEvaluation = riskManager.evaluateTradeViability(pick.symbol, parseFloat(pick.livePrice), mathEval.targetP, mathEval.stopLossP, capital, true);
+            
+            if (pick.riskEvaluation.approved) {
+                verifiedPicks.push(pick);
+            }
+        } else {
+            console.log(`❌ [/best MATH REJECT] ${pick.symbol}: ${mathEval.reason}`);
+        }
+        if (verifiedPicks.length >= 5) break;
+    }
+
+    const topPicks = verifiedPicks; // Ensure Top 5 Math-Verified Master Super-Winners returned
     return { timeStatus, setups: topPicks };
 }
 

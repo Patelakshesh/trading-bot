@@ -2,16 +2,7 @@ const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
 const { RSI, MACD, EMA, BollingerBands } = require('technicalindicators');
 
-// Same universe as Intraday for consistency
-const LARGE_CAPS = [
-    'RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'ICICIBANK.NS', 'INFY.NS', 'SBI.NS',
-    'BHARTIARTL.NS', 'ITC.NS', 'LT.NS', 'TATAMOTORS.NS', 'BAJFINANCE.NS', 'AXISBANK.NS'
-];
-const MID_CAPS = [
-    'TRENT.NS', 'BHEL.NS', 'HAL.NS', 'DIXON.NS', 'SUZLON.NS', 'RVNL.NS', 'IREDA.NS',
-    'ZOMATO.NS', 'POLYCAB.NS', 'PFC.NS', 'RECLTD.NS', 'IRFC.NS'
-];
-const INTRADAY_UNIVERSE = [...LARGE_CAPS, ...MID_CAPS]; // Simplified list for speed, add more if needed
+const { INTRADAY_UNIVERSE } = require('./intradayService');
 
 async function calculatePredictionScore(symbol) {
     try {
