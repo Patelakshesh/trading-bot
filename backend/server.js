@@ -1421,6 +1421,66 @@ cron.schedule('*/15 * * * *', async () => {
     }
 });
 
+// INSTANT AUTO-NOTIFICATION BROADCASTER FOR F&O AND INTRADAY
+cron.schedule('*/15 * * * *', async () => {
+    if (!bot) return;
+    try {
+        const timeCheck = intradayService.checkIndianMarketTime();
+        if (!timeCheck.isOpen) return; // Only scan during market hours
+
+        console.log('Scanning for Instant Intraday & F&O Auto-Notifications...');
+        const allUsers = await Portfolio.distinct('chatId');
+        if (!allUsers || allUsers.length === 0) return;
+
+        // 1. Check Intraday Setups (Target: 2%, SL: 1%)
+        const intradayResult = await intradayService.getIntradaySetups(null, 20000);
+        if (intradayResult && intradayResult.setups && intradayResult.setups.length > 0) {
+            const bestSetup = intradayResult.setups[0];
+            const alertKey = `INTRADAY_ALERT_${bestSetup.symbol}_${new Date().toISOString().split('T')[0]}`;
+            if (!sentAlertsMemory.has(alertKey)) {
+                sentAlertsMemory.add(alertKey);
+                
+                const recQty = bestSetup.riskEvaluation ? bestSetup.riskEvaluation.recommendedQuantity : "15";
+                
+                const tipMsg = `🚨 <b>INSTANT INTRADAY AUTO-ALERT</b> 🚨\n\n` +
+                               `🔥 <b>${bestSetup.symbol}</b> has a massive Live Order Book Breakout!\n\n` +
+                               `💰 <b>Live Price:</b> ₹${bestSetup.ltp || bestSetup.close}\n` +
+                               `📈 <b>Volume Spike:</b> ${bestSetup.volumeMultiplier || '2.5'}x Average\n` +
+                               `🎯 <b>Target (+2%):</b> ₹${(bestSetup.ltp * 1.02).toFixed(2)}\n` +
+                               `🛡️ <b>SL (-1%):</b> ₹${(bestSetup.ltp * 0.99).toFixed(2)}\n\n` +
+                               `⚡ <b>Action:</b> Buy ${recQty} Shares INSTANTLY.`;
+                
+                for (let chatId of allUsers) {
+                    if (chatId !== 'UI_USER') bot.sendMessage(chatId, tipMsg, {parse_mode: 'HTML'});
+                }
+            }
+        }
+
+        // 2. Check F&O Setups
+        const { getFNOTrade } = require('./services/fnoService');
+        for (const asset of ['crude', 'nifty']) {
+            const fnoResult = await getFNOTrade(asset);
+            if (fnoResult.status !== 'NO_TRADE') {
+                const fnoAlertKey = `FNO_ALERT_${asset}_${new Date().toISOString().split('T')[0]}_${new Date().getHours()}`;
+                if (!sentAlertsMemory.has(fnoAlertKey)) {
+                    sentAlertsMemory.add(fnoAlertKey);
+                    
+                    const fnoMsg = `🚨 <b>INSTANT F&O AUTO-ALERT</b> 🚨\n\n` +
+                                   `🔥 <b>Asset:</b> ${asset.toUpperCase()}\n\n` +
+                                   `${fnoResult.message}\n\n` +
+                                   `⚡ <b>Action:</b> Execute INSTANTLY.`;
+                    
+                    for (let chatId of allUsers) {
+                        if (chatId !== 'UI_USER') bot.sendMessage(chatId, fnoMsg, {parse_mode: 'HTML'});
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error in Auto-Notification CRON:', err);
+    }
+});
+
 // PROACTIVE AI TIP BROADCASTER (Runs every 2 hours, ONLY during market hours)
 cron.schedule('0 */2 * * *', async () => {
     if (!bot) return;
