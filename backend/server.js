@@ -1425,15 +1425,19 @@ cron.schedule('*/15 * * * *', async () => {
 cron.schedule('*/15 * * * *', async () => {
     if (!bot) return;
     try {
-        const timeCheck = intradayService.checkIndianMarketTime();
-        if (!timeCheck.isOpen) return; // Only scan during market hours
-
         console.log('Scanning for Instant Intraday & F&O Auto-Notifications...');
         const allUsers = await Portfolio.distinct('chatId');
         if (!allUsers || allUsers.length === 0) return;
 
-        // 1. Check Intraday Setups (Target: 2%, SL: 1%)
-        const intradayResult = await intradayService.getIntradaySetups(null, 20000);
+        const now = new Date();
+        const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        const h = ist.getHours();
+        const m = ist.getMinutes();
+        const totalMinutes = h * 60 + m;
+
+        // 1. Check Intraday Setups (Only during Equity hours: 9:15 AM - 3:30 PM)
+        if (totalMinutes >= 555 && totalMinutes <= 930) {
+            const intradayResult = await intradayService.getIntradaySetups(null, 20000);
         if (intradayResult && intradayResult.setups && intradayResult.setups.length > 0) {
             const bestSetup = intradayResult.setups[0];
             const alertKey = `INTRADAY_ALERT_${bestSetup.symbol}_${new Date().toISOString().split('T')[0]}`;
@@ -1456,22 +1460,27 @@ cron.schedule('*/15 * * * *', async () => {
             }
         }
 
-        // 2. Check F&O Setups
-        const { getFNOTrade } = require('./services/fnoService');
-        for (const asset of ['crude', 'nifty']) {
-            const fnoResult = await getFNOTrade(asset);
-            if (fnoResult.status !== 'NO_TRADE') {
-                const fnoAlertKey = `FNO_ALERT_${asset}_${new Date().toISOString().split('T')[0]}_${new Date().getHours()}`;
-                if (!sentAlertsMemory.has(fnoAlertKey)) {
-                    sentAlertsMemory.add(fnoAlertKey);
-                    
-                    const fnoMsg = `🚨 <b>INSTANT F&O AUTO-ALERT</b> 🚨\n\n` +
-                                   `🔥 <b>Asset:</b> ${asset.toUpperCase()}\n\n` +
-                                   `${fnoResult.message}\n\n` +
-                                   `⚡ <b>Action:</b> Execute INSTANTLY.`;
-                    
-                    for (let chatId of allUsers) {
-                        if (chatId !== 'UI_USER') bot.sendMessage(chatId, fnoMsg, {parse_mode: 'HTML'});
+        // 2. Check F&O Setups (MCX is open until 11:30 PM / 11:55 PM, so scan all day long!)
+        if (totalMinutes >= 540 && totalMinutes <= 1410) { // 9:00 AM to 11:30 PM
+            const { getFNOTrade } = require('./services/fnoService');
+            for (const asset of ['crude', 'nifty']) {
+                // Skip Nifty after 3:30 PM
+                if (asset === 'nifty' && totalMinutes > 930) continue;
+
+                const fnoResult = await getFNOTrade(asset);
+                if (fnoResult.status !== 'NO_TRADE') {
+                    const fnoAlertKey = `FNO_ALERT_${asset}_${new Date().toISOString().split('T')[0]}_${new Date().getHours()}`;
+                    if (!sentAlertsMemory.has(fnoAlertKey)) {
+                        sentAlertsMemory.add(fnoAlertKey);
+                        
+                        const fnoMsg = `🚨 <b>INSTANT F&O AUTO-ALERT</b> 🚨\n\n` +
+                                       `🔥 <b>Asset:</b> ${asset.toUpperCase()}\n\n` +
+                                       `${fnoResult.message}\n\n` +
+                                       `⚡ <b>Action:</b> Execute INSTANTLY.`;
+                        
+                        for (let chatId of allUsers) {
+                            if (chatId !== 'UI_USER') bot.sendMessage(chatId, fnoMsg, {parse_mode: 'HTML'});
+                        }
                     }
                 }
             }
