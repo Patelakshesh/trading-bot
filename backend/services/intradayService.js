@@ -14,14 +14,14 @@ const { EMA, ATR, bullishhammer, bullishengulfingpattern } = require('technicali
 // ==========================================
 async function validateIntradayMath(symbol, currentPrice, currentVolume) {
     try {
-        // 1. Fetch Intraday 5-min chart for EMA Trend, VWAP, and Patterns
-        const d5m = await yahooFinance.chart(symbol, { interval: '5m', range: '1d' }).catch(() => null);
-        
-        // 2. Fetch Daily chart for ATR and Volume Avg
-        const daily = await yahooFinance.chart(symbol, { interval: '1d', range: '1mo' }).catch(() => null);
+        const now = Math.floor(Date.now() / 1000);
+        const p1_1d = now - (1 * 24 * 60 * 60);
+        const p1_1mo = now - (30 * 24 * 60 * 60);
+        const p1_5d = now - (5 * 24 * 60 * 60);
 
-        // 3. Fetch 1-Hour chart for Macro Trend Confluence (Step 1)
-        const d1h = await yahooFinance.chart(symbol, { interval: '1h', range: '5d' }).catch(() => null);
+        const d5m = await yahooFinance.chart(symbol, { interval: '5m', period1: p1_1d }).catch(() => null);
+        const daily = await yahooFinance.chart(symbol, { interval: '1d', period1: p1_1mo }).catch(() => null);
+        const d1h = await yahooFinance.chart(symbol, { interval: '1h', period1: p1_5d }).catch(() => null);
         
         if (!d5m || !daily || !d1h || !d5m.quotes || !daily.quotes || !d1h.quotes || d5m.quotes.length < 15 || daily.quotes.length < 14) {
             return { valid: false, reason: 'Rejected: Yahoo Finance API data insufficient or rate-limited. Safety block active.', targetP: 0, stopLossP: 0, trueVwap: currentPrice };
