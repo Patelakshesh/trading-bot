@@ -1441,10 +1441,10 @@ cron.schedule('*/15 * * * *', async () => {
                 
                 const tipMsg = `🚨 <b>INSTANT INTRADAY AUTO-ALERT</b> 🚨\n\n` +
                                `🔥 <b>${bestSetup.symbol}</b> has a massive Live Order Book Breakout!\n\n` +
-                               `💰 <b>Live Price:</b> ₹${bestSetup.ltp || bestSetup.close}\n` +
+                               `💰 <b>Live Price:</b> ₹${bestSetup.livePrice}\n` +
                                `📈 <b>Volume Spike:</b> ${bestSetup.volumeMultiplier || '2.5'}x Average\n` +
-                               `🎯 <b>Target (+2%):</b> ₹${(bestSetup.ltp * 1.02).toFixed(2)}\n` +
-                               `🛡️ <b>SL (-1%):</b> ₹${(bestSetup.ltp * 0.99).toFixed(2)}\n\n` +
+                               `🎯 <b>Target (+2%):</b> ₹${bestSetup.target}\n` +
+                               `🛡️ <b>SL (-1%):</b> ₹${bestSetup.stopLoss}\n\n` +
                                `⚡ <b>Action:</b> Buy ${recQty} Shares INSTANTLY.`;
                 
                 for (let chatId of allUsers) {
