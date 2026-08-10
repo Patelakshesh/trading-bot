@@ -19,13 +19,26 @@ async function validateIntradayMath(symbol, currentPrice, currentVolume) {
         
         // 2. Fetch Daily chart for ATR and Volume Avg
         const daily = await yahooFinance.chart(symbol, { interval: '1d', range: '1mo' }).catch(() => null);
+
+        // 3. Fetch 1-Hour chart for Macro Trend Confluence (Step 1)
+        const d1h = await yahooFinance.chart(symbol, { interval: '1h', range: '5d' }).catch(() => null);
         
-        if (!d5m || !daily || !d5m.quotes || !daily.quotes || d5m.quotes.length < 15 || daily.quotes.length < 14) {
-            return { valid: true, reason: 'Fallback to Standard Target (API Data Insufficient)', targetP: parseFloat((currentPrice * 1.02).toFixed(2)), stopLossP: parseFloat((currentPrice * 0.99).toFixed(2)) };
+        if (!d5m || !daily || !d1h || !d5m.quotes || !daily.quotes || !d1h.quotes || d5m.quotes.length < 15 || daily.quotes.length < 14) {
+            return { valid: true, reason: 'Fallback to Standard Target (API Data Insufficient)', targetP: parseFloat((currentPrice * 1.02).toFixed(2)), stopLossP: parseFloat((currentPrice * 0.99).toFixed(2)), trueVwap: currentPrice };
         }
 
         const m5Closes = d5m.quotes.map(q => q.close).filter(c => c !== null);
         
+        // STEP 1: 1-Hour Trend Confluence (Boosts Win Rate)
+        const h1Closes = d1h.quotes.map(q => q.close).filter(c => c !== null);
+        const ema20_1h = EMA.calculate({ period: 20, values: h1Closes });
+        if (ema20_1h.length > 0) {
+            const current1hEma = ema20_1h[ema20_1h.length - 1];
+            if (currentPrice < current1hEma) {
+                return { valid: false, reason: '1-Hour Macro Trend is Bearish (Price < 1H EMA20). Rejecting.' };
+            }
+        }
+
         // PRIORITY 2: Intraday 5-min EMA Confirmation
         const ema9 = EMA.calculate({ period: 9, values: m5Closes });
         const ema21 = EMA.calculate({ period: 21, values: m5Closes });
@@ -61,6 +74,14 @@ async function validateIntradayMath(symbol, currentPrice, currentVolume) {
             }
         }
         const trueVwap = cumulativeVolume > 0 ? (cumulativeTPV / cumulativeVolume) : currentPrice;
+
+        // STEP 2: 2-Candle VWAP Confirmation (Prevent Whipsaws)
+        const recent2Closes = d5m.quotes.slice(-2).map(c => c.close).filter(c => c !== null);
+        if (recent2Closes.length === 2) {
+            if (recent2Closes[0] < trueVwap || recent2Closes[1] < trueVwap) {
+                return { valid: false, reason: 'Rejected: Needs 2 consecutive 5m candles closed above True VWAP.' };
+            }
+        }
 
         // PHASE 5: CANDLE PATTERN RECOGNITION (Last 3 candles)
         const recentCandles = d5m.quotes.slice(-3);

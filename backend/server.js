@@ -1543,9 +1543,16 @@ cron.schedule('*/10 * * * *', async () => {
 
             const timeHeld = Date.now() - trade.signalTime.getTime();
             
-            // 1. Check Trailing Stop-Loss (If up +1%, move SL to Entry)
-            if (currentPrice >= trade.entryPrice * 1.01 && trade.stopLossPrice < trade.entryPrice) {
-                console.log(`[TradeLog] ${trade.symbol} is up >1%. Trailing SL moved to entry (₹${trade.entryPrice})`);
+            // STEP 3: 2-Tier Dynamic Trailing Stop-Loss (Prevents winning trades from turning to losses)
+            // Tier 2: If up +1.2%, move SL to +0.6% Profit
+            if (currentPrice >= trade.entryPrice * 1.012 && trade.stopLossPrice < trade.entryPrice * 1.006) {
+                console.log(`[TradeLog] ${trade.symbol} is up >1.2%. Trailing SL moved to +0.6% Profit (₹${(trade.entryPrice * 1.006).toFixed(2)})`);
+                trade.stopLossPrice = trade.entryPrice * 1.006;
+                await trade.save();
+            }
+            // Tier 1: If up +0.75%, move SL to Entry (Break-Even)
+            else if (currentPrice >= trade.entryPrice * 1.0075 && trade.stopLossPrice < trade.entryPrice) {
+                console.log(`[TradeLog] ${trade.symbol} is up >0.75%. Trailing SL moved to entry (₹${trade.entryPrice})`);
                 trade.stopLossPrice = trade.entryPrice;
                 await trade.save();
             }
