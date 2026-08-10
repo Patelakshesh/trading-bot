@@ -58,14 +58,196 @@ const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes live refresh interval
 const dailySetupCache = { timestamp: 0, setups: null };
 
 // IN-MEMORY METRICS & NEWS CACHE TO ELIMINATE TELEGRAM TIMEOUTS & RATE LIMITS
-const growwQuoteCache = new Map(); // 60 seconds TTL for prices & volumes
+const growwQuoteCache = new Map(); // 15 seconds TTL for rapid execution!
 const newsRssCache = new Map(); // 10 minutes TTL for RSS news headlines
+
+// ============================================================================
+// 🧠 PREDICTIVE INTELLIGENCE LAYER (Signals 1-4 from the Redesign Plan)
+// ============================================================================
+
+// SIGNAL 1: DAILY CHART TREND FILTER (5-EMA > 20-EMA = Uptrend)
+// Refreshes once per day. Only stocks in a confirmed daily uptrend can be recommended.
+const dailyTrendCache = { timestamp: 0, uptrendStocks: new Set(), pivotData: new Map() };
+
+function calculateEMA(closes, period) {
+    if (closes.length < period) return null;
+    const multiplier = 2 / (period + 1);
+    // Seed with SMA of first 'period' values
+    let ema = closes.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < closes.length; i++) {
+        ema = (closes[i] - ema) * multiplier + ema;
+    }
+    return ema;
+}
+
+async function refreshDailyTrendFilter() {
+    const now = Date.now();
+    // Refresh once every 4 hours (only changes at end of day anyway)
+    if (now - dailyTrendCache.timestamp < 4 * 60 * 60 * 1000 && dailyTrendCache.uptrendStocks.size > 0) {
+        return;
+    }
+
+    console.log(`📊 [SIGNAL 1] Scanning daily chart trends for ${ALL_CAP_UNIVERSE.length} stocks (5-EMA vs 20-EMA)...`);
+    const uptrendStocks = new Set();
+    const pivotData = new Map();
+    const batchSize = 10;
+
+    for (let i = 0; i < ALL_CAP_UNIVERSE.length; i += batchSize) {
+        const batch = ALL_CAP_UNIVERSE.slice(i, i + batchSize);
+        await Promise.all(batch.map(async (sym) => {
+            try {
+                const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1mo`;
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 4000);
+                const res = await fetch(url, { signal: ctrl.signal });
+                clearTimeout(timer);
+                if (!res.ok) return;
+
+                const data = await res.json();
+                const result = data.chart?.result?.[0];
+                if (!result) return;
+
+                const quotes = result.indicators.quote[0];
+                const closes = quotes.close.filter(c => c !== null && c > 0);
+                
+                if (closes.length < 20) return;
+
+                const ema5 = calculateEMA(closes, 5);
+                const ema20 = calculateEMA(closes, 20);
+
+                if (ema5 !== null && ema20 !== null && ema5 > ema20) {
+                    uptrendStocks.add(sym);
+                }
+
+                // SIGNAL 3: Calculate Pivot Point Support/Resistance from yesterday's candle
+                const highs = quotes.high.filter(h => h !== null && h > 0);
+                const lows = quotes.low.filter(l => l !== null && l > 0);
+                if (highs.length >= 2 && lows.length >= 2 && closes.length >= 2) {
+                    const yHigh = highs[highs.length - 2]; // Yesterday's high
+                    const yLow = lows[lows.length - 2];     // Yesterday's low
+                    const yClose = closes[closes.length - 2]; // Yesterday's close
+                    const pivot = (yHigh + yLow + yClose) / 3;
+                    const s1 = (2 * pivot) - yHigh; // Support 1
+                    const r1 = (2 * pivot) - yLow;  // Resistance 1
+                    pivotData.set(sym, { pivot: parseFloat(pivot.toFixed(2)), s1: parseFloat(s1.toFixed(2)), r1: parseFloat(r1.toFixed(2)) });
+                }
+            } catch (e) {
+                // Network timeout — skip this stock
+            }
+        }));
+    }
+
+    dailyTrendCache.timestamp = now;
+    dailyTrendCache.uptrendStocks = uptrendStocks;
+    dailyTrendCache.pivotData = pivotData;
+    console.log(`📊 [SIGNAL 1 COMPLETE] ${uptrendStocks.size} out of ${ALL_CAP_UNIVERSE.length} stocks are in a DAILY UPTREND (5-EMA > 20-EMA).`);
+    console.log(`📍 [SIGNAL 3 COMPLETE] Pivot Points calculated for ${pivotData.size} stocks.`);
+}
+
+function isInDailyUptrend(symbol) {
+    return dailyTrendCache.uptrendStocks.has(symbol);
+}
+
+function getPivotLevels(symbol) {
+    return dailyTrendCache.pivotData.get(symbol) || null;
+}
+
+
+// SIGNAL 2: PRE-MARKET GLOBAL CUES (US, Asia, Nifty Futures Sentiment)
+// Refreshes every 30 minutes. Determines if global sentiment is GREEN, YELLOW, or RED.
+const globalSentimentCache = { timestamp: 0, sentiment: 'YELLOW', details: '' };
+
+async function getGlobalMarketSentiment() {
+    const now = Date.now();
+    if (now - globalSentimentCache.timestamp < 30 * 60 * 1000 && globalSentimentCache.sentiment) {
+        return globalSentimentCache;
+    }
+
+    console.log(`🌍 [SIGNAL 2] Checking global market cues (US S&P 500, Nikkei, Nifty)...`);
+    let usChange = 0, asiaChange = 0, niftyChange = 0;
+    let signals = [];
+
+    // Check US S&P 500
+    try {
+        const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=2d`);
+        const data = await res.json();
+        const quotes = data.chart.result[0].indicators.quote[0];
+        const closes = quotes.close.filter(c => c !== null);
+        if (closes.length >= 2) {
+            usChange = ((closes[closes.length - 1] - closes[closes.length - 2]) / closes[closes.length - 2]) * 100;
+            signals.push(`🇺🇸 S&P 500: ${usChange >= 0 ? '+' : ''}${usChange.toFixed(2)}%`);
+        }
+    } catch (e) {}
+
+    // Check Japan Nikkei 225
+    try {
+        const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/%5EN225?interval=1d&range=2d`);
+        const data = await res.json();
+        const quotes = data.chart.result[0].indicators.quote[0];
+        const closes = quotes.close.filter(c => c !== null);
+        if (closes.length >= 2) {
+            asiaChange = ((closes[closes.length - 1] - closes[closes.length - 2]) / closes[closes.length - 2]) * 100;
+            signals.push(`🇯🇵 Nikkei: ${asiaChange >= 0 ? '+' : ''}${asiaChange.toFixed(2)}%`);
+        }
+    } catch (e) {}
+
+    // Check Nifty 50 today
+    try {
+        const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/%5ENSEI?interval=1d&range=1d`);
+        const data = await res.json();
+        const quotes = data.chart.result[0].indicators.quote[0];
+        if (quotes.open[0] && quotes.close[quotes.close.length - 1]) {
+            niftyChange = ((quotes.close[quotes.close.length - 1] - quotes.open[0]) / quotes.open[0]) * 100;
+            signals.push(`🇮🇳 Nifty 50: ${niftyChange >= 0 ? '+' : ''}${niftyChange.toFixed(2)}%`);
+        }
+    } catch (e) {}
+
+    const details = signals.join(' | ');
+    let sentiment = 'YELLOW';
+
+    // RED: US crashed AND Nifty is negative
+    if (usChange < -0.5 && niftyChange < -0.3) {
+        sentiment = 'RED';
+    }
+    // RED: Nifty itself is crashing hard
+    else if (niftyChange < -0.5) {
+        sentiment = 'RED';
+    }
+    // GREEN: US was green AND Nifty is positive
+    else if (usChange > 0 && niftyChange > 0.1) {
+        sentiment = 'GREEN';
+    }
+    // GREEN: Nifty is strongly positive on its own
+    else if (niftyChange > 0.3) {
+        sentiment = 'GREEN';
+    }
+
+    globalSentimentCache.timestamp = now;
+    globalSentimentCache.sentiment = sentiment;
+    globalSentimentCache.details = details;
+    globalSentimentCache.niftyChange = niftyChange;
+
+    console.log(`🌍 [SIGNAL 2 COMPLETE] Global Sentiment: ${sentiment} | ${details}`);
+    return globalSentimentCache;
+}
+
+
+// SIGNAL 4: RELATIVE STRENGTH VS NIFTY
+// A stock must be outperforming Nifty by at least 1.5x to qualify
+function hasRelativeStrength(stockChangePercent, niftyChange) {
+    if (niftyChange <= 0) {
+        // If Nifty is flat or negative, ANY positive stock is a leader
+        return stockChangePercent > 0.3;
+    }
+    // Stock must be gaining at least 1.5x more than Nifty
+    return stockChangePercent >= (niftyChange * 1.5);
+}
 
 // 1. LIVE GROWW ORDER-BOOK & LIQUIDITY SCANNER (With instant memory buffering & failover resilience)
 async function getRealGrowwMetrics(symbol) {
     const now = Date.now();
     const cached = growwQuoteCache.get(symbol);
-    if (cached && (now - cached.timestamp < 60000)) {
+    if (cached && (now - cached.timestamp < 15000)) {
         return cached.data;
     }
     try {
@@ -222,7 +404,7 @@ async function checkPeerConfluence(symbol) {
     return { valid: true, sectorInfo: 'Sector Momentum Aligned' };
 }
 
-// 4. INDIAN MARKET TIME CHECKER
+// 4. INDIAN MARKET TIME CHECKER & TIME-OF-DAY INTELLIGENCE (Pillar 4)
 function checkIndianMarketTime() {
     const now = new Date();
     const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
@@ -230,8 +412,13 @@ function checkIndianMarketTime() {
     const m = ist.getMinutes();
     const day = ist.getDay();
     const totalMinutes = h * 60 + m;
+    
     const marketOpen = 9 * 60 + 15; // 9:15 AM
+    const safeOpen = 9 * 60 + 45; // 9:45 AM (Wait for chaos to settle)
+    const deadZoneStart = 11 * 60 + 30; // 11:30 AM
+    const deadZoneEnd = 13 * 60; // 1:00 PM
     const marketClose = 15 * 60 + 30; // 3:30 PM
+    const cutoffTime = 14 * 60 + 30; // 2:30 PM (No new entries)
     
     if (day === 0 || day === 6) {
         return { isOpen: false, reason: '🏖️ Indian Markets are currently CLOSED for the weekend.' };
@@ -243,9 +430,20 @@ function checkIndianMarketTime() {
         return { isOpen: false, reason: '🔔 Indian Markets closed today at 3:30 PM IST.' };
     }
     
+    // Pillar 4: Time-of-Day Intelligence Rules
+    if (totalMinutes < safeOpen) {
+        return { isOpen: false, reason: '⚠️ **CAUTION:** Market is in the 9:15-9:45 AM Chaos Zone. High risk of bull traps. Waiting for trend confirmation.' };
+    }
+    if (totalMinutes >= deadZoneStart && totalMinutes < deadZoneEnd) {
+        return { isOpen: false, reason: '😴 **DEAD ZONE:** Market is in the Midday Chop Zone (11:30 AM - 1:00 PM). Volume is dead. Avoid trading.' };
+    }
+    if (totalMinutes >= cutoffTime) {
+        return { isOpen: false, reason: '🏁 **LATE DAY:** Market is nearing close (>2:30 PM). No new entries allowed. Manage existing positions only.' };
+    }
+    
     return {
         isOpen: true,
-        reason: '✅ Market is open. Execute via VWAP Pullback Limit Orders.',
+        reason: '✅ Prime Trading Zone active. Execute via VWAP Pullback Limit Orders.',
         chopWarning: ''
     };
 }
@@ -260,6 +458,16 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
     if (!targetSymbol && nowTs < dailySetupCache.timestamp + CACHE_TTL_MS && dailySetupCache.setups?.length > 0) {
         console.log(`⏱️ [LIVE BUFFER] Returning active 2-minute scan window (next live refresh shortly)...`);
         return { timeStatus, setups: dailySetupCache.setups };
+    }
+
+    // 🧠 PREDICTIVE INTELLIGENCE: Load daily trends & global sentiment BEFORE scanning
+    await refreshDailyTrendFilter();
+    const globalCues = await getGlobalMarketSentiment();
+
+    // 🔴 SIGNAL 2: If global sentiment is RED, return NO setups to protect capital
+    if (!targetSymbol && globalCues.sentiment === 'RED') {
+        console.log(`🔴 [GLOBAL RED] Market sentiment is RED (${globalCues.details}). Blocking all recommendations.`);
+        return { timeStatus, setups: [], globalSentiment: globalCues };
     }
 
     const candidates = targetSymbol 
@@ -277,6 +485,20 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             // FILTER 1: Skip frozen circuit locks or illiquid names
             if (!targetSymbol && isCircuitLocked) continue;
 
+            // 📊 SIGNAL 1: DAILY TREND FILTER — Only trade stocks in a confirmed uptrend!
+            if (!targetSymbol && !isInDailyUptrend(sym)) continue;
+
+            // 🌍 SIGNAL 4: RELATIVE STRENGTH — Stock must outperform Nifty by 1.5x!
+            if (!targetSymbol && !hasRelativeStrength(changeVal, globalCues.niftyChange || 0)) continue;
+
+            // 📍 SIGNAL 3: PIVOT RESISTANCE CHECK — Don't buy near yesterday's resistance!
+            const pivots = getPivotLevels(sym);
+            if (!targetSymbol && pivots && price > pivots.r1 * 0.998) continue; // Too close to resistance
+
+            // 🛡️ ANTI-BULL TRAP FILTER (The Fix for SONACOMS): Reject if price crashed > 1% from its Morning High!
+            const pullbackFromHigh = ((high - price) / high) * 100;
+            if (!targetSymbol && pullbackFromHigh > 1.00) continue; 
+
             // FILTER 2: 30-DAY EMPIRICAL PROFIT MAKER ZONE (+0.30% to +2.50% & Zero Arbitrage Drag)
             if (!targetSymbol) {
                 if (changeVal < 0.30 || changeVal > 2.50) continue;
@@ -293,8 +515,9 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
             const newsCheck = await checkIndianNews(sym, companyName);
             if (!targetSymbol && newsCheck.status === 'TOXIC') continue;
 
-            const targetP = parseFloat((price * 1.0175).toFixed(2));
-            const stopLossP = parseFloat((price * 0.9935).toFixed(2));
+            // 🎯 REALISTIC INTRADAY SCALP TARGETS (2.0% Target / 1.0% Stop Loss)
+            const targetP = parseFloat((price * 1.02).toFixed(2));
+            const stopLossP = parseFloat((price * 0.99).toFixed(2));
             const vwapAnchor = parseFloat(((high + low + price) / 3).toFixed(2));
 
             const riskEval = riskManager.evaluateTradeViability(sym, price, targetP, stopLossP, capital, true);
@@ -375,6 +598,10 @@ async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
 
             if (!targetSymbol && isCircuitLocked) continue;
 
+            // 🛡️ ANTI-BULL TRAP FILTER: Reject if price crashed > 1% from its Morning High!
+            const pullbackFromHigh = ((high - price) / high) * 100;
+            if (!targetSymbol && pullbackFromHigh > 1.00) continue;
+
             // EXPANDED BREAKOUT RANGE RULE: Change percent strictly between +0.30% and +4.50%
             if (!targetSymbol && (changeVal < 0.30 || changeVal > 4.50 || /BANK|SBI|BHEL|BEL|ONGC|NTPC|POWER|SOUTH|YES|SUZLON|KARUR|BAJ|FIN|HDFC|ICICI|CELLO|LT|CHOLA|MUTHOOT|ANGEL|CAMS|CDSL|BSE|RVNL|MCX|MAZDOCK|COCHINSHIP|HAL/i.test(sym))) continue;
 
@@ -388,8 +615,9 @@ async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
             // Require VWAP breakout; if below ORB high due to normal intraday pullback, treat as minor score reduction rather than total rejection!
             if (!targetSymbol && !isAboveVwap) continue;
 
-            const targetP = parseFloat((price * 1.015).toFixed(2));
-            const stopLossP = parseFloat((price * 0.9925).toFixed(2));
+            // 🎯 REALISTIC INTRADAY SCALP TARGETS (2.0% Target / 1.0% Stop Loss)
+            const targetP = parseFloat((price * 1.02).toFixed(2));
+            const stopLossP = parseFloat((price * 0.99).toFixed(2));
 
             const companyName = sym.replace('.NS', '').replace('.BO', '');
             const riskEval = riskManager.evaluateTradeViability(sym, price, targetP, stopLossP, capital, true);
@@ -460,6 +688,11 @@ async function getTop10MarketSetups(capital = 20000) {
             const { price, open, high, low, changeVal, buyerDominance, isCircuitLocked, volume } = live;
 
             if (isCircuitLocked || volume < 80000) continue;
+            
+            // 🛡️ ANTI-BULL TRAP FILTER: Reject if price crashed > 1% from its Morning High!
+            const pullbackFromHigh = ((high - price) / high) * 100;
+            if (pullbackFromHigh > 1.00) continue;
+
             if (changeVal < 0.30 || changeVal > 3.80 || /BANK|SBI|BHEL|BEL|ONGC|NTPC|POWER|SOUTH|YES|SUZLON|KARUR|BAJ|FIN|HDFC|ICICI|CELLO|LT|CHOLA|MUTHOOT|ANGEL|CAMS|CDSL|BSE|RVNL|MCX|MAZDOCK|COCHINSHIP|HAL/i.test(sym)) continue;
             if (timeStatus.isOpen && buyerDominance !== null && buyerDominance < 51) continue;
 
@@ -467,8 +700,9 @@ async function getTop10MarketSetups(capital = 20000) {
             if (LARGE_CAPS.includes(sym)) capCategory = '🏢 LARGE CAP';
             else if (SMALL_CAPS.includes(sym)) capCategory = '🌱 SMALL CAP';
 
-            const targetP = parseFloat((price * 1.018).toFixed(2));
-            const stopLossP = parseFloat((price * 0.9935).toFixed(2));
+            // 🎯 REALISTIC INTRADAY SCALP TARGETS (2.0% Target / 1.0% Stop Loss)
+            const targetP = parseFloat((price * 1.02).toFixed(2));
+            const stopLossP = parseFloat((price * 0.99).toFixed(2));
             const vwapAnchor = parseFloat(((high + low + price) / 3).toFixed(2));
 
             const riskEval = riskManager.evaluateTradeViability(sym, price, targetP, stopLossP, capital, true);
@@ -565,6 +799,11 @@ async function getAbove4PercentSetups(capital = 20000) {
             const { price, open, high, low, changeVal, buyerDominance, isCircuitLocked, volume } = live;
 
             if (isCircuitLocked || volume < 80000) continue;
+            
+            // 🛡️ ANTI-BULL TRAP FILTER: Reject if price crashed > 1.25% from its Morning High (Slightly relaxed for >4% rockets)!
+            const pullbackFromHigh = ((high - price) / high) * 100;
+            if (pullbackFromHigh > 1.25) continue;
+
             // Allow strong gainers >= +2.00% into consideration so list never drops to 1 stock on low-volatility days!
             if (changeVal < 2.00 || changeVal > 9.50 || /BANK|SBI|BHEL|BEL|ONGC|NTPC|POWER|SOUTH|YES|SUZLON|KARUR|BAJ|FIN|HDFC|ICICI|CELLO|LT|CHOLA|MUTHOOT|ANGEL|CAMS|CDSL|BSE|RVNL|MCX|MAZDOCK|COCHINSHIP|HAL/i.test(sym)) continue;
 
@@ -573,8 +812,9 @@ async function getAbove4PercentSetups(capital = 20000) {
             if (LARGE_CAPS.includes(sym)) capCategory = '🏢 LARGE CAP SURGER';
             else if (SMALL_CAPS.includes(sym)) capCategory = '🌱 SMALL CAP ROCKET';
 
-            const targetP = parseFloat((price * 1.025).toFixed(2));
-            const stopLossP = parseFloat((price * 0.988).toFixed(2));
+            // 🎯 ROCKET SCALP TARGETS (2.0% Target / 1.0% Stop Loss)
+            const targetP = parseFloat((price * 1.02).toFixed(2));
+            const stopLossP = parseFloat((price * 0.99).toFixed(2));
 
             const riskEval = riskManager.evaluateTradeViability(sym, price, targetP, stopLossP, capital, true);
             if (!riskEval.approved) continue;
@@ -582,8 +822,12 @@ async function getAbove4PercentSetups(capital = 20000) {
             const domScore = buyerDominance !== null ? buyerDominance : 65;
             const isMidSmallCap = !LARGE_CAPS.includes(sym);
             const isStrictRocket = changeVal >= 4.00;
+            // 🚨 CLIMAX PENALTY: Prevent buying exhaustion traps where volume is >5x normal!
+            const isClimax = (volume > 1500000 && (volume / 250000) > 5.0);
+            const climaxPenalty = isClimax ? -200000 : 0; 
+            
             // Massive 100k bonus ensures true >4% rockets rank above everything else!
-            const score = Math.round((isStrictRocket ? 100000 : 0) + (domScore * 25) + (changeVal * 150) + (isMidSmallCap ? 5000 : 0) + (Math.min(volume, 5000000) / 40000));
+            const score = Math.round((isStrictRocket ? 100000 : 0) + (domScore * 25) + (changeVal * 150) + (isMidSmallCap ? 5000 : 0) + (Math.min(volume, 5000000) / 40000) + climaxPenalty);
 
             verifiedSetups.push({
                 symbol: sym,
@@ -623,6 +867,22 @@ async function getCombinedMasterSetups(capital = 20000) {
     const timeStatus = checkIndianMarketTime();
     console.log("⚡ [SUPER-CONFLUENCE ENGINE] Intersecting v4.0, July 30 ORB & All-Cap Top 10 quant layers...");
 
+    // 🧠 PREDICTIVE INTELLIGENCE: Load signals before ANY scanning
+    await refreshDailyTrendFilter();
+    const globalCues = await getGlobalMarketSentiment();
+
+    // 🔴 SIGNAL 2: If global sentiment is RED, block all trades!
+    if (globalCues.sentiment === 'RED') {
+        console.log(`🔴 [GLOBAL RED] Sentiment is RED. Blocking ALL /best recommendations.`);
+        return { 
+            timeStatus, 
+            setups: [], 
+            globalSentiment: globalCues,
+            blocked: true,
+            blockedReason: `🔴 GLOBAL MARKET ALERT: ${globalCues.details}\n\n⛔ System has blocked all trade recommendations today because global markets are crashing. Cash is king. Protect your capital.`
+        };
+    }
+
     const [v4Result, julResult, top10Result] = await Promise.all([
         getIntradaySetups(null, capital),
         getIntraday30Setups(null, capital),
@@ -630,6 +890,7 @@ async function getCombinedMasterSetups(capital = 20000) {
     ]);
 
     const map = new Map();
+
     const addPick = (item, sourceName, icon) => {
         if (!map.has(item.symbol)) {
             map.set(item.symbol, {
@@ -672,5 +933,7 @@ module.exports = {
     getTop10MarketSetups,
     getAbove4PercentSetups,
     getCombinedMasterSetups,
+    getGlobalMarketSentiment,
+    refreshDailyTrendFilter,
     INTRADAY_UNIVERSE
 };

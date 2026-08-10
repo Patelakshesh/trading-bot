@@ -62,7 +62,51 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
-        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/best` - 🔥 Master Combined Super-Picks (v4.0 + July 30 + Top 10 + AI Tip)\n`/top10` - Top 10 All-Cap Winners (Small, Mid & Large Cap)\n`/intraday` - Top 3 Intraday Confluence v4.0 (VWAP Limit Pullback)\n`/intraday30` - Top 3 July 30 System (Commit c6e122a comparison)\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get an instant AI swing-trade recommendation\n`/profit` - View total portfolio profit', {parse_mode: 'Markdown'});
+        bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/best` - 🔥 Master Combined Super-Picks\n`/intraday` - Intraday Confluence\n`/fno` - ⚡ Nifty 50 Options Trade (High Risk)\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get AI swing-trade recommendation\n`/profit` - View portfolio profit', {parse_mode: 'Markdown'});
+    });
+
+    bot.onText(/^\/fno(?:\s+(.+))?$/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const instrument = (match[1] || 'nifty').trim().toLowerCase();
+        
+        let dispName = 'NIFTY 50';
+        if (instrument === 'crude') dispName = 'CRUDE OIL (MCX)';
+        if (instrument === 'gold') dispName = 'GOLD (MCX)';
+        
+        const statusMsg = await bot.sendMessage(chatId, `⚡ <b>Scanning ${dispName} for explosive momentum...</b>`, {parse_mode: 'HTML'});
+        
+        try {
+            const { getFNOTrade } = require('./services/fnoService');
+            const result = await getFNOTrade(instrument);
+            
+            if (result.status === 'TRADE_FOUND') {
+                const tr = result.trade;
+                const mcxNoteStr = result.mcxNote ? `\n🛢️ <b>Market:</b> ${result.mcxNote}` : '';
+                const newsStr = result.newsHeadline ? `\n📰 <b>Live News:</b> <i>"${result.newsHeadline}"</i>` : '';
+                
+                const msgText = `🚨 <b>F&O OPTIONS MOMENTUM ALERT</b> 🚨\n\n` +
+                                `📈 <b>Instrument:</b> ${result.instrumentName}\n` +
+                                `📊 <b>Global Spot Price:</b> ${result.spotPrice}${mcxNoteStr}${newsStr}\n\n` +
+                                `🎯 <b>WHAT TO BUY:</b> <b>${tr.type}</b>\n` +
+                                `👉 <i>Strike:</i> ${tr.strikeGuide}\n` +
+                                `📅 <i>Expiry:</i> ${tr.expiryGuide}\n\n` +
+                                `🧠 <b>AI Logic:</b> ${tr.logic}\n\n` +
+                                `⚠️ <b>STRICT TRADING RULES (For your ₹3,500 Capital):</b>\n` +
+                                `1️⃣ ${tr.rules[0]}\n` +
+                                `2️⃣ ${tr.rules[1]}\n` +
+                                `3️⃣ ${tr.rules[2]}\n` +
+                                `4️⃣ ${tr.rules[3]}\n\n` +
+                                `<i>Note: Option Buying is extremely risky. Respect the Stop Loss!</i>`;
+                
+                await bot.editMessageText(msgText, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+            } else if (result.status === 'NO_TRADE') {
+                await bot.editMessageText(`⚖️ <b>NO TRADE ZONE</b>\n\n${result.message}`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+            } else {
+                await bot.editMessageText(`❌ Error fetching F&O data. Market might be closed.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+            }
+        } catch(e) {
+            await bot.editMessageText(`❌ System error in F&O module.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+        }
     });
 
     // 1. Upgraded /bought command to automatically fetch live price if omitted
@@ -912,12 +956,26 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             const timeCheck = intradayService.checkIndianMarketTime();
             if (!timeCheck.isOpen) {
                 await bot.sendMessage(chatId, timeCheck.reason, { parse_mode: 'Markdown' });
+                return; // 🛡️ Pillar 4: Strictly block the system from returning setups during dangerous hours!
             }
 
             const result = await intradayService.getCombinedMasterSetups(20000);
 
+            // 🔴 GLOBAL SENTIMENT RED BLOCK
+            if (result.blocked) {
+                await bot.editMessageText(
+                    `🔴 <b>GLOBAL MARKET CRASH ALERT</b> 🔴\n\n` +
+                    `${result.globalSentiment?.details || 'Markets are negative.'}\n\n` +
+                    `⛔ <b>The system has BLOCKED all trade recommendations today.</b>\n\n` +
+                    `💡 <i>Professional traders know: "Cash is a position." When global markets crash, the smartest move is to NOT trade. Your ₹2,000 capital is more important than any single trade.</i>\n\n` +
+                    `⏰ Try again tomorrow when global sentiment improves.`,
+                    { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' }
+                );
+                return;
+            }
+
             if (!result.setups || result.setups.length === 0) {
-                await bot.editMessageText(`⚠️ No verified Super-Confluence setups active right now. Re-check after 15 minutes!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                await bot.editMessageText(`⚠️ No verified Super-Confluence setups active right now. All 191 stocks failed the 7-layer intelligence filter. Re-check after 15 minutes!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 return;
             }
 
@@ -936,17 +994,18 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                          `   🔗 <b>Consensus Verification:</b> ${enginesList}\n` +
                          `   💰 <b>Live Market Price:</b> ₹${limitEntry} (${s.changePercent} today)\n` +
                          `   📍 <b>VWAP Pullback Buy Limit Price:</b> <b>₹${vwapAnchor}</b> <i>(Do NOT buy above this price!)</i>\n` +
-                         `   🎯 <b>Pro Target (+1.75%):</b> <b>₹${s.target}</b>\n` +
-                         `   🛑 <b>Stop-Loss (-0.65%):</b> <b>₹${s.stopLoss}</b>\n` +
-                         `   📦 <b>5x MIS Size (₹4,000 Capital):</b> <b>${recQty} Shares</b>\n` +
+                         `   🎯 <b>Scalp Target (+1.0%):</b> <b>₹${s.target}</b>\n` +
+                         `   🛑 <b>Strict Stop-Loss (-0.6%):</b> <b>₹${s.stopLoss}</b>\n` +
+                         `   📦 <b>5x MIS Size (₹3,500 Capital):</b> <b>${recQty} Shares</b>\n` +
                          `   💡 <i>${s.newsHeadline || s.doubleCheckReason}</i>\n` +
                          `────────────────────────────\n`;
             });
 
             reply += `\n<b>👑 HOW TO EXECUTE WITH CONFIDENCE:</b>\n` +
-                     `1️⃣ <b>Thursday & Friday:</b> Check <code>/best</code> at <b>9:31 AM SHARP</b>. Write down your preferred leader and verify on paper how cleanly it bounces from its VWAP Buy Limit Price!\n` +
-                     `2️⃣ <b>Monday Live Trade:</b> Type <code>/best</code> at 9:31 AM. Place a Limit Buy order at the exact <b>VWAP Pullback Price</b> between <b>9:35 AM and 10:05 AM</b>.\n` +
-                     `3️⃣ <b>Zero-Loss Rule:</b> The moment your position crosses <b>+₹300 profit</b>, immediately shift your Stop-Loss to your Entry Price (Break-Even)!`;
+                     `1️⃣ <b>Discipline Rule:</b> NEVER trade before 9:45 AM. Wait for the Morning Chaos to settle.\n` +
+                     `2️⃣ <b>Live Trade:</b> Type <code>/best</code> at 9:46 AM. Place a Limit Buy order at the exact <b>VWAP Pullback Price</b>.\n` +
+                     `3️⃣ <b>Zero-Loss Rule:</b> The moment your position crosses <b>+0.5% profit</b>, shift your Stop-Loss to your Entry Price (Break-Even)!\n` +
+                     `4️⃣ <b>🛑 Daily Risk Cap:</b> If you hit 2 stop-losses today, SHUT DOWN the app. No more trades for the day!`;
 
             await bot.editMessageText(reply, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
         } catch (err) {
