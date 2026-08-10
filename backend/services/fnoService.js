@@ -134,13 +134,13 @@ async function getFNOTrade(instrumentType = 'nifty') {
             }
         } catch(e) {}
 
-        // PRO-TRADER FILTER: Options Buying only works in high momentum.
-        if (currentADX < 25) {
+        // PRO-TRADER FILTER: Options Buying only works in high momentum (Golden Sweet Spot: ADX > 22).
+        if (currentADX < 22) {
             return {
                 status: 'NO_TRADE',
                 message: `Current ${instrumentName} Spot: ${currentPrice.toFixed(2)}.\n\n` +
                          `⚠️ ADX (Trend Strength) is critically low at ${currentADX.toFixed(1)}.\n` +
-                         `The market is in a CHOPPY / SIDEWAYS zone. If you buy options right now, Theta Decay will destroy your premium. A Professional Trader stays out. Wait for ADX > 25.`
+                         `The market is in a CHOPPY / SIDEWAYS zone. If you buy options right now, Theta Decay will destroy your premium. A Professional Trader stays out. Wait for ADX > 22.`
             };
         }
 
