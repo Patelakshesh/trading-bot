@@ -189,12 +189,17 @@ async function getFNOTrade(instrumentType = 'nifty') {
             logic = `🩸 BEARISH BREAKDOWN CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bearish (${currentRSI.toFixed(1)}). The 5 EMA has crossed below the 20 EMA on selling volume. Early-Entry short trigger activated!`;
         }
         else {
+            let spotDisplay = `${currentPrice.toFixed(2)}`;
+            if (instrumentType.toLowerCase() === 'crude') {
+                spotDisplay += ` ($) / ₹${(currentPrice * 84).toFixed(0)} (MCX Approx)`;
+            }
+
             return {
                 status: 'NO_TRADE',
-                message: `Current ${instrumentName} Spot: ${currentPrice.toFixed(2)}.\n\n` + 
+                message: `Current ${instrumentName} Spot: ${spotDisplay}.\n\n` + 
                          `⚠️ Market Check: ADX is ${currentADX.toFixed(1)} and RSI is ${currentRSI.toFixed(1)}.\n` +
                          `📉 Trend Check: 5-EMA is at ${ema5.toFixed(2)} | 20-EMA is at ${ema20.toFixed(2)}.\n` +
-                         `The market is currently CHOPPY/SIDEWAYS because the Trend lines (EMA) have not crossed safely, or there is no strong breakout candle. In F&O, you only buy options when momentum is explosive. Protect your ₹3,500 capital and sit out. Re-check in 15 minutes.`
+                         `The market is currently CHOPPY/SIDEWAYS because the Trend lines (EMA) have not crossed safely, or there is no strong breakout candle. In F&O, you only buy options when momentum is explosive. Protect your ₹3,500 capital and sit out. Re-check in 2 minutes.`
             };
         }
 
