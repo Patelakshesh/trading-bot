@@ -70,6 +70,12 @@ function calculateEMA(closes, period) {
 
 async function getFNOTrade(instrumentType = 'nifty') {
     try {
+        let inrRate = 95.43;
+        try { 
+            const inrQuote = await yahooFinance.quote('INR=X'); 
+            if(inrQuote && inrQuote.regularMarketPrice) inrRate = inrQuote.regularMarketPrice; 
+        } catch(e) {}
+        
         let symbol = '^NSEI';
         let instrumentName = 'NIFTY 50';
         let mcxNote = '';
@@ -170,7 +176,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
         if (instrumentType.toLowerCase() === 'nifty') {
             strikePriceNum = Math.round(currentPrice / 50) * 50; 
         } else if (instrumentType.toLowerCase() === 'crude') {
-            const mcxApproxPrice = currentPrice * 84; 
+            const mcxApproxPrice = currentPrice * inrRate; 
             strikePriceNum = Math.round(mcxApproxPrice / 100) * 100; 
         } else if (instrumentType.toLowerCase() === 'gold') {
             strikePriceNum = "ATM (Look at Broker)";
@@ -191,7 +197,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
         else {
             let spotDisplay = `${currentPrice.toFixed(2)}`;
             if (instrumentType.toLowerCase() === 'crude') {
-                spotDisplay += ` ($) / ₹${(currentPrice * 84).toFixed(0)} (MCX Approx)`;
+                spotDisplay += ` ($) / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
             }
 
             return {
