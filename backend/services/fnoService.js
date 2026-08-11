@@ -5,9 +5,10 @@ const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHis
 async function predictNiftyDirection() {
     try {
         const symbols = ['^GSPC', 'DX-Y.NYB', 'CL=F', '^VIX', '^NSEI'];
-        const results = await Promise.all(symbols.map(sym => 
-            yahooFinance.chart(sym, { interval: '1d', range: '2d' }).catch(() => null)
-        ));
+        const results = await Promise.all(symbols.map(sym => {
+            const p1 = Math.floor(Date.now() / 1000) - (5 * 24 * 60 * 60);
+            return yahooFinance.chart(sym, { interval: '1d', period1: p1 }).catch(() => null);
+        }));
 
         let score = 0;
         let reasons = [];

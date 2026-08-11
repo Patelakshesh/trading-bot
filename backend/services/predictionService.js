@@ -7,7 +7,8 @@ const { INTRADAY_UNIVERSE } = require('./intradayService');
 async function calculatePredictionScore(symbol) {
     try {
         // Fetch 1y data to calculate 200-SMA
-        const daily = await yahooFinance.chart(symbol, { interval: '1d', range: '1y' }).catch(() => null);
+        const p1 = Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60);
+        const daily = await yahooFinance.chart(symbol, { interval: '1d', period1: p1 }).catch(() => null);
         if (!daily || !daily.quotes || daily.quotes.length < 200) return null;
 
         const quotes = daily.quotes.filter(q => q.close !== null);
