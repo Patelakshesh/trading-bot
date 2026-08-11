@@ -1489,9 +1489,21 @@ cron.schedule('*/2 * * * *', async () => {
                 if (!sentAlertsMemory.has(fnoAlertKey)) {
                     sentAlertsMemory.add(fnoAlertKey);
                     
+                    let formattedMessage = '';
+                    if (fnoResult.trade) {
+                        formattedMessage = `📈 <b>Trade Type:</b> ${fnoResult.trade.type}\n` +
+                                           `💡 <b>Logic:</b> ${fnoResult.trade.logic}\n` +
+                                           `🎯 <b>Strike:</b> ${fnoResult.trade.strikeGuide}\n` +
+                                           `📅 <b>Expiry:</b> ${fnoResult.trade.expiryGuide}\n\n` +
+                                           `🛡️ <b>Rules:</b>\n- ${fnoResult.trade.rules.join('\n- ')}`;
+                    } else {
+                        formattedMessage = fnoResult.message || JSON.stringify(fnoResult);
+                    }
+
                     const fnoMsg = `🚨 <b>INSTANT F&O AUTO-ALERT</b> 🚨\n\n` +
-                                   `🔥 <b>Asset:</b> ${asset.toUpperCase()}\n\n` +
-                                   `${fnoResult.message}\n\n` +
+                                   `🔥 <b>Asset:</b> ${fnoResult.instrumentName || asset.toUpperCase()}\n` +
+                                   `💰 <b>Spot Price:</b> ₹${fnoResult.spotPrice}\n\n` +
+                                   `${formattedMessage}\n\n` +
                                    `⚡ <b>Action:</b> Execute INSTANTLY.`;
                     
                     for (let chatId of allUsers) {
