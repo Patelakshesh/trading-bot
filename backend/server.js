@@ -1439,7 +1439,7 @@ cron.schedule('*/15 * * * *', async () => {
 });
 
 // INSTANT AUTO-NOTIFICATION BROADCASTER FOR F&O AND INTRADAY
-cron.schedule('*/15 * * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
     if (!bot) return;
     try {
         console.log('Scanning for Instant Intraday & F&O Auto-Notifications...');
