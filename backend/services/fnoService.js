@@ -240,10 +240,15 @@ async function getFNOTrade(instrumentType = 'nifty') {
             }
         }
 
+        let spotDisplay = `${currentPrice.toFixed(2)}`;
+        if (instrumentType.toLowerCase() === 'crude') {
+            spotDisplay += ` ($) / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
+        }
+
         // Return the Option Trade Plan
         return {
             status: 'TRADE_FOUND',
-            spotPrice: currentPrice.toFixed(2),
+            spotPrice: spotDisplay,
             instrumentName: instrumentName,
             mcxNote: mcxNote,
             newsHeadline: newsHeadline,
