@@ -167,8 +167,8 @@ async function getFNOTrade(instrumentType = 'nifty') {
             expiryDateStr = nextThursday.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
         } else {
             let expiryMonth = today.getMonth();
-            if (today.getDate() > 19) expiryMonth++; 
-            const mcxExpiry = new Date(today.getFullYear(), expiryMonth, 19);
+            if (today.getDate() > 17) expiryMonth++; 
+            const mcxExpiry = new Date(today.getFullYear(), expiryMonth, 17);
             expiryDateStr = mcxExpiry.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
         }
 
