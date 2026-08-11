@@ -176,17 +176,17 @@ async function getFNOTrade(instrumentType = 'nifty') {
             strikePriceNum = "ATM (Look at Broker)";
         }
 
-        // CALL OPTION LOGIC (Requires RSI > 55 for high probability)
-        if (ema5 > ema20 && candleGain > 0.04 && lastCandle.close > prevCandle.high && currentRSI > 55) {
+        // CALL OPTION LOGIC (Requires RSI > 50 for high probability)
+        if (ema5 > ema20 && candleGain > 0 && currentRSI > 50) {
             signal = "BUY";
             optionType = "CE (CALL)";
-            logic = `🔥 EXPLOSIVE TREND CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bullish (${currentRSI.toFixed(1)}). The 5 EMA has crossed above the 20 EMA with bullish volume. This is a Professional "Gap & Go" setup for 70-80% accuracy.`;
+            logic = `🔥 EXPLOSIVE TREND CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bullish (${currentRSI.toFixed(1)}). The 5 EMA has crossed above the 20 EMA with bullish volume. This is an Early-Entry "Gap & Go" setup for catching spikes!`;
         } 
-        // PUT OPTION LOGIC (Requires RSI < 45 for high probability)
-        else if (ema5 < ema20 && candleGain < -0.04 && lastCandle.close < prevCandle.low && currentRSI < 45) {
+        // PUT OPTION LOGIC (Requires RSI < 50 for high probability)
+        else if (ema5 < ema20 && candleGain < 0 && currentRSI < 50) {
             signal = "BUY";
             optionType = "PE (PUT)";
-            logic = `🩸 BEARISH BREAKDOWN CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bearish (${currentRSI.toFixed(1)}). The 5 EMA has crossed below the 20 EMA on heavy selling volume. Pro Traders are shorting here.`;
+            logic = `🩸 BEARISH BREAKDOWN CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bearish (${currentRSI.toFixed(1)}). The 5 EMA has crossed below the 20 EMA on selling volume. Early-Entry short trigger activated!`;
         }
         else {
             return {
