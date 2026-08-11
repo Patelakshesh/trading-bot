@@ -191,7 +191,9 @@ async function getFNOTrade(instrumentType = 'nifty') {
         else {
             return {
                 status: 'NO_TRADE',
-                message: `Current ${instrumentName} Spot: ${currentPrice.toFixed(2)}.\n\nThe market is currently CHOPPY/SIDEWAYS. In F&O, you only buy options when momentum is explosive. Protect your ₹3,500 capital and sit out. Re-check in 15 minutes.`
+                message: `Current ${instrumentName} Spot: ${currentPrice.toFixed(2)}.\n\n` + 
+                         `⚠️ Market Check: ADX is ${currentADX.toFixed(1)} and RSI is ${currentRSI.toFixed(1)}.\n` +
+                         `The market is currently CHOPPY/SIDEWAYS because the Trend lines (EMA) have not crossed safely. In F&O, you only buy options when momentum is explosive. Protect your ₹3,500 capital and sit out. Re-check in 15 minutes.`
             };
         }
 
