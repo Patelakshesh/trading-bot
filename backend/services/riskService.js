@@ -116,7 +116,7 @@ class RiskManager {
                 expectedNetProfit: netProfit,
                 maxNetLoss: netLoss,
                 netRiskRewardRatio: `1 : ${netRR.toFixed(2)}`
-            },
+            }, 
             reason: `✅ PRO APPROVED: Strong Net R:R (1 : ${netRR.toFixed(2)}) after ₹${totalTaxesAndFees} tax/brokerage fee hurdle.`
         };
     }
@@ -124,7 +124,7 @@ class RiskManager {
     // 2. DAILY KILL SWITCH MODULE (Track trade outcomes)
     recordTradeResult(symbol, pnlAmount) {
         this.checkAndResetDay();
-        const pnl = parseFloat(pnlAmount);
+        const pnl = parseFloat(pnlAmount); 
 
         if (pnl > 0) {
             this.dailyWins++;
