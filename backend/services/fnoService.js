@@ -230,17 +230,20 @@ async function getFNOTrade(instrumentType = 'nifty') {
             strikePriceNum = "ATM (Look at Broker)";
         }
 
-        // CALL OPTION LOGIC (Requires Crossover + ADX > 22 + RSI > 50)
-        if (prevEma5 <= prevEma20 && ema5 > ema20 && candleGain > 0 && currentRSI > 50 && currentADX >= 22) {
+        const emaGapPercent = (Math.abs(ema5 - ema20) / currentPrice) * 100;
+        const validGap = emaGapPercent >= 0.05;
+
+        // CALL OPTION LOGIC (Requires valid gap + ADX > 22 + RSI > 50)
+        if (ema5 > ema20 && validGap && candleGain > 0 && currentRSI > 50 && currentADX >= 22) {
             signal = "BUY";
             optionType = "CE (CALL)";
-            logic = `🔥 EXPLOSIVE TREND CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bullish (${currentRSI.toFixed(1)}). The 5 EMA has crossed above the 20 EMA with bullish volume. This is an Early-Entry "Gap & Go" setup for catching spikes!`;
+            logic = `🔥 EXPLOSIVE TREND CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bullish (${currentRSI.toFixed(1)}). The EMA gap has widened to a breakout level on bullish volume. This is a high-probability entry setup!`;
         } 
-        // PUT OPTION LOGIC (Requires Crossover + ADX > 22 + RSI < 50)
-        else if (prevEma5 >= prevEma20 && ema5 < ema20 && candleGain < 0 && currentRSI < 50 && currentADX >= 22) {
+        // PUT OPTION LOGIC (Requires valid gap + ADX > 22 + RSI < 50)
+        else if (ema5 < ema20 && validGap && candleGain < 0 && currentRSI < 50 && currentADX >= 22) {
             signal = "BUY";
             optionType = "PE (PUT)";
-            logic = `🩸 BEARISH BREAKDOWN CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bearish (${currentRSI.toFixed(1)}). The 5 EMA has crossed below the 20 EMA on selling volume. Early-Entry short trigger activated!`;
+            logic = `🩸 BEARISH BREAKDOWN CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bearish (${currentRSI.toFixed(1)}). The EMA gap has widened downward on selling volume. Massive short trigger activated!`;
         }
         else {
             let spotDisplay = `${currentPrice.toFixed(2)}`;
