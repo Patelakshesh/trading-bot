@@ -71,12 +71,14 @@ async function checkUpcomingNews(instrumentType) {
         const events = await fetchEconomicCalendar();
         const now = new Date();
         
-        // Look for High Impact events for Crude (USD) or Nifty (INR/Global)
+        // Look for High Impact events GLOBALLY (because European/Chinese news also spikes markets)
         const relevantEvents = events.filter(e => {
             if (e.impact !== 'High') return false;
-            if (instrumentType.toLowerCase() === 'crude' && e.country === 'USD') return true;
-            if (instrumentType.toLowerCase() === 'nifty' && (e.country === 'INR' || e.country === 'USD')) return true;
-            return false;
+            
+            // For Gold and Crude, ALL global High-Impact news causes spikes (OPEC, China Data, Eurozone, USD)
+            // For Nifty, global cues (USD/EUR/CNY) strongly affect it too.
+            // So we will track ALL High-Impact news for any instrument.
+            return true;
         });
 
         for (const e of relevantEvents) {
