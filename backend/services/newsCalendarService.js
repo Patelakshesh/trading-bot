@@ -58,9 +58,9 @@ function getEventTimeIST(dateStr, timeStr) {
     // Using a simple fixed offset for EST (-5 hours from UTC, IST is +5:30)
     // EST to IST is a +10:30 hours difference (ignoring daylight savings for simplicity, 
     // or +9:30 during EDT. For absolute precision, we check current timezone).
-    // Let's create an exact UTC date assuming the XML provides EST time.
+    // Let's create an exact UTC date assuming the XML provides EDT time (-04:00) during summer.
     
-    const eventDateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00-05:00`;
+    const eventDateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00-04:00`;
     const eventDate = new Date(eventDateStr);
     
     return eventDate;
