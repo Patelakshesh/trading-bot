@@ -1,5 +1,6 @@
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+const { checkUpcomingNews } = require('./newsCalendarService');
 
 // 🔮 PHASE 4: GLOBAL NIFTY DIRECTION PREDICTOR
 async function predictNiftyDirection() {
@@ -167,18 +168,6 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 currentRSI = rsiValues[rsiValues.length - 1];
             }
         } catch(e) {}
-
-        // Calculate ADX (14 period) to detect chopped markets
-        let currentADX = 0;
-        try {
-            const highPrices = quotes.map(r => r.high);
-            const lowPrices = quotes.map(r => r.low);
-            const adxValues = ADX.calculate({ close: closes, high: highPrices, low: lowPrices, period: 14 });
-            if (adxValues && adxValues.length > 0) {
-                currentADX = adxValues[adxValues.length - 1].adx;
-            }
-        } catch(e) {}
-
         // PRO-TRADER FILTER: Options Buying only works in high momentum (Golden Sweet Spot: ADX > 22).
         let currentADX = 20;
         try {
@@ -196,6 +185,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
         const newsSpikeWarning = await checkUpcomingNews(instrumentType);
         let preMessage = newsSpikeWarning ? `${newsSpikeWarning}\n\n` : '';
         
+
         let adxWarning = '';
         if (currentADX < 22) {
             adxWarning = `⚠️ ADX (Momentum) is low at ${currentADX.toFixed(1)}. This means the trend is weak or just starting. Use strict stop-loss!`;
@@ -297,8 +287,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
             spotDisplay += ` ($) / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
         }
 
-        const newsSpikeWarning = await checkUpcomingNews(instrumentType);
-        let finalMessagePrefix = newsSpikeWarning ? `${newsSpikeWarning}\n\n` : '';
+        let finalMessagePrefix = preMessage;
 
         // Return the Option Trade Plan
         return {
