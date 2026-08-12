@@ -195,18 +195,12 @@ async function getFNOTrade(instrumentType = 'nifty') {
 
         const newsSpikeWarning = await checkUpcomingNews(instrumentType);
         let preMessage = newsSpikeWarning ? `${newsSpikeWarning}\n\n` : '';
-
+        
+        let adxWarning = '';
         if (currentADX < 22) {
-            let spotDisplay = `${currentPrice.toFixed(2)}`;
-            if (instrumentType.toLowerCase() === 'crude') {
-                spotDisplay += ` ($) / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
-            }
-            return {
-                status: 'NO_TRADE',
-                message: preMessage + `Current ${instrumentName} Spot: ${spotDisplay}.\n\n` +
-                         `⚠️ ADX (Trend Strength) is critically low at ${currentADX.toFixed(1)}.\n` +
-                         `The market is in a CHOPPY / SIDEWAYS zone. If you buy options right now, Theta Decay will destroy your premium. A Professional Trader stays out. Wait for ADX > 22.`
-            };
+            adxWarning = `⚠️ ADX (Momentum) is low at ${currentADX.toFixed(1)}. This means the trend is weak or just starting. Use strict stop-loss!`;
+        } else {
+            adxWarning = `🔥 ADX is STRONG at ${currentADX.toFixed(1)}. High momentum confirmed!`;
         }
 
         let signal = "NEUTRAL";
@@ -261,9 +255,9 @@ async function getFNOTrade(instrumentType = 'nifty') {
             return {
                 status: 'NO_TRADE',
                 message: preMessage + `Current ${instrumentName} Spot: ${spotDisplay}.\n\n` + 
-                         `⚠️ Market Check: ADX is ${currentADX.toFixed(1)} and RSI is ${currentRSI.toFixed(1)}.\n` +
+                         `${adxWarning}\nRSI is ${currentRSI.toFixed(1)}.\n` +
                          `📉 Trend Check: 5-EMA is at ${ema5.toFixed(2)} | 20-EMA is at ${ema20.toFixed(2)}.\n` +
-                         `The market is currently CHOPPY/SIDEWAYS because the Trend lines (EMA) have not crossed safely, or there is no strong breakout candle. In F&O, you only buy options when momentum is explosive. Protect your ₹3,500 capital and sit out. Re-check in 2 minutes.`
+                         `No clear crossover detected. Wait for a strong breakout.`
             };
         }
 
@@ -315,7 +309,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
             newsHeadline: newsSpikeWarning ? newsSpikeWarning : newsHeadline,
             trade: {
                 type: optionType,
-                logic: logic,
+                logic: `${adxWarning}\n\n` + logic,
                 strikeGuide: `${strikePriceNum} ${optionType}`,
                 expiryGuide: `${expiryDateStr} Expiry`,
                 rules: [
