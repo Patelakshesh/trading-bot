@@ -80,28 +80,66 @@ async function getFNOTrade(instrumentType = 'nifty') {
         let instrumentName = 'NIFTY 50';
         let mcxNote = '';
         let stepSize = 50;
+        let useTradingView = true; // Enabled globally now!
+        let tvSymbol = 'NSE:NIFTY'; // Nifty 0-sec live
 
         if (instrumentType.toLowerCase() === 'crude') {
             symbol = 'CL=F'; // Global WTI Crude Oil
             instrumentName = 'CRUDE OIL (MCX & Mini)';
             mcxNote = "Crude Oil Options (Trade the MCX current month expiry)";
-            stepSize = 1; // Crude oil strikes are typically in increments of 100 on MCX (₹), but WTI is in $1 increments. We will output the WTI spot for reference, but tell the user to match ATM on MCX.
+            stepSize = 1; 
+            useTradingView = true;
+            tvSymbol = 'TVC:USOIL';
         } else if (instrumentType.toLowerCase() === 'gold') {
             symbol = 'GC=F';
             instrumentName = 'GOLD (MCX)';
             mcxNote = "Gold Options (Trade the MCX current month expiry)";
             stepSize = 10; 
+            useTradingView = true;
+            tvSymbol = 'TVC:GOLD';
         }
 
         console.log(`Fetching data for F&O Analysis: ${instrumentName} (${symbol})`);
         
-        const d = new Date();
-        d.setDate(d.getDate() - 5);
-        const p1 = Math.floor(d.getTime()/1000);
+        let quotes = [];
         
-        const queryOptions = { period1: p1, interval: '5m' };
-        const result = await yahooFinance.chart(symbol, queryOptions);
-        const quotes = result.quotes.filter(q => q.close !== null);
+        if (useTradingView) {
+            console.log(`🚀 Bypassing delays! Fetching 0-Second Live Data from TradingView: ${tvSymbol}`);
+            try {
+                const TradingView = require('@mathieuc/tradingview');
+                const client = new TradingView.Client();
+                const chart = new client.Session.Chart();
+                chart.setMarket(tvSymbol, { timeframe: '5' });
+                
+                quotes = await new Promise((resolve, reject) => {
+                    chart.onUpdate(() => {
+                        const q = chart.periods.map(p => ({
+                            close: p.close,
+                            open: p.open,
+                            high: p.max,
+                            low: p.min,
+                            volume: p.volume
+                        }));
+                        client.end();
+                        resolve(q);
+                    });
+                    setTimeout(() => { client.end(); reject(new Error('TV Timeout')); }, 8000);
+                });
+            } catch (err) {
+                console.log("TradingView failed, falling back to Yahoo", err);
+                useTradingView = false;
+            }
+        }
+
+        if (!useTradingView || quotes.length === 0) {
+            const d = new Date();
+            d.setDate(d.getDate() - 5);
+            const p1 = Math.floor(d.getTime()/1000);
+            
+            const queryOptions = { period1: p1, interval: '5m' };
+            const result = await yahooFinance.chart(symbol, queryOptions);
+            quotes = result.quotes.filter(q => q.close !== null);
+        }
         
         if (quotes.length < 25) {
             return { status: 'ERROR', message: `Not enough data available for ${instrumentName}.` };
@@ -142,10 +180,27 @@ async function getFNOTrade(instrumentType = 'nifty') {
         } catch(e) {}
 
         // PRO-TRADER FILTER: Options Buying only works in high momentum (Golden Sweet Spot: ADX > 22).
+        let currentADX = 20;
+        try {
+            const adxResult = ADX.calculate({
+                high: quotes.map(q => q.high),
+                low: quotes.map(q => q.low),
+                close: quotes.map(q => q.close),
+                period: 14
+            });
+            if (adxResult && adxResult.length > 0) {
+                currentADX = adxResult[adxResult.length - 1].adx;
+            }
+        } catch(e) { console.error("ADX calculation error"); }
+
         if (currentADX < 22) {
+            let spotDisplay = `${currentPrice.toFixed(2)}`;
+            if (instrumentType.toLowerCase() === 'crude') {
+                spotDisplay += ` ($) / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
+            }
             return {
                 status: 'NO_TRADE',
-                message: `Current ${instrumentName} Spot: ${currentPrice.toFixed(2)}.\n\n` +
+                message: `Current ${instrumentName} Spot: ${spotDisplay}.\n\n` +
                          `⚠️ ADX (Trend Strength) is critically low at ${currentADX.toFixed(1)}.\n` +
                          `The market is in a CHOPPY / SIDEWAYS zone. If you buy options right now, Theta Decay will destroy your premium. A Professional Trader stays out. Wait for ADX > 22.`
             };
