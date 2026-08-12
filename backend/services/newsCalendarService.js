@@ -55,12 +55,10 @@ function getEventTimeIST(dateStr, timeStr) {
     // Create Date object in EST (America/New_York)
     const [month, day, year] = dateStr.split('-');
     
-    // Using a simple fixed offset for EST (-5 hours from UTC, IST is +5:30)
-    // EST to IST is a +10:30 hours difference (ignoring daylight savings for simplicity, 
-    // or +9:30 during EDT. For absolute precision, we check current timezone).
-    // Let's create an exact UTC date assuming the XML provides EDT time (-04:00) during summer.
+    // Using a simple fixed offset. The XML feed from ForexFactory is actually provided in GMT/UTC time!
+    // We will parse it strictly as UTC (Z).
     
-    const eventDateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00-04:00`;
+    const eventDateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00Z`;
     const eventDate = new Date(eventDateStr);
     
     return eventDate;
