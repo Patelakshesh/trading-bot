@@ -60,13 +60,15 @@ async function getNiftyMaxPain() {
 }
 
 function calculateEMA(closes, period) {
-    if (closes.length < period) return null;
+    if (closes.length < period) return { current: null, prev: null };
     const multiplier = 2 / (period + 1);
     let ema = closes.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    let prevEma = ema;
     for (let i = period; i < closes.length; i++) {
+        prevEma = ema;
         ema = (closes[i] - ema) * multiplier + ema;
     }
-    return ema;
+    return { current: ema, prev: prevEma };
 }
 
 async function getFNOTrade(instrumentType = 'nifty') {
@@ -151,8 +153,12 @@ async function getFNOTrade(instrumentType = 'nifty') {
         
         const { ADX } = require('technicalindicators');
         
-        const ema5 = calculateEMA(closes, 5);
-        const ema20 = calculateEMA(closes, 20);
+        const ema5Data = calculateEMA(closes, 5);
+        const ema20Data = calculateEMA(closes, 20);
+        const ema5 = ema5Data.current;
+        const prevEma5 = ema5Data.prev;
+        const ema20 = ema20Data.current;
+        const prevEma20 = ema20Data.prev;
         
         const lastCandle = quotes[quotes.length - 1];
         const prevCandle = quotes[quotes.length - 2];
@@ -224,14 +230,14 @@ async function getFNOTrade(instrumentType = 'nifty') {
             strikePriceNum = "ATM (Look at Broker)";
         }
 
-        // CALL OPTION LOGIC (Requires RSI > 50 for high probability)
-        if (ema5 > ema20 && candleGain > 0 && currentRSI > 50) {
+        // CALL OPTION LOGIC (Requires Crossover + ADX > 22 + RSI > 50)
+        if (prevEma5 <= prevEma20 && ema5 > ema20 && candleGain > 0 && currentRSI > 50 && currentADX >= 22) {
             signal = "BUY";
             optionType = "CE (CALL)";
             logic = `🔥 EXPLOSIVE TREND CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bullish (${currentRSI.toFixed(1)}). The 5 EMA has crossed above the 20 EMA with bullish volume. This is an Early-Entry "Gap & Go" setup for catching spikes!`;
         } 
-        // PUT OPTION LOGIC (Requires RSI < 50 for high probability)
-        else if (ema5 < ema20 && candleGain < 0 && currentRSI < 50) {
+        // PUT OPTION LOGIC (Requires Crossover + ADX > 22 + RSI < 50)
+        else if (prevEma5 >= prevEma20 && ema5 < ema20 && candleGain < 0 && currentRSI < 50 && currentADX >= 22) {
             signal = "BUY";
             optionType = "PE (PUT)";
             logic = `🩸 BEARISH BREAKDOWN CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bearish (${currentRSI.toFixed(1)}). The 5 EMA has crossed below the 20 EMA on selling volume. Early-Entry short trigger activated!`;
