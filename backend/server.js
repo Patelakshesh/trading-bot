@@ -1485,7 +1485,9 @@ cron.schedule('*/2 * * * *', async () => {
         for (const asset of ['crude', 'nifty']) {
             const fnoResult = await getFNOTrade(asset);
             if (fnoResult.status !== 'NO_TRADE') {
-                const fnoAlertKey = `FNO_ALERT_${asset}_${new Date().toISOString().split('T')[0]}_${new Date().getHours()}`;
+                const tradeType = fnoResult.trade ? fnoResult.trade.type.substring(0,2) : 'UKN';
+                const currentMinuteBlock = Math.floor(new Date().getMinutes() / 15);
+                const fnoAlertKey = `FNO_ALERT_${asset}_${tradeType}_${new Date().toISOString().split('T')[0]}_${new Date().getHours()}_${currentMinuteBlock}`;
                 if (!sentAlertsMemory.has(fnoAlertKey)) {
                     sentAlertsMemory.add(fnoAlertKey);
                     
