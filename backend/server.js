@@ -1439,9 +1439,9 @@ cron.schedule('*/15 * * * *', async () => {
 });
 
 // =========================================================================
-// 🚨 PRE-SPIKE NEW YORK OPENING BELL WARNING (Runs Daily at 6:45 PM IST)
+// 🚨 PRE-SPIKE NEW YORK OPENING BELL WARNING (Runs Daily at 6:55 PM IST)
 // =========================================================================
-cron.schedule('15 13 * * *', async () => {
+cron.schedule('25 13 * * *', async () => {
     if (!bot) return;
     try {
         const allUsers = await Portfolio.distinct('chatId');
@@ -1449,7 +1449,7 @@ cron.schedule('15 13 * * *', async () => {
         if (telegramUsers.length === 0) return;
 
         const warningMsg = `🗽 <b>PRE-SPIKE WARNING: NEW YORK OPENING BELL</b> 🗽\n\n` +
-                           `The US Stock Market opens in exactly <b>15 Minutes</b> (7:00 PM IST).\n` +
+                           `The US Stock Market opens in exactly <b>5 Minutes</b> (7:00 PM IST).\n` +
                            `Billions of dollars are about to flood the Global Crude Oil market.\n\n` +
                            `⚠️ <b>ACTION REQUIRED:</b>\n` +
                            `1. Open your Groww App now.\n` +
@@ -1460,7 +1460,7 @@ cron.schedule('15 13 * * *', async () => {
         for (let chatId of telegramUsers) {
             bot.sendMessage(chatId, warningMsg, {parse_mode: 'HTML'});
         }
-        console.log("Sent Daily 6:45 PM NY Open Warning");
+        console.log("Sent Daily 6:55 PM NY Open Warning");
     } catch(err) {
         console.error('Error in NY Open Warning CRON:', err);
     }
