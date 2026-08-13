@@ -230,6 +230,20 @@ async function getFNOTrade(instrumentType = 'nifty') {
             strikePriceNum = "ATM (Look at Broker)";
         }
 
+        // KILL SWITCH: DO NOT TRADE CRUDE OIL DURING INDIAN DAYTIME (10:00 AM to 5:00 PM IST)
+        // Indian daytime volume is localized MCX manipulation. True volume starts at 5:00 PM and 7:00 PM.
+        if (instrumentType.toLowerCase() === 'crude') {
+            const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+            const hourIST = nowIST.getUTCHours();
+            // 10:00 AM to 5:00 PM is hourIST 10 to 16
+            if (hourIST >= 10 && hourIST < 17) {
+                return {
+                    status: 'NO_TRADE',
+                    message: `⚠️ DAYTIME KILL SWITCH ACTIVE: Current CRUDE OIL Spot is $${currentPrice.toFixed(2)}. \n\nDo NOT trade Crude Oil during Indian Daytime (10 AM to 5 PM). The volume is completely dead and filled with localized MCX traps and Theta decay. Wait for the US Pre-Market at 5:00 PM!`
+                };
+            }
+        }
+
         const emaGapPercent = (Math.abs(ema5 - ema20) / currentPrice) * 100;
         const validGap = emaGapPercent >= 0.05;
 
