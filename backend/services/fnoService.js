@@ -342,7 +342,8 @@ async function getFNOTrade(instrumentType = 'nifty') {
                     "⚠️ CAPITAL MANAGEMENT: You are recovering capital (₹3,500). Use MAX 30% of capital per trade.",
                     dynamicTarget,
                     dynamicSL,
-                    "🛡️ TRAILING STOP: Once you are +1.5% in profit, MOVE YOUR STOP LOSS TO BREAKEVEN (Cost-to-Cost). Never let a green trade turn red!",
+                    "🛡️ TRAILING STOP: Once you are +1.5% in profit, MOVE YOUR STOP LOSS TO BREAKEVEN.",
+                    "🚨 DIVERGENCE CHECK: Look at your MCX chart. If the bot says PUT, but your MCX chart is going UP, DO NOT TRADE. The USD/INR currency is fluctuating. Only trade when MCX and WTI match!",
                     `📰 NEWS CONFLUENCE: ${newsHeadline}`,
                     globalNote,
                     "⏱️ TIME STOP: Max 15-20 minutes hold time to prevent Theta decay loss."
