@@ -312,6 +312,20 @@ async function getFNOTrade(instrumentType = 'nifty') {
 
         let finalMessagePrefix = preMessage;
 
+        let dynamicTarget = "";
+        let dynamicSL = "";
+        
+        if (currentADX >= 30) {
+            dynamicTarget = "🎯 TARGET: +4% to +5% (MASSIVE MOMENTUM DETECTED! Let the profits run!)";
+            dynamicSL = "🛑 STOP LOSS: -2% (Give it room to breathe, huge trend active).";
+        } else if (currentADX >= 25) {
+            dynamicTarget = "🎯 TARGET: +2% to +3% (Strong momentum. Solid base hit).";
+            dynamicSL = "🛑 STOP LOSS: -1.5% (Standard risk).";
+        } else {
+            dynamicTarget = "🎯 TARGET: +1% to +1.5% (Low momentum / Early trend. Take fast profits!)";
+            dynamicSL = "🛑 STOP LOSS: -1% (STRICT - Cut losses instantly if it reverses).";
+        }
+
         // Return the Option Trade Plan
         return {
             status: 'TRADE_FOUND',
@@ -326,8 +340,8 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 expiryGuide: `${expiryDateStr} Expiry`,
                 rules: [
                     "⚠️ CAPITAL MANAGEMENT: You are recovering capital (₹3,500). Use MAX 30% of capital per trade.",
-                    "🎯 TARGET: +2% (Safe, highly accurate profit booking to build capital steadily).",
-                    "🛑 STOP LOSS: -1% (STRICT - Cut losses immediately if thesis breaks).",
+                    dynamicTarget,
+                    dynamicSL,
                     `📰 NEWS CONFLUENCE: ${newsHeadline}`,
                     globalNote,
                     "⏱️ TIME STOP: Max 15-20 minutes hold time to prevent Theta decay loss."
