@@ -247,14 +247,14 @@ async function getFNOTrade(instrumentType = 'nifty') {
         const emaGapPercent = (Math.abs(ema5 - ema20) / currentPrice) * 100;
         const validGap = emaGapPercent >= 0.05;
 
-        // CALL OPTION LOGIC (Requires valid gap + ADX > 25 + RSI > 50)
-        if (ema5 > ema20 && validGap && candleGain > 0 && currentRSI > 50 && currentADX >= 25) {
+        // CALL OPTION LOGIC (Requires valid gap + ADX > 22 + RSI > 50)
+        if (ema5 > ema20 && validGap && candleGain > 0 && currentRSI > 50 && currentADX >= 22) {
             signal = "BUY";
             optionType = "CE (CALL)";
             logic = `🔥 EXPLOSIVE TREND CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bullish (${currentRSI.toFixed(1)}). The EMA gap has widened to a breakout level on bullish volume. This is a high-probability entry setup!`;
         } 
-        // PUT OPTION LOGIC (Requires valid gap + ADX > 25 + RSI < 50)
-        else if (ema5 < ema20 && validGap && candleGain < 0 && currentRSI < 50 && currentADX >= 25) {
+        // PUT OPTION LOGIC (Requires valid gap + ADX > 22 + RSI < 50)
+        else if (ema5 < ema20 && validGap && candleGain < 0 && currentRSI < 50 && currentADX >= 22) {
             signal = "BUY";
             optionType = "PE (PUT)";
             logic = `🩸 BEARISH BREAKDOWN CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bearish (${currentRSI.toFixed(1)}). The EMA gap has widened downward on selling volume. Massive short trigger activated!`;
