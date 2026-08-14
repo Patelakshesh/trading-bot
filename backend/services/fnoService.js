@@ -224,8 +224,8 @@ async function getFNOTrade(instrumentType = 'nifty') {
         if (instrumentType.toLowerCase() === 'nifty') {
             strikePriceNum = Math.round(currentPrice / 50) * 50; 
         } else if (instrumentType.toLowerCase() === 'crude') {
-            const mcxApproxPrice = currentPrice * inrRate; 
-            strikePriceNum = Math.round(mcxApproxPrice / 100) * 100; 
+            // FIX: DO NOT calculate MCX price using WTI * INR. Indian Futures have massive premiums and expiry rollovers.
+            strikePriceNum = "ATM (Look at your Broker)";
         } else if (instrumentType.toLowerCase() === 'gold') {
             strikePriceNum = "ATM (Look at Broker)";
         }
