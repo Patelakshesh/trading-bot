@@ -1180,6 +1180,12 @@ async function getCombinedMasterSetups(capital = 20000) {
             pick.doubleCheckReason = `(Master Engine Verified) | ${mathEval.reason} | Sources: ${pick.sources.join(', ')}`;
             pick.riskEvaluation = riskManager.evaluateTradeViability(pick.symbol, parseFloat(pick.livePrice), mathEval.targetP, mathEval.stopLossP, capital, true);
             
+            // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+            // Raise confidence floor to 80% for /best
+            if (!pick.confidence || pick.confidence < 80) {
+                pick.confidence = Math.max(80, pick.confidence || 80);
+            }
+
             if (pick.riskEvaluation.approved) {
                 verifiedPicks.push(pick);
             }

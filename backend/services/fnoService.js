@@ -290,6 +290,17 @@ async function getFNOTrade(instrumentType = 'nifty') {
             }
         }
 
+        // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+        if (instrumentType.toLowerCase() === 'nifty') {
+            const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+            if (nowIST.getDay() === 4) { // Thursday (Expiry Day)
+                return {
+                    status: 'NO_TRADE',
+                    message: `🚫 EXPIRY DAY BLOCKED: Today is Thursday. Option premiums will decay to zero (Theta Decay). Unless you are a highly experienced Option Seller, trading Nifty options on expiry day is gambling. Capital protected.`
+                };
+            }
+        }
+
         // --- NEW QUANT FILTERS FROM WIN_RATE_MAXIMIZE.md ---
         if (instrumentType.toLowerCase() === 'crude' && currentADX < 22) {
             return {

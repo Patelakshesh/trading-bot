@@ -234,6 +234,25 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 position.realizedProfit = realizedProfit;
                 await position.save();
                 
+                // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+                // Save to TradeLog for accurate win-rate backtesting and tracking
+                try {
+                    const pnlPercent = ((sellPrice - position.buyPrice) / position.buyPrice) * 100;
+                    await TradeLog.create({
+                        strategy: 'swing_tip', // Defaulting manual buys to swing_tip for win rate calculation
+                        symbol: symbol,
+                        entryPrice: position.buyPrice,
+                        targetPrice: position.buyPrice * 1.05, // Approximation
+                        stopLossPrice: position.buyPrice * 0.95, // Approximation
+                        outcome: realizedProfit > 0 ? 'WIN' : 'LOSS',
+                        exitPrice: sellPrice,
+                        exitTime: new Date(),
+                        pnlPercent: pnlPercent
+                    });
+                } catch (logErr) {
+                    console.error("Failed to save to TradeLog:", logErr.message);
+                }
+
                 const sign = realizedProfit >= 0 ? '+' : '';
                 const emoji = realizedProfit >= 0 ? '🤑' : '🩸';
                 bot.sendMessage(chatId, `✅ **Full Position Sold!**\n\n📉 **Stock:** ${symbol}\n📦 **Sold:** ${position.quantity} shares\n💰 **Sell Price:** ₹${sellPrice}\n${emoji} **Realized Profit:** ${sign}₹${realizedProfit.toFixed(2)}`, {parse_mode: 'Markdown'});

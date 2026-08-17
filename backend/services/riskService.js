@@ -14,6 +14,49 @@ class RiskManager {
         this.maxConsecutiveLosses = 2; // Trigger daily shutdown after 2 losses in a row
         this.maxDailyLossAmount = 2500; // Max allowed monetary loss in INR per day
         this.currentDailyLossAmount = 0;
+        
+        // Initialize from DB
+        this._loadState();
+    }
+
+    async _loadState() {
+        try {
+            const mongoose = require('mongoose');
+            if (mongoose.connection.readyState !== 1) return; // Wait for DB
+            const RiskState = require('../models/RiskState');
+            const state = await RiskState.findOne({ date: this.today });
+            if (state) {
+                this.dailyLosses = state.dailyLosses;
+                this.dailyWins = state.dailyWins;
+                this.consecutiveLosses = state.consecutiveLosses;
+                this.killSwitchActive = state.killSwitchActive;
+                this.currentDailyLossAmount = state.currentDailyLossAmount;
+                console.log(`🛡️ RiskManager state restored from DB: KillSwitch=${this.killSwitchActive}`);
+            }
+        } catch (e) {
+            console.error('Failed to load RiskState:', e.message);
+        }
+    }
+
+    async _persistState() {
+        try {
+            const mongoose = require('mongoose');
+            if (mongoose.connection.readyState !== 1) return;
+            const RiskState = require('../models/RiskState');
+            await RiskState.findOneAndUpdate(
+                { date: this.today },
+                {
+                    dailyLosses: this.dailyLosses,
+                    dailyWins: this.dailyWins,
+                    consecutiveLosses: this.consecutiveLosses,
+                    killSwitchActive: this.killSwitchActive,
+                    currentDailyLossAmount: this.currentDailyLossAmount
+                },
+                { upsert: true, new: true }
+            );
+        } catch (e) {
+            console.error('Failed to persist RiskState:', e.message);
+        }
     }
 
     // Reset tracking if a new trading day begins
@@ -27,6 +70,7 @@ class RiskManager {
             this.currentDailyLossAmount = 0;
             this.killSwitchActive = false;
             console.log("🌅 New Trading Day: Daily Kill Switch and Risk Counters reset.");
+            this._persistState(); // Save the reset state
         }
     }
 
@@ -136,12 +180,16 @@ class RiskManager {
             this.currentDailyLossAmount += Math.abs(pnl);
             console.warn(`❌ Trade Loss recorded for ${symbol}: -₹${Math.abs(pnl)}. Consecutive Losses today: ${this.consecutiveLosses}`);
 
-            if (this.consecutiveLosses >= this.maxConsecutiveLosses || this.currentDailyLossAmount >= this.maxDailyLossAmount) {
+        if (this.consecutiveLosses >= this.maxConsecutiveLosses || this.currentDailyLossAmount >= this.maxDailyLossAmount) {
                 this.killSwitchActive = true;
                 console.error(`🚨 DAILY KILL SWITCH ACTIVATED! 2 Consecutive Losses hit or Max Loss exceeded today. System shut down until tomorrow.`);
             }
         }
         
+        // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+        // Persist the state to MongoDB so it survives server restarts
+        this._persistState();
+
         return {
             today: this.today,
             wins: this.dailyWins,
