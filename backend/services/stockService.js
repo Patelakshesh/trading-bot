@@ -11,13 +11,7 @@ const getStockPrice = async (symbol) => {
     if (!symbol) return null;
     const querySymbol = symbol; // Trust the symbol exactly as passed
     
-    // Check Cache first (30 second cache to prevent rate-limiting)
-    if (priceCache.has(querySymbol)) {
-        const cached = priceCache.get(querySymbol);
-        if (Date.now() - cached.timestamp < CACHE_DURATION_MS) {
-            return cached.price;
-        }
-    }
+    // Cache removed: We now pull 0-second live data directly from Angle One!
 
     // --- NEW PRIMARY: Angle One (Super Reliable, Real-time) ---
     try {
