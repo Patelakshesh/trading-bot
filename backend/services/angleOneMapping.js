@@ -68,10 +68,12 @@ class AngleOneMapping {
     }
 
     getToken(symbol) {
+        if (!symbol) return null;
+        symbol = symbol.toUpperCase();
         // symbol like "RELIANCE.NS"
         if (symbol === 'NIFTY' || symbol === '^NSEI') return this.tokenMap.get('NIFTY');
         if (symbol === 'BANKNIFTY' || symbol === '^NSEBANK') return this.tokenMap.get('BANKNIFTY');
-        if (symbol === 'CRUDE') return this.tokenMap.get('MCX-CRUDEOIL');
+        if (symbol === 'CRUDE' || symbol === 'CRUDEOIL') return this.tokenMap.get('MCX-CRUDEOIL');
         if (symbol === 'GOLD') return this.tokenMap.get('MCX-GOLD');
 
         const cleanSymbol = symbol.split('.')[0];
