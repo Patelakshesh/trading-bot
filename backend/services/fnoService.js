@@ -269,7 +269,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
             if (hourIST >= 10 && hourIST < 17) {
                 return {
                     status: 'NO_TRADE',
-                    message: `⚠️ DAYTIME KILL SWITCH ACTIVE: Current CRUDE OIL Spot is $${currentPrice.toFixed(2)}. \n\nDo NOT trade Crude Oil during Indian Daytime (10 AM to 5 PM). The volume is completely dead and filled with localized MCX traps and Theta decay. Wait for the US Pre-Market at 5:00 PM!`
+                    message: `⚠️ DAYTIME KILL SWITCH ACTIVE: Current CRUDE OIL Spot is ₹${currentPrice.toFixed(2)}. \n\nDo NOT trade Crude Oil during Indian Daytime (10 AM to 5 PM). The volume is completely dead and filled with localized MCX traps and Theta decay. Wait for the US Pre-Market at 5:00 PM!`
                 };
             }
         }
