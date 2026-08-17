@@ -16,6 +16,7 @@ const { analyzePortfolio, getStockAnalysis } = require('./services/aiService');
 const { getTechnicalIndicators } = require('./services/technicalService');
 const advancedDataService = require('./services/advancedDataService');
 const intradayService = require('./services/intradayService');
+const angleOneService = require('./services/angleOneService');
 
 const app = express();
 app.use(cors());
@@ -1781,6 +1782,14 @@ cron.schedule('0 15 * * 1-5', async () => {
 }, { timezone: 'UTC' });
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`Server running on port ${PORT}`);
+    
+    // Initialize Angle One on startup
+    const loggedIn = await angleOneService.login();
+    if (loggedIn) {
+        console.log("🟢 Ready to execute live trades on Angle One API!");
+    } else {
+        console.log("⚠️ Running in mock mode (Angle One not connected)");
+    }
 });
