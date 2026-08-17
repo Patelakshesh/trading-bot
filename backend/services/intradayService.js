@@ -10,6 +10,26 @@ const riskManager = require('./riskService');
 const { EMA, ATR, bullishhammer, bullishengulfingpattern } = require('technicalindicators');
 
 // ==========================================
+// SECTOR PEER MAPPING (For /best Confluence)
+// ==========================================
+const SECTOR_PEERS = {
+    'IT': ['TCS.NS', 'INFY.NS', 'HCLTECH.NS', 'WIPRO.NS', 'TECHM.NS'],
+    'BANKING': ['HDFCBANK.NS', 'ICICIBANK.NS', 'SBIN.NS', 'AXISBANK.NS', 'KOTAKBANK.NS'],
+    'AUTO': ['TATAMOTORS.NS', 'M&M.NS', 'MARUTI.NS', 'BAJAJ-AUTO.NS', 'EICHERMOT.NS'],
+    'PHARMA': ['SUNPHARMA.NS', 'CIPLA.NS', 'DRREDDY.NS', 'DIVISLAB.NS'],
+    'ENERGY': ['RELIANCE.NS', 'ONGC.NS', 'NTPC.NS', 'POWERGRID.NS', 'COALINDIA.NS'],
+    'FMCG': ['ITC.NS', 'HUL.NS', 'NESTLEIND.NS', 'BRITANNIA.NS', 'TATACONSUM.NS'],
+    'METALS': ['TATASTEEL.NS', 'HINDALCO.NS', 'JSWSTEEL.NS']
+};
+
+function getSectorForSymbol(symbol) {
+    for (const [sector, peers] of Object.entries(SECTOR_PEERS)) {
+        if (peers.includes(symbol.toUpperCase())) return sector;
+    }
+    return null;
+}
+
+// ==========================================
 // 🧠 PHASE 1, 3 & 5 MATH VERIFICATION ENGINE
 // ==========================================
 async function validateIntradayMath(symbol, currentPrice, currentVolume) {
@@ -1124,6 +1144,29 @@ async function getCombinedMasterSetups(capital = 20000) {
             if (!pick.isAboveVwap) {
                 console.log(`❌ [/best MATH REJECT] ${pick.symbol}: Below TRUE VWAP (${pick.vwap})`);
                 continue;
+            }
+            
+            // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+            // 🏢 SECTOR PEER BREADTH CHECK: A real breakout drags the sector with it.
+            const sector = getSectorForSymbol(pick.symbol);
+            if (sector) {
+                const peers = SECTOR_PEERS[sector].filter(p => p !== pick.symbol.toUpperCase());
+                let movingPeers = 0;
+                try {
+                    const peerQuotes = await yahooFinance.quote(peers);
+                    for (const pq of peerQuotes) {
+                        if (pq.regularMarketChangePercent && pq.regularMarketChangePercent >= 0.5) {
+                            movingPeers++;
+                        }
+                    }
+                } catch (e) {
+                    console.log(`⚠️ Failed to fetch sector peers for ${pick.symbol}`);
+                }
+
+                if (movingPeers < 1) {
+                    console.log(`❌ [/best SECTOR REJECT] ${pick.symbol}: Sector (${sector}) is weak. No peers moving > +0.5%. Suspected Fake Breakout trap.`);
+                    continue; // REJECT if sector is not participating
+                }
             }
             
             pick.doubleCheckReason = `(Master Engine Verified) | ${mathEval.reason} | Sources: ${pick.sources.join(', ')}`;
