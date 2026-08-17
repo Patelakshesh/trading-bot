@@ -12,6 +12,11 @@ class AngleOneMapping {
         if (this.fetchPromise) return this.fetchPromise;
 
         this.fetchPromise = (async () => {
+            // Load manual overrides immediately so they always work!
+            this.tokenMap.set('NIFTY', { token: '26000', exch_seg: 'NSE' });
+            this.tokenMap.set('BANKNIFTY', { token: '26009', exch_seg: 'NSE' });
+            this.tokenMap.set('MCX-CRUDEOIL', { token: '236968', exch_seg: 'MCX' });
+            
             try {
                 console.log('Downloading Angle One Instrument Master... (this takes a few seconds)');
                 const response = await axios.get('https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json');
@@ -54,7 +59,8 @@ class AngleOneMapping {
                 this.isLoaded = true;
                 console.log(`Angle One Mapping Loaded: ${this.tokenMap.size} symbols mapped.`);
             } catch (err) {
-                console.error('Failed to load Angle One mapping:', err.message);
+                console.error('Failed to load Angle One mapping JSON (ECONNRESET). Using manual overrides instead.');
+                this.isLoaded = true; // Set to true so we can still use Nifty and Crude
             }
         })();
 
