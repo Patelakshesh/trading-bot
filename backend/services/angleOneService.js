@@ -1,5 +1,5 @@
 const axios = require('axios');
-const totp = require('totp-generator');
+const { TOTP } = require('totp-generator');
 
 class AngleOneService {
   constructor() {
@@ -27,7 +27,7 @@ class AngleOneService {
       }
 
       // 1. Generate live TOTP PIN using the secret you generated
-      const currentTotp = totp(this.totpSecret);
+      const { otp: currentTotp } = await TOTP.generate(this.totpSecret);
       
       console.log('Attempting Angle One Login with TOTP...');
 
