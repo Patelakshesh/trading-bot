@@ -1,5 +1,7 @@
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
+const angleOneService = require('./angleOneService');
+const angleOneMapping = require('./angleOneMapping');
 
 // In-memory cache to prevent Yahoo Finance rate-limiting (HTTP 429)
 const priceCache = new Map();
@@ -17,7 +19,23 @@ const getStockPrice = async (symbol) => {
         }
     }
 
-    // --- PRIMARY: Yahoo Finance (Reliable, correct prices) ---
+    // --- NEW PRIMARY: Angle One (Super Reliable, Real-time) ---
+    try {
+        await angleOneMapping.init();
+        const mapped = angleOneMapping.getToken(symbol);
+        if (mapped && angleOneService.jwtToken) {
+            const price = await angleOneService.getQuote(mapped.exch_seg, mapped.token);
+            if (price && price > 0) {
+                priceCache.set(querySymbol, { price, timestamp: Date.now() });
+                console.log(`[AngleOne] ${symbol} = ₹${price}`);
+                return price;
+            }
+        }
+    } catch (a1Error) {
+        console.warn(`[AngleOne] Failed for ${symbol}: ${a1Error.message}. Trying Yahoo...`);
+    }
+
+    // --- FALLBACK 1: Yahoo Finance (Reliable, correct prices) ---
     try {
         const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Yahoo Timeout')), 5000));
         const quote = await Promise.race([yahooFinance.quote(querySymbol), timeout]);

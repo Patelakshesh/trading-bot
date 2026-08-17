@@ -83,6 +83,33 @@ class AngleOneService {
       'Authorization': `Bearer ${this.jwtToken}`
     };
   }
+  async getQuote(exchange, token) {
+    if (!this.jwtToken) return null;
+    try {
+      const response = await axios.post(
+        'https://apiconnect.angelbroking.com/rest/secure/angelbroking/market/v1/quote/',
+        {
+          mode: "FULL",
+          exchangeTokens: {
+            [exchange]: [token]
+          }
+        },
+        { headers: this.getHeaders() }
+      );
+      
+      if (response.data && response.data.status && response.data.data && response.data.data.fetched) {
+        const fetchedData = response.data.data.fetched;
+        const item = fetchedData.find(f => f.exchange === exchange);
+        if (item && item.ltp) {
+          return item.ltp;
+        }
+      }
+      return null;
+    } catch (err) {
+      console.error(`❌ Angle One Quote Error for ${exchange}:${token}:`, err.response?.data || err.message);
+      return null;
+    }
+  }
 }
 
 module.exports = new AngleOneService();
