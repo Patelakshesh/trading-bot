@@ -613,6 +613,13 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
         return { timeStatus, setups: [], globalSentiment: globalCues };
     }
 
+    // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+    // 📉 NIFTY BREADTH GATE: Never swim against the tide.
+    if (!targetSymbol && globalCues.niftyChange !== undefined && globalCues.niftyChange < -0.4) {
+        console.log(`📉 [BREADTH GATE] Nifty is down ${globalCues.niftyChange.toFixed(2)}%. Blocking all BUY signals to prevent fakeouts.`);
+        return { timeStatus, setups: [], globalSentiment: globalCues };
+    }
+
     const candidates = targetSymbol 
         ? [(targetSymbol.toUpperCase().endsWith('.NS') || targetSymbol.toUpperCase().endsWith('.BO')) ? targetSymbol.toUpperCase() : `${targetSymbol.toUpperCase()}.NS`] 
         : [...INTRADAY_UNIVERSE];

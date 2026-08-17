@@ -290,20 +290,28 @@ async function getFNOTrade(instrumentType = 'nifty') {
             }
         }
 
+        // --- NEW QUANT FILTERS FROM WIN_RATE_MAXIMIZE.md ---
+        if (instrumentType.toLowerCase() === 'crude' && currentADX < 22) {
+            return {
+                status: 'NO_TRADE',
+                message: `⚠️ LOW MOMENTUM KILL SWITCH: ${instrumentName} ADX is ${currentADX.toFixed(1)}. \n\nThe market is sideways. Buying options now guarantees loss via Theta decay. Only trade when ADX > 22.`
+            };
+        }
+
         const emaGapPercent = (Math.abs(ema5 - ema20) / currentPrice) * 100;
         const validGap = emaGapPercent >= 0.05;
 
-        // CALL OPTION LOGIC (Requires valid gap + ADX > 25 + RSI > 50)
-        if (ema5 > ema20 && validGap && candleGain > 0 && currentRSI > 50 && currentADX >= 25) {
+        // CALL OPTION LOGIC (Requires valid gap + ADX > 22 + RSI between 45 and 68)
+        if (ema5 > ema20 && validGap && candleGain > 0 && currentRSI >= 45 && currentRSI <= 68 && currentADX >= 22) {
             signal = "BUY";
             optionType = "CE (CALL)";
-            logic = `🔥 EXPLOSIVE TREND CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bullish (${currentRSI.toFixed(1)}). The EMA gap has widened to a breakout level on bullish volume. This is a high-probability entry setup!`;
+            logic = `🔥 EXPLOSIVE TREND CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is healthy (${currentRSI.toFixed(1)}). The EMA gap has widened to a breakout level on bullish volume. This is a high-probability entry setup!`;
         } 
-        // PUT OPTION LOGIC (Requires valid gap + ADX > 25 + RSI < 50)
-        else if (ema5 < ema20 && validGap && candleGain < 0 && currentRSI < 50 && currentADX >= 25) {
+        // PUT OPTION LOGIC (Requires valid gap + ADX > 22 + RSI between 32 and 55)
+        else if (ema5 < ema20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22) {
             signal = "BUY";
             optionType = "PE (PUT)";
-            logic = `🩸 BEARISH BREAKDOWN CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is Bearish (${currentRSI.toFixed(1)}). The EMA gap has widened downward on selling volume. Massive short trigger activated!`;
+            logic = `🩸 BEARISH BREAKDOWN CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is healthy bearish (${currentRSI.toFixed(1)}). The EMA gap has widened downward on selling volume. Massive short trigger activated!`;
         }
         else {
             let spotDisplay = `${currentPrice.toFixed(2)}`;
