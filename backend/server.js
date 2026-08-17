@@ -372,11 +372,11 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 let backtestMsg = '';
                 if (backtest && backtest.trades && backtest.trades.length > 0) {
                     let winningTrades = 0;
-                    let lastBuyPrice = 0;
+                    let lastBuyPrice = null; // FIX: Prevent 0 from inflating win rate on first sell
                     for (const t of backtest.trades) {
                         if (t.type === 'BUY') lastBuyPrice = t.price;
                         if (t.type === 'SELL') {
-                            if (t.price > lastBuyPrice) winningTrades++;
+                            if (lastBuyPrice !== null && t.price > lastBuyPrice) winningTrades++;
                         }
                     }
                     const totalSellTrades = backtest.trades.filter(t => t.type === 'SELL').length;
@@ -642,7 +642,10 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                                     const aiTarget = parseFloat(t.target.toString().replace(/[^0-9.]/g, ''));
                                     const aiSL = parseFloat(t.stopLoss.toString().replace(/[^0-9.]/g, ''));
                                     
-                                    if (aiEntry > 0 && aiTarget > 0) targetMultiplier = aiTarget / aiEntry;
+                                    if (aiEntry > 0 && aiTarget > 0) {
+                    targetMultiplier = aiTarget / aiEntry;
+                    if (targetMultiplier > 1.20 || targetMultiplier < 0.80) targetMultiplier = 1.05; // FIX: Cap AI hallucination at +/- 20%
+                }
                                     if (aiEntry > 0 && aiSL > 0) slMultiplier = aiSL / aiEntry;
                                 }
 
@@ -701,6 +704,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             const timeCheck = intradayService.checkIndianMarketTime();
             if (!timeCheck.isOpen) {
                 await bot.sendMessage(chatId, timeCheck.reason, { parse_mode: 'Markdown' });
+                return; // FIX: Prevent expensive scanner from running if market is closed
             }
 
             const result = await intradayService.getIntradaySetups(targetArg, 20000); // Assume standard ₹20k baseline capital
@@ -823,6 +827,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             const timeCheck = intradayService.checkIndianMarketTime();
             if (!timeCheck.isOpen) {
                 await bot.sendMessage(chatId, timeCheck.reason, { parse_mode: 'Markdown' });
+                return; // FIX: Prevent expensive scanner from running if market is closed
             }
 
             const result = await intradayService.getIntraday30Setups(targetArg, 20000);
