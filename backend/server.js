@@ -288,6 +288,29 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         }
     });
 
+    bot.onText(/^\/debug (.*)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const symbol = match[1].toUpperCase();
+        const angleOneMapping = require('./services/angleOneMapping');
+        const angleOneService = require('./services/angleOneService');
+        try {
+            await angleOneMapping.init();
+            const mapped = angleOneMapping.getToken(symbol);
+            if (!mapped) return bot.sendMessage(chatId, `Debug: Symbol not found in mapping.`);
+            bot.sendMessage(chatId, `Debug: Mapped to ${mapped.exch_seg} ${mapped.token}. Fetching quote...`);
+            
+            const axios = require('axios');
+            const response = await axios.post(
+                'https://apiconnect.angelbroking.com/rest/secure/angelbroking/market/v1/quote/',
+                { mode: "FULL", exchangeTokens: { [mapped.exch_seg]: [mapped.token] } },
+                { headers: angleOneService.getHeaders() }
+            );
+            bot.sendMessage(chatId, `Debug Success: ${JSON.stringify(response.data).substring(0, 500)}`);
+        } catch (e) {
+            bot.sendMessage(chatId, `Debug Error: ${e.message} | ${JSON.stringify(e.response?.data || {}).substring(0, 500)}`);
+        }
+    });
+
     // 3. New /tip command (Instant AI Recommendation or Global Top 5)
     bot.onText(/\/tip(?:\s+(.+))?/, async (msg, match) => {
         const chatId = msg.chat.id;
