@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const cron = require('node-cron');
 const TelegramBot = require('node-telegram-bot-api').default || require('node-telegram-bot-api');
+const YahooFinance = require('yahoo-finance2').default;
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
 
 const Portfolio = require('./models/Portfolio');
 const Watchlist = require('./models/Watchlist');
@@ -392,6 +394,21 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 const analysis = await getStockAnalysis(symbol, news, technicals, currentPrice, holding);
                 
                 if (analysis && analysis.action) {
+                    
+                    // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+                    // If action is BUY but stock is already up > 3.5% today, block it to prevent chasing
+                    if (analysis.action === 'BUY' && !holding) {
+                        try {
+                            const q = await yahooFinance.quote(symbol);
+                            if (q && q.regularMarketChangePercent > 3.5) {
+                                analysis.action = 'SKIP';
+                                analysis.reasoning = `OVERBOUGHT: Stock is already up ${q.regularMarketChangePercent.toFixed(2)}% today. The move is exhausted. Do not chase.`;
+                            }
+                        } catch (err) {
+                            console.error("Tip Change Check Error:", err.message);
+                        }
+                    }
+
                     const actionIcon = analysis.action === 'BUY' ? '🟢' : analysis.action === 'SELL' ? '🔴' : '🟡';
                     
                     const livePrice = currentPrice || 0;
@@ -1106,6 +1123,15 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     // 4.5. New /predict command (Tomorrow's Movers)
     bot.onText(/\/(predict)/, async (msg) => {
         const chatId = msg.chat.id;
+
+        // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+        const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+        const hour = nowIST.getUTCHours();
+        const min = nowIST.getUTCMinutes();
+        if (hour < 15 || (hour === 15 && min < 15)) {
+             return bot.sendMessage(chatId, `🚫 <b>/predict is locked until 3:15 PM.</b>\n\nPredictions made during market hours are highly inaccurate due to closing volatility. Wait until the final 15 minutes of the session to scan for tomorrow's movers!`, {parse_mode: 'HTML'});
+        }
+
         bot.sendMessage(chatId, `🔮 **PREDICTION ENGINE RUNNING...**\nScanning 191 stocks using RSI, MACD, Volume Spikes, and Bollinger Bands. This takes ~30 seconds...`, {parse_mode: 'Markdown'});
         
         try {

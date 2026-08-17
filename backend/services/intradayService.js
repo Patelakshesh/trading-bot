@@ -71,16 +71,20 @@ async function validateIntradayMath(symbol, currentPrice, currentVolume) {
             }
         }
 
-        // PRIORITY 4: Volume Spike Detection
+        // PRIORITY 4: Volume Spike Detection (Extrapolated for time of day)
         const dailyVols = daily.quotes.map(q => q.volume).filter(v => v !== null).slice(-10);
         const avgVol10d = dailyVols.length > 0 ? dailyVols.reduce((a, b) => a + b, 0) / dailyVols.length : 1;
-        const volumeRatio = currentVolume / avgVol10d;
         
-        // For early morning (before 10:30), volume will naturally be lower than full daily average, 
-        // so we don't strictly block it, but we log it.
-        const timeH = new Date().getHours();
-        if (timeH >= 11 && volumeRatio < 0.25) {
-             return { valid: false, reason: `Volume is too weak (${volumeRatio.toFixed(2)}x of avg). Fake breakout risk.` };
+        // NSE Day is 375 minutes (9:15 to 15:30)
+        const nowISTVolumeCheck = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+        const minutesFromOpen = Math.max(1, (nowISTVolumeCheck.getUTCHours() - 9) * 60 + nowISTVolumeCheck.getUTCMinutes() - 15);
+        const fractionOfDay = Math.max(0.1, Math.min(1, minutesFromOpen / 375));
+        const extrapolatedVolume = currentVolume / fractionOfDay;
+        const trueVolumeRatio = extrapolatedVolume / avgVol10d;
+
+        // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+        if (trueVolumeRatio < 1.2) {
+             return { valid: false, reason: `Volume pace is too weak (${trueVolumeRatio.toFixed(2)}x expected). Real breakouts need >1.2x.` };
         }
 
         // PHASE 3: TRUE VWAP CALCULATION (Session-Only: resets at 9:15 AM IST every day)
@@ -585,6 +589,10 @@ function checkIndianMarketTime() {
     
     if (day === 0 || day === 6) {
         return { isOpen: false, reason: '🏖️ Indian Markets are currently CLOSED for the weekend.' };
+    }
+    // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+    if (day === 1) { // 1 = Monday
+        return { isOpen: false, reason: '🚫 INTRADAY BLOCKED: Monday Trading is disabled. Weekend gaps cause artificial chart noise and false breakouts. Capital preservation mode active.' };
     }
     if (totalMinutes < marketOpen) {
         return { isOpen: false, reason: `⏳ Indian Markets open at 9:15 AM IST. Current time: ${h}:${String(m).padStart(2,'0')}.` };

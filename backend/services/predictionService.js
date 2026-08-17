@@ -15,16 +15,32 @@ async function calculatePredictionScore(symbol) {
         const closes = quotes.map(q => q.close);
         const volumes = quotes.map(q => q.volume);
         
-        // STEP 4 Fix: 200-SMA Macro Trend Shield
+        // STEP 4 Fix: 200-SMA Macro Trend Shield & 50-EMA Uptrend Rule (WIN_RATE_MAXIMIZE.md)
         const sma200 = SMA.calculate({ period: 200, values: closes });
-        if (sma200.length > 0) {
+        const ema50 = EMA.calculate({ period: 50, values: closes });
+        if (sma200.length > 0 && ema50.length >= 2) {
             const currentSma200 = sma200[sma200.length - 1];
             const currentClose = closes[closes.length - 1];
+            
+            const currentEma50 = ema50[ema50.length - 1];
+            const prevEma50 = ema50[ema50.length - 2];
+
             if (currentClose < currentSma200) {
                 return null; // Reject: Trading below 200-SMA (Bearish Macro Trend)
             }
+            if (currentEma50 <= prevEma50) {
+                return null; // Reject: 50-EMA is flattening or pointing down
+            }
         }
         
+        // NEW MANDATORY QUANT FILTER: Volume must be > 1.5x average
+        const recentVols = volumes.slice(-11, -1);
+        const avgVol10d = recentVols.reduce((a, b) => a + b, 0) / (recentVols.length || 1);
+        const currentVol = volumes[volumes.length - 1];
+        if (currentVol < avgVol10d * 1.5) {
+            return null; // Reject: No institutional volume detected
+        }
+
         let score = 0;
         let reasons = [];
 
@@ -53,10 +69,7 @@ async function calculatePredictionScore(symbol) {
             }
         }
 
-        // 3. Volume > 2x Average (+20 points)
-        const recentVols = volumes.slice(-11, -1);
-        const avgVol10d = recentVols.reduce((a, b) => a + b, 0) / 10;
-        const currentVol = volumes[volumes.length - 1];
+        // 3. Volume > 2x Average (+20 points bonus)
         if (currentVol > avgVol10d * 2) {
             score += 20;
             reasons.push('2x Institutional Volume Spike');
