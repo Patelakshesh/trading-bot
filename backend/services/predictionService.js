@@ -52,6 +52,22 @@ async function calculatePredictionScore(symbol) {
             if (prevRsi < 30 && currentRsi >= 30) {
                 score += 25;
                 reasons.push('RSI Oversold Bounce');
+                
+                // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+                // Check for Candlestick Reversal Pattern on RSI Bounce
+                const { bullishhammer, bullishengulfingpattern } = require('technicalindicators');
+                const last2Open = quotes.slice(-2).map(q => q.open);
+                const last2High = quotes.slice(-2).map(q => q.high);
+                const last2Low = quotes.slice(-2).map(q => q.low);
+                const last2Close = quotes.slice(-2).map(q => q.close);
+                
+                const isHammer = bullishhammer({ open: last2Open, high: last2High, low: last2Low, close: last2Close });
+                const isEngulfing = bullishengulfingpattern({ open: last2Open, high: last2High, low: last2Low, close: last2Close });
+                
+                if (isHammer || isEngulfing) {
+                    score += 15;
+                    reasons.push(isHammer ? 'Bullish Hammer Formation' : 'Bullish Engulfing Pattern');
+                }
             } else if (currentRsi > 55 && currentRsi < 70 && currentRsi > prevRsi) {
                 score += 10;
                 reasons.push('RSI Bullish Momentum');
