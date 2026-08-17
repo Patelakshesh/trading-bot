@@ -19,7 +19,7 @@ class AngleOneMapping {
             
             try {
                 console.log('Downloading Angle One Instrument Master... (this takes a few seconds)');
-                const response = await axios.get('https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json');
+                const response = await axios.get('https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json', { timeout: 8000 });
                 const data = response.data;
                 
                 for (const item of data) {
