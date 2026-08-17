@@ -49,8 +49,12 @@ async function validateIntradayMath(symbol, currentPrice, currentVolume) {
 
         const m5Closes = d5m.quotes.map(q => q.close).filter(c => c !== null);
         
+        // BUG FIX: Inject 0-second live price into the arrays to eliminate delayed historical candle lag!
+        if (m5Closes.length > 0) m5Closes[m5Closes.length - 1] = currentPrice;
+        
         // STEP 1: 1-Hour Trend Confluence (Boosts Win Rate)
         const h1Closes = d1h.quotes.map(q => q.close).filter(c => c !== null);
+        if (h1Closes.length > 0) h1Closes[h1Closes.length - 1] = currentPrice;
         const ema20_1h = EMA.calculate({ period: 20, values: h1Closes });
         if (ema20_1h.length > 0) {
             const current1hEma = ema20_1h[ema20_1h.length - 1];

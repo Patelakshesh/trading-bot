@@ -199,8 +199,11 @@ async function getFNOTrade(instrumentType = 'nifty') {
         
         const { ADX } = require('technicalindicators');
         
-        // BUG FIX: Inject the true live price into the closes array so EMA calculation is 0-second accurate!
+        // BUG FIX: Inject the true live price into the closes and quotes array so EMA and ADX calculations are 0-second accurate!
         closes[closes.length - 1] = currentPrice;
+        quotes[quotes.length - 1].close = currentPrice;
+        if (currentPrice > quotes[quotes.length - 1].high) quotes[quotes.length - 1].high = currentPrice;
+        if (currentPrice < quotes[quotes.length - 1].low) quotes[quotes.length - 1].low = currentPrice;
 
         const ema5Data = calculateEMA(closes, 5);
         const ema20Data = calculateEMA(closes, 20);
