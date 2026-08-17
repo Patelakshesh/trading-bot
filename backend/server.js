@@ -1816,3 +1816,23 @@ app.listen(PORT, async () => {
         console.log("⚠️ Running in mock mode (Angle One not connected)");
     }
 });
+
+// --- FIX: GRACEFUL SHUTDOWN FOR RENDER ZERO-DOWNTIME DEPLOYS ---
+// Prevents Telegram "409 Conflict" by immediately killing the old bot when Render sends SIGTERM
+const gracefulShutdown = () => {
+    console.log("\n🔄 Received kill signal (SIGTERM/SIGINT). Shutting down old bot instance instantly...");
+    if (bot) {
+        bot.stopPolling().then(() => {
+            console.log("✅ Telegram polling stopped.");
+            process.exit(0);
+        }).catch((err) => {
+            console.error("❌ Error stopping bot:", err);
+            process.exit(1);
+        });
+    } else {
+        process.exit(0);
+    }
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
