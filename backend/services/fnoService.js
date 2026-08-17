@@ -117,7 +117,10 @@ async function getFNOTrade(instrumentType = 'nifty') {
             
             if (instrumentType.toLowerCase() === 'crude') {
                 a1Exchange = 'MCX';
-                a1Token = '560978'; // CRUDEOILM (Mini August Expiry)
+                // Auto-roller: reads nearest non-expired CRUDEOILM contract from AngleOne instrument master
+                const crudeToken = angleOneMapping.getCrudeOilMiniToken();
+                a1Token = crudeToken ? crudeToken.token : '560978'; // fallback only if mapping fully failed
+                console.log(`🔄 [CrudeAutoRoller] Active token: ${a1Token}`);
             } else if (instrumentType.toLowerCase() === 'gold') {
                 a1Exchange = 'MCX';
                 a1Token = '237072'; // GOLD

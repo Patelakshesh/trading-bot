@@ -11,12 +11,28 @@ class AngleOneService {
     this.jwtToken = null;
     this.feedToken = null;
     this.refreshToken = null;
+    this.loginTime = null; // Track when we last logged in
     
     // Angle One requires these headers, but they don't block you based on them when using TOTP. 
     // We provide standard dummy values here.
     this.macAddress = "00-B0-D0-63-C2-26"; 
     this.clientLocalIp = "192.168.168.168"; 
     this.clientPublicIp = "106.193.147.98"; 
+  }
+
+  // Auto-refresh: re-login if token is older than 23 hours (expires at 24h)
+  async ensureLoggedIn() {
+    const TOKEN_MAX_AGE_MS = 23 * 60 * 60 * 1000; // 23 hours
+    const isExpired = !this.jwtToken || !this.loginTime || (Date.now() - this.loginTime > TOKEN_MAX_AGE_MS);
+    if (isExpired) {
+      console.log('🔄 [AngleOne] Token expired or missing. Auto re-logging in...');
+      const success = await this.login();
+      if (!success) {
+        console.error('❌ [AngleOne] Auto re-login failed. Requests will fail.');
+        return false;
+      }
+    }
+    return true;
   }
 
   async login() {
@@ -57,6 +73,7 @@ class AngleOneService {
         this.jwtToken = response.data.data.jwtToken;
         this.refreshToken = response.data.data.refreshToken;
         this.feedToken = response.data.data.feedToken;
+        this.loginTime = Date.now(); // Record login time for auto-refresh tracking
         console.log('✅ Angle One Login Successful! TOTP bypass worked.');
         return true;
       } else {
@@ -84,6 +101,7 @@ class AngleOneService {
     };
   }
   async getQuote(exchange, token) {
+    await this.ensureLoggedIn();
     if (!this.jwtToken) return null;
     try {
       const response = await axios.post(
@@ -106,12 +124,35 @@ class AngleOneService {
       }
       return null;
     } catch (err) {
-      console.error(`❌ Angle One Quote Error for ${exchange}:${token}:`, err.response?.data || err.message);
+      // 401 = token expired mid-session — force re-login once and retry
+      if (err.response?.status === 401) {
+        console.warn(`⚠️ [AngleOne] 401 on getQuote. Forcing re-login and retrying...`);
+        this.jwtToken = null; // Force ensureLoggedIn to re-login
+        const ok = await this.ensureLoggedIn();
+        if (ok) {
+          try {
+            const retry = await axios.post(
+              'https://apiconnect.angelbroking.com/rest/secure/angelbroking/market/v1/quote/',
+              { mode: "FULL", exchangeTokens: { [exchange]: [token] } },
+              { headers: this.getHeaders() }
+            );
+            if (retry.data?.data?.fetched) {
+              const item = retry.data.data.fetched.find(f => f.exchange === exchange);
+              if (item?.ltp) return item.ltp;
+            }
+          } catch (retryErr) {
+            console.error(`❌ [AngleOne] Retry also failed for getQuote:`, retryErr.message);
+          }
+        }
+      } else {
+        console.error(`❌ Angle One Quote Error for ${exchange}:${token}:`, err.response?.data || err.message);
+      }
       return null;
     }
   }
 
   async getHistoricData(exchange, token, interval = "FIVE_MINUTE", daysBack = 5) {
+    await this.ensureLoggedIn();
     if (!this.jwtToken) return [];
     try {
       const now = new Date();

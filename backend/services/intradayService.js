@@ -63,11 +63,26 @@ async function validateIntradayMath(symbol, currentPrice, currentVolume) {
              return { valid: false, reason: `Volume is too weak (${volumeRatio.toFixed(2)}x of avg). Fake breakout risk.` };
         }
 
-        // PHASE 3: TRUE VWAP CALCULATION
+        // PHASE 3: TRUE VWAP CALCULATION (Session-Only: resets at 9:15 AM IST every day)
+        // IST = UTC+5:30. 9:15 AM IST = 3:45 AM UTC. We filter to only today's session candles.
+        const todayIST = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+        const nowIST = new Date(todayIST.getTime() + istOffset);
+        // Build today's 9:15 AM IST as a UTC timestamp
+        const sessionStartIST = new Date(Date.UTC(
+            nowIST.getUTCFullYear(),
+            nowIST.getUTCMonth(),
+            nowIST.getUTCDate(),
+            3, 45, 0, 0 // 3:45 AM UTC = 9:15 AM IST
+        ));
+
         let cumulativeTPV = 0;
         let cumulativeVolume = 0;
         for (const candle of d5m.quotes) {
             if (candle.high !== null && candle.low !== null && candle.close !== null && candle.volume !== null) {
+                // Only include candles from today's market session (9:15 AM IST onwards)
+                const candleTime = new Date(candle.date * 1000);
+                if (candleTime < sessionStartIST) continue; // Skip pre-market & previous day candles
                 const typicalPrice = (candle.high + candle.low + candle.close) / 3;
                 cumulativeTPV += typicalPrice * candle.volume;
                 cumulativeVolume += candle.volume;

@@ -15,7 +15,8 @@ class AngleOneMapping {
             // Load manual overrides immediately so they always work!
             this.tokenMap.set('NIFTY', { token: '26000', exch_seg: 'NSE' });
             this.tokenMap.set('BANKNIFTY', { token: '26009', exch_seg: 'NSE' });
-            this.tokenMap.set('MCX-CRUDEOIL', { token: '560978', exch_seg: 'MCX' }); // CRUDEOILM19AUG26FUT (Mini)
+            // NOTE: CRUDEOILM token is NOT hardcoded here anymore — it is auto-discovered
+            // from the AngleOne Instrument Master JSON below (nearest expiry logic).
             
             try {
                 console.log('Downloading Angle One Instrument Master... (this takes a few seconds)');
@@ -73,7 +74,7 @@ class AngleOneMapping {
         // symbol like "RELIANCE.NS"
         if (symbol === 'NIFTY' || symbol === '^NSEI') return this.tokenMap.get('NIFTY');
         if (symbol === 'BANKNIFTY' || symbol === '^NSEBANK') return this.tokenMap.get('BANKNIFTY');
-        if (symbol === 'CRUDE' || symbol === 'CRUDEOIL' || symbol === 'CRUDEOILM' || symbol === 'CRUDEOILM.MCX') return this.tokenMap.get('MCX-CRUDEOIL');
+        if (symbol === 'CRUDE' || symbol === 'CRUDEOIL' || symbol === 'CRUDEOILM' || symbol === 'CRUDEOILM.MCX') return this.getCrudeOilMiniToken();
         if (symbol === 'GOLD') return this.tokenMap.get('MCX-GOLD');
 
         const cleanSymbol = symbol.split('.')[0];
@@ -82,6 +83,26 @@ class AngleOneMapping {
         } else {
             return this.tokenMap.get(`${cleanSymbol}-EQ`);
         }
+    }
+
+    // Returns the active (nearest non-expired) CRUDEOILM Mini token from the instrument master.
+    // Falls back to the last known token only if the instrument master failed to load.
+    getCrudeOilMiniToken() {
+        // The MCX nearest-expiry picker stores CRUDEOILM under 'MCX-CRUDEOILM'
+        const fromMaster = this.tokenMap.get('MCX-CRUDEOILM');
+        if (fromMaster && fromMaster.token) {
+            console.log(`🔄 [CrudeAutoRoller] Using live token: ${fromMaster.token} (expires ${fromMaster.expiry})`);
+            return fromMaster;
+        }
+        // Also try the key set by manual override on failed JSON load
+        const fromOverride = this.tokenMap.get('MCX-CRUDEOIL');
+        if (fromOverride && fromOverride.token) {
+            console.warn(`⚠️ [CrudeAutoRoller] Instrument master not loaded. Using fallback token: ${fromOverride.token}`);
+            return fromOverride;
+        }
+        // Absolute last resort — log clearly so you know it's stale
+        console.error(`❌ [CrudeAutoRoller] No valid CRUDEOILM token found! Using emergency hardcoded token. Please check AngleOne API connectivity.`);
+        return { token: '560978', exch_seg: 'MCX' };
     }
 }
 
