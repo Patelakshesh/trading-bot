@@ -117,7 +117,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
             
             if (instrumentType.toLowerCase() === 'crude') {
                 a1Exchange = 'MCX';
-                a1Token = '236968'; // CRUDEOIL
+                a1Token = '560977'; // CRUDEOIL (August Expiry)
             } else if (instrumentType.toLowerCase() === 'gold') {
                 a1Exchange = 'MCX';
                 a1Token = '237072'; // GOLD

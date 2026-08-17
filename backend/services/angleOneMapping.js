@@ -15,7 +15,7 @@ class AngleOneMapping {
             // Load manual overrides immediately so they always work!
             this.tokenMap.set('NIFTY', { token: '26000', exch_seg: 'NSE' });
             this.tokenMap.set('BANKNIFTY', { token: '26009', exch_seg: 'NSE' });
-            this.tokenMap.set('MCX-CRUDEOIL', { token: '236968', exch_seg: 'MCX' });
+            this.tokenMap.set('MCX-CRUDEOIL', { token: '560977', exch_seg: 'MCX' }); // CRUDEOIL19AUG26FUT
             
             try {
                 console.log('Downloading Angle One Instrument Master... (this takes a few seconds)');
