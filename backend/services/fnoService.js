@@ -87,12 +87,12 @@ async function getFNOTrade(instrumentType = 'nifty') {
         let tvSymbol = 'NSE:NIFTY'; // Nifty 0-sec live
 
         if (instrumentType.toLowerCase() === 'crude') {
-            symbol = 'CRUDEOIL.MCX'; 
+            symbol = 'CL=F'; // Global WTI Crude Oil
             instrumentName = 'CRUDE OIL (MCX)';
-            mcxNote = "Crude Oil Options (Trade the MCX current month expiry)";
-            stepSize = 10; 
+            mcxNote = "Crude Oil Options (Chart analysis via Global WTI due to MCX data limits)";
+            stepSize = 1; 
             useTradingView = true;
-            tvSymbol = 'MCX:CRUDEOIL1!'; // Scanning true Indian Market now!
+            tvSymbol = 'TVC:USOIL'; // Reverting to Global proxy to avoid Permission Denied
         } else if (instrumentType.toLowerCase() === 'gold') {
             symbol = 'GC=F';
             instrumentName = 'GOLD (MCX)';
