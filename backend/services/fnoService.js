@@ -89,9 +89,9 @@ async function getFNOTrade(instrumentType = 'nifty') {
         let tvSymbol = 'NSE:NIFTY'; // Nifty 0-sec live
 
         if (instrumentType.toLowerCase() === 'crude') {
-            symbol = 'CRUDEOIL.MCX'; 
-            instrumentName = 'CRUDE OIL (MCX)';
-            mcxNote = "Crude Oil Options (Scanning true Indian MCX Market directly via Angle One)";
+            symbol = 'CRUDEOILM.MCX'; 
+            instrumentName = 'CRUDE OIL MINI (MCX)';
+            mcxNote = "Crude Oil Mini Options (Scanning true Indian MCX Market directly via Angle One)";
             stepSize = 10; 
             useTradingView = false; // We don't need TVC proxy anymore!
             tvSymbol = 'MCX:CRUDEOIL1!'; 
@@ -117,7 +117,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
             
             if (instrumentType.toLowerCase() === 'crude') {
                 a1Exchange = 'MCX';
-                a1Token = '560977'; // CRUDEOIL (August Expiry)
+                a1Token = '560978'; // CRUDEOILM (Mini August Expiry)
             } else if (instrumentType.toLowerCase() === 'gold') {
                 a1Exchange = 'MCX';
                 a1Token = '237072'; // GOLD
