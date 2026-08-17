@@ -110,6 +110,48 @@ class AngleOneService {
       return null;
     }
   }
+
+  async getHistoricData(exchange, token, interval = "FIVE_MINUTE", daysBack = 5) {
+    if (!this.jwtToken) return [];
+    try {
+      const now = new Date();
+      const formatDt = (d) => {
+          const pad = (n) => n.toString().padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      };
+      
+      const toDate = formatDt(now);
+      const fromD = new Date(now.getTime() - (daysBack * 24 * 60 * 60 * 1000));
+      const fromDate = formatDt(fromD);
+
+      const response = await axios.post(
+        'https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData',
+        {
+          exchange: exchange,
+          symboltoken: token,
+          interval: interval,
+          fromdate: fromDate,
+          todate: toDate
+        },
+        { headers: this.getHeaders() }
+      );
+
+      if (response.data && response.data.status && response.data.data) {
+        return response.data.data.map(c => ({
+            timestamp: c[0],
+            open: parseFloat(c[1]),
+            high: parseFloat(c[2]),
+            low: parseFloat(c[3]),
+            close: parseFloat(c[4]),
+            volume: parseInt(c[5])
+        }));
+      }
+      return [];
+    } catch (err) {
+      console.error(`❌ Angle One Historic Error:`, err.response?.data || err.message);
+      return [];
+    }
+  }
 }
 
 module.exports = new AngleOneService();

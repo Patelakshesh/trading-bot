@@ -1,6 +1,8 @@
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
 const { checkUpcomingNews } = require('./newsCalendarService');
+const angleOneService = require('./angleOneService');
+const angleOneMapping = require('./angleOneMapping');
 
 // 🔮 PHASE 4: GLOBAL NIFTY DIRECTION PREDICTOR
 async function predictNiftyDirection() {
@@ -87,12 +89,12 @@ async function getFNOTrade(instrumentType = 'nifty') {
         let tvSymbol = 'NSE:NIFTY'; // Nifty 0-sec live
 
         if (instrumentType.toLowerCase() === 'crude') {
-            symbol = 'CL=F'; // Global WTI Crude Oil
+            symbol = 'CRUDEOIL.MCX'; 
             instrumentName = 'CRUDE OIL (MCX)';
-            mcxNote = "Crude Oil Options (Chart analysis via Global WTI due to MCX data limits)";
-            stepSize = 1; 
-            useTradingView = true;
-            tvSymbol = 'TVC:USOIL'; // Reverting to Global proxy to avoid Permission Denied
+            mcxNote = "Crude Oil Options (Scanning true Indian MCX Market directly via Angle One)";
+            stepSize = 10; 
+            useTradingView = false; // We don't need TVC proxy anymore!
+            tvSymbol = 'MCX:CRUDEOIL1!'; 
         } else if (instrumentType.toLowerCase() === 'gold') {
             symbol = 'GC=F';
             instrumentName = 'GOLD (MCX)';
@@ -105,8 +107,36 @@ async function getFNOTrade(instrumentType = 'nifty') {
         console.log(`Fetching data for F&O Analysis: ${instrumentName} (${symbol})`);
         
         let quotes = [];
-        
-        if (useTradingView) {
+        let fetchedViaAngleOne = false;
+
+        // --- NEW: ANGLE ONE TRUE INDIAN HISTORICAL DATA ---
+        try {
+            await angleOneMapping.init();
+            let a1Exchange = 'NSE';
+            let a1Token = '26000'; // NIFTY
+            
+            if (instrumentType.toLowerCase() === 'crude') {
+                a1Exchange = 'MCX';
+                a1Token = '236968'; // CRUDEOIL
+            } else if (instrumentType.toLowerCase() === 'gold') {
+                a1Exchange = 'MCX';
+                a1Token = '237072'; // GOLD
+            }
+            
+            console.log(`🚀 Fetching True Indian Market Data from Angle One for ${instrumentName}...`);
+            const a1Data = await angleOneService.getHistoricData(a1Exchange, a1Token, "FIVE_MINUTE", 5);
+            if (a1Data && a1Data.length >= 25) {
+                quotes = a1Data;
+                fetchedViaAngleOne = true; 
+                console.log(`✅ Successfully fetched ${quotes.length} historical 5m candles from Angle One.`);
+            } else {
+                console.log(`Angle One Historical returned insufficient data (${a1Data ? a1Data.length : 0} candles). Falling back...`);
+            }
+        } catch (e) {
+            console.error("Angle One Historical failed:", e.message);
+        }
+
+        if (useTradingView && !fetchedViaAngleOne) {
             console.log(`🚀 Bypassing delays! Fetching 0-Second Live Data from TradingView: ${tvSymbol}`);
             try {
                 const TradingView = require('@mathieuc/tradingview');
@@ -129,12 +159,12 @@ async function getFNOTrade(instrumentType = 'nifty') {
                     setTimeout(() => { client.end(); reject(new Error('TV Timeout')); }, 8000);
                 });
             } catch (err) {
-                console.log("TradingView failed, falling back to Yahoo", err);
+                console.log("TradingView failed, falling back to Yahoo", err.message);
                 useTradingView = false;
             }
         }
 
-        if (!useTradingView || quotes.length === 0) {
+        if (!fetchedViaAngleOne && (!useTradingView || quotes.length === 0)) {
             const d = new Date();
             d.setDate(d.getDate() - 5);
             const p1 = Math.floor(d.getTime()/1000);
