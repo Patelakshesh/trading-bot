@@ -199,6 +199,9 @@ async function getFNOTrade(instrumentType = 'nifty') {
         
         const { ADX } = require('technicalindicators');
         
+        // BUG FIX: Inject the true live price into the closes array so EMA calculation is 0-second accurate!
+        closes[closes.length - 1] = currentPrice;
+
         const ema5Data = calculateEMA(closes, 5);
         const ema20Data = calculateEMA(closes, 20);
         const ema5 = ema5Data.current;
@@ -209,7 +212,9 @@ async function getFNOTrade(instrumentType = 'nifty') {
         const lastCandle = quotes[quotes.length - 1];
         const prevCandle = quotes[quotes.length - 2];
         
-        const candleGain = ((lastCandle.close - lastCandle.open) / lastCandle.open) * 100;
+        // BUG FIX: Use the true 0-second live currentPrice, not the delayed historical close!
+        // This prevents the bot from giving a PUT when the live market is violently going up.
+        const candleGain = ((currentPrice - lastCandle.open) / lastCandle.open) * 100;
 
         // Calculate RSI (14 period) to increase accuracy to 70-80%
         let currentRSI = 50;
