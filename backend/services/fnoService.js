@@ -179,7 +179,20 @@ async function getFNOTrade(instrumentType = 'nifty') {
         }
 
         const closes = quotes.map(q => q.close);
-        const currentPrice = closes[closes.length - 1];
+        let currentPrice = closes[closes.length - 1];
+        
+        // --- 0-SECOND LIVE PRICE OVERRIDE ---
+        // If Angle One historical failed (rate limit) and we fell back to Yahoo 15-min delayed charts,
+        // ALWAYS override the signal price with the true 0-second Live Angle One Spot Price!
+        try {
+            const stockService = require('./stockService');
+            const livePrice = await stockService.getStockPrice(symbol);
+            if (livePrice && livePrice > 0) {
+                currentPrice = livePrice;
+            }
+        } catch (err) {
+            console.error("Live Price Override Failed:", err.message);
+        }
         
         const { ADX } = require('technicalindicators');
         

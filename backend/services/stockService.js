@@ -32,7 +32,7 @@ const getStockPrice = async (symbol) => {
     // --- FALLBACK 1: Yahoo Finance (Reliable, correct prices) ---
     try {
         let yahooQuery = querySymbol;
-        if (querySymbol.toUpperCase() === 'CRUDE' || querySymbol.toUpperCase() === 'CRUDEOIL') yahooQuery = 'CL=F';
+        if (querySymbol.toUpperCase() === 'CRUDE' || querySymbol.toUpperCase() === 'CRUDEOIL' || querySymbol.toUpperCase() === 'CRUDEOILM' || querySymbol.toUpperCase() === 'CRUDEOILM.MCX') yahooQuery = 'CL=F';
         if (querySymbol.toUpperCase() === 'GOLD') yahooQuery = 'GC=F';
 
         const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Yahoo Timeout')), 5000));
