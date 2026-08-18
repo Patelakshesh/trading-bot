@@ -374,9 +374,9 @@ async function getFNOTrade(instrumentType = 'nifty') {
             }
         }
 
-        let spotDisplay = `${currentPrice.toFixed(2)}`;
+        let spotDisplay = `₹${currentPrice.toFixed(2)}`;
         if (instrumentType.toLowerCase() === 'crude') {
-            spotDisplay += ` ($) / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
+            spotDisplay = `₹${currentPrice.toFixed(2)} (MCX Spot)`;
         }
 
         let finalMessagePrefix = preMessage;
