@@ -344,16 +344,17 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 spotDisplay += ` ($) / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
             }
 
-            // EARLY WARNING PREDICTIVE DETECTOR (RSI DIVERGENCE + BOLLINGER BAND SQUEEZE)
+            // EARLY WARNING PREDICTIVE DETECTOR (RSI DIVERGENCE + BOLLINGER BAND SQUEEZE + REJECTION WICK)
             if (bbData) {
-                if (currentRSI < 30 && currentPrice <= bbData.lower * 1.002) {
+                // Must have a Green Candle (candleGain > 0) to avoid catching a falling knife during a crash
+                if (currentRSI < 30 && currentPrice <= bbData.lower * 1.002 && candleGain > 0) {
                     return {
                         status: 'EARLY_WARNING',
                         spotPrice: spotDisplay,
                         instrumentName: instrumentName,
                         trade: {
                             type: 'CE (CALL) [EARLY PREDICTION]',
-                            logic: `⚠️ <b>PREDICTIVE REVERSAL SQUEEZE</b> ⚠️\n\nThe AI detects a massive <b>Oversold Squeeze</b> on the 5-min chart.\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Deeply Oversold)\n📈 <b>Bollinger Bands:</b> Touching extreme lower support at ${bbData.lower.toFixed(2)}`,
+                            logic: `⚠️ <b>PREDICTIVE REVERSAL SQUEEZE</b> ⚠️\n\nThe AI detects a massive <b>Oversold Squeeze</b> on the 5-min chart.\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Deeply Oversold)\n📈 <b>Bollinger Bands:</b> Touching extreme lower support at ${bbData.lower.toFixed(2)}\n🕯️ <b>Price Action:</b> Green Rejection Candle Detected!`,
                             strikeGuide: `${strikePriceNum} CE (PREPARE)`,
                             expiryGuide: `${expiryDateStr} Expiry`,
                             rules: [
@@ -364,7 +365,8 @@ async function getFNOTrade(instrumentType = 'nifty') {
                             ]
                         }
                     };
-                } else if (currentRSI > 70 && currentPrice >= bbData.upper * 0.998) {
+                // Must have a Red Candle (candleGain < 0) to avoid getting run over by a bull run
+                } else if (currentRSI > 70 && currentPrice >= bbData.upper * 0.998 && candleGain < 0) {
                     return {
                         status: 'EARLY_WARNING',
                         spotPrice: spotDisplay,
