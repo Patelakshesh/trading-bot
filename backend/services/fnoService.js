@@ -187,14 +187,16 @@ async function getFNOTrade(instrumentType = 'nifty') {
         // --- 0-SECOND LIVE PRICE OVERRIDE ---
         // If Angle One historical failed (rate limit) and we fell back to Yahoo 15-min delayed charts,
         // ALWAYS override the signal price with the true 0-second Live Angle One Spot Price!
-        try {
-            const stockService = require('./stockService');
-            const livePrice = await stockService.getStockPrice(symbol);
-            if (livePrice && livePrice > 0) {
-                currentPrice = livePrice;
+        if (!fetchedViaAngleOne) {
+            try {
+                const stockService = require('./stockService');
+                const livePrice = await stockService.getStockPrice(symbol);
+                if (livePrice && livePrice > 0) {
+                    currentPrice = livePrice;
+                }
+            } catch (err) {
+                console.error("Live Price Override Failed:", err.message);
             }
-        } catch (err) {
-            console.error("Live Price Override Failed:", err.message);
         }
         
         const { ADX } = require('technicalindicators');
