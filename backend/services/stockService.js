@@ -32,7 +32,16 @@ const getStockPrice = async (symbol) => {
     // --- FALLBACK 1: Yahoo Finance (Reliable, correct prices) ---
     try {
         let yahooQuery = querySymbol;
-        if (querySymbol.toUpperCase() === 'CRUDE' || querySymbol.toUpperCase() === 'CRUDEOIL' || querySymbol.toUpperCase() === 'CRUDEOILM' || querySymbol.toUpperCase() === 'CRUDEOILM.MCX') yahooQuery = 'CL=F';
+        if (querySymbol.toUpperCase() === 'CRUDE' || querySymbol.toUpperCase() === 'CRUDEOIL') {
+            yahooQuery = 'CL=F';
+        }
+        
+        // BUG FIX: Never fallback to Yahoo's USD CL=F if the system specifically asked for the MCX INR symbol!
+        // Mixing an $82 USD price into a ₹6800 INR historical array instantly crashes the EMA math and triggers a false PUT.
+        if (querySymbol.toUpperCase() === 'CRUDEOILM.MCX') {
+            throw new Error('Skipping Yahoo Finance for MCX Crude to prevent USD/INR currency mismatch in math arrays.');
+        }
+
         if (querySymbol.toUpperCase() === 'GOLD') yahooQuery = 'GC=F';
 
         const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Yahoo Timeout')), 5000));
