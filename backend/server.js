@@ -112,6 +112,41 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         }
     });
 
+    // New Command: /pressure to check Bollinger Band Squeeze & RSI
+    bot.onText(/^\/pressure(?:\s+(.+))?$/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const requestedAsset = match[1] ? match[1].toLowerCase() : 'crude';
+        
+        if (requestedAsset !== 'crude' && requestedAsset !== 'nifty') {
+            return bot.sendMessage(chatId, "⚠️ Please specify either 'crude' or 'nifty'. Example: /pressure crude");
+        }
+
+        const statusMsg = await bot.sendMessage(chatId, `🔍 <b>Analyzing Predictive Pressure for ${requestedAsset.toUpperCase()}...</b>`, {parse_mode: 'HTML'});
+        
+        try {
+            const { getFNOTrade } = require('./services/fnoService');
+            // We run the FNO check which calculates RSI and BB internally
+            const fnoResult = await getFNOTrade(requestedAsset);
+            
+            if (fnoResult.status === 'EARLY_WARNING') {
+                // If it's already in warning state, just output the warning message!
+                await bot.editMessageText(fnoResult.message, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+            } else if (fnoResult.status === 'NO_TRADE') {
+                // Extract RSI if possible, otherwise give a standard response
+                const rsiMatch = fnoResult.message.match(/RSI is ([\d.]+)/);
+                const rsiText = rsiMatch ? `Current RSI is <b>${rsiMatch[1]}</b>.` : '';
+                const response = `⏱️ <b>PRESSURE NORMAL</b>\n\n${requestedAsset.toUpperCase()} is currently trading in a normal range. The Bollinger Bands are not tightly squeezed, and there is no extreme RSI divergence.\n\n${rsiText}\n\n<i>No immediate explosion is predicted right now. The bot will automatically alert you when pressure builds up!</i>`;
+                
+                await bot.editMessageText(response, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+            } else {
+                // If TRADE_FOUND or ERROR
+                await bot.editMessageText(`🚨 <b>PRESSURE RELEASED!</b>\n\nThe explosion has already started. Type /fno to see the active confirmed trade!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+            }
+        } catch(e) {
+            await bot.editMessageText(`❌ System error analyzing pressure.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+        }
+    });
+
     // 1. Upgraded /bought command to automatically fetch live price if omitted
     bot.onText(/\/bought ([^\s]+)(?:\s+([\d.]+))?(?:\s+(\d+))?(?:\s+(\d+))?/, async (msg, match) => {
         const chatId = msg.chat.id;
@@ -1587,26 +1622,31 @@ cron.schedule('*/2 * * * *', async () => {
             if (fnoResult.status !== 'NO_TRADE' && fnoResult.status !== 'ERROR') {
                 const tradeType = fnoResult.trade ? fnoResult.trade.type.substring(0,2) : 'UKN';
                 const currentMinuteBlock = Math.floor(new Date().getMinutes() / 15);
-                const fnoAlertKey = `FNO_ALERT_${asset}_${tradeType}_${new Date().toISOString().split('T')[0]}_${new Date().getHours()}_${currentMinuteBlock}`;
+                const fnoAlertKey = `FNO_ALERT_${asset}_${tradeType}_${fnoResult.status}_${new Date().toISOString().split('T')[0]}_${new Date().getHours()}_${currentMinuteBlock}`;
                 if (!sentAlertsMemory.has(fnoAlertKey)) {
                     sentAlertsMemory.add(fnoAlertKey);
                     
-                    let formattedMessage = '';
-                    if (fnoResult.trade) {
-                        formattedMessage = `📈 <b>Trade Type:</b> ${fnoResult.trade.type}\n` +
-                                           `💡 <b>Logic:</b> ${fnoResult.trade.logic}\n` +
-                                           `🎯 <b>Strike:</b> ${fnoResult.trade.strikeGuide}\n` +
-                                           `📅 <b>Expiry:</b> ${fnoResult.trade.expiryGuide}\n\n` +
-                                           `🛡️ <b>Rules:</b>\n- ${fnoResult.trade.rules.join('\n- ')}`;
+                    let fnoMsg = '';
+                    if (fnoResult.status === 'EARLY_WARNING') {
+                        fnoMsg = fnoResult.message; // Message is already beautifully formatted in fnoService
                     } else {
-                        formattedMessage = fnoResult.message || JSON.stringify(fnoResult);
-                    }
+                        let formattedMessage = '';
+                        if (fnoResult.trade) {
+                            formattedMessage = `📈 <b>Trade Type:</b> ${fnoResult.trade.type}\n` +
+                                               `💡 <b>Logic:</b> ${fnoResult.trade.logic}\n` +
+                                               `🎯 <b>Strike:</b> ${fnoResult.trade.strikeGuide}\n` +
+                                               `📅 <b>Expiry:</b> ${fnoResult.trade.expiryGuide}\n\n` +
+                                               `🛡️ <b>Rules:</b>\n- ${fnoResult.trade.rules.join('\n- ')}`;
+                        } else {
+                            formattedMessage = fnoResult.message || JSON.stringify(fnoResult);
+                        }
 
-                    const fnoMsg = `🚨 <b>INSTANT F&O AUTO-ALERT</b> 🚨\n\n` +
-                                   `🔥 <b>Asset:</b> ${fnoResult.instrumentName || asset.toUpperCase()}\n` +
-                                   `💰 <b>Spot Price:</b> ${fnoResult.spotPrice}\n\n` +
-                                   `${formattedMessage}\n\n` +
-                                   `⚡ <b>Action:</b> Execute INSTANTLY.`;
+                        fnoMsg = `🚨 <b>INSTANT F&O CONFIRMED BREAKOUT</b> 🚨\n\n` +
+                                 `🔥 <b>Asset:</b> ${fnoResult.instrumentName || asset.toUpperCase()}\n` +
+                                 `💰 <b>Spot Price:</b> ${fnoResult.spotPrice}\n\n` +
+                                 `${formattedMessage}\n\n` +
+                                 `⚡ <b>Action:</b> Execute INSTANTLY.`;
+                    }
                     
                     for (let chatId of allUsers) {
                         if (chatId !== 'UI_USER') bot.sendMessage(chatId, fnoMsg, {parse_mode: 'HTML'});

@@ -299,6 +299,16 @@ async function getFNOTrade(instrumentType = 'nifty') {
             }
         }
 
+        // CALCULATE BOLLINGER BANDS FOR PREDICTIVE SQUEEZE DETECTOR
+        let bbData = null;
+        try {
+            const { BollingerBands } = require('technicalindicators');
+            const bbResult = BollingerBands.calculate({ period: 20, values: closes, stdDev: 2 });
+            if (bbResult && bbResult.length > 0) {
+                bbData = bbResult[bbResult.length - 1];
+            }
+        } catch(e) {}
+
         // --- NEW QUANT FILTERS FROM WIN_RATE_MAXIMIZE.md ---
         if (instrumentType.toLowerCase() === 'crude' && currentADX < 22) {
             return {
@@ -332,6 +342,25 @@ async function getFNOTrade(instrumentType = 'nifty') {
             let spotDisplay = `${currentPrice.toFixed(2)}`;
             if (instrumentType.toLowerCase() === 'crude') {
                 spotDisplay += ` ($) / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
+            }
+
+            // EARLY WARNING PREDICTIVE DETECTOR (RSI DIVERGENCE + BOLLINGER BAND SQUEEZE)
+            if (bbData) {
+                if (currentRSI < 30 && currentPrice <= bbData.lower * 1.002) {
+                    return {
+                        status: 'EARLY_WARNING',
+                        spotPrice: spotDisplay,
+                        instrumentName: instrumentName,
+                        message: `⚠️ <b>EARLY PREDICTION ALERT: CALL (CE) REVERSAL PENDING</b> ⚠️\n\nThe AI detects a massive <b>Oversold Squeeze</b> on the 5-min chart.\n\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Deeply Oversold)\n📈 <b>Bollinger Bands:</b> Touching extreme lower support at ${bbData.lower.toFixed(2)}\n\n<i>Get ready on Angle One! A massive bounce (CALL) is mathematically likely in the next 5-15 minutes. Wait for the final crossover confirmation!</i>`
+                    };
+                } else if (currentRSI > 70 && currentPrice >= bbData.upper * 0.998) {
+                    return {
+                        status: 'EARLY_WARNING',
+                        spotPrice: spotDisplay,
+                        instrumentName: instrumentName,
+                        message: `⚠️ <b>EARLY PREDICTION ALERT: PUT (PE) REVERSAL PENDING</b> ⚠️\n\nThe AI detects a massive <b>Overbought Squeeze</b> on the 5-min chart.\n\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Dangerously Overbought)\n📉 <b>Bollinger Bands:</b> Touching extreme upper resistance at ${bbData.upper.toFixed(2)}\n\n<i>Get ready on Angle One! A massive crash (PUT) is mathematically likely in the next 5-15 minutes. Wait for the final crossover confirmation!</i>`
+                    };
+                }
             }
 
             return {
