@@ -351,14 +351,36 @@ async function getFNOTrade(instrumentType = 'nifty') {
                         status: 'EARLY_WARNING',
                         spotPrice: spotDisplay,
                         instrumentName: instrumentName,
-                        message: `⚠️ <b>EARLY PREDICTION ALERT: CALL (CE) REVERSAL PENDING</b> ⚠️\n\nThe AI detects a massive <b>Oversold Squeeze</b> on the 5-min chart.\n\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Deeply Oversold)\n📈 <b>Bollinger Bands:</b> Touching extreme lower support at ${bbData.lower.toFixed(2)}\n\n<i>Get ready on Angle One! A massive bounce (CALL) is mathematically likely in the next 5-15 minutes. Wait for the final crossover confirmation!</i>`
+                        trade: {
+                            type: 'CE (CALL) [EARLY PREDICTION]',
+                            logic: `⚠️ <b>PREDICTIVE REVERSAL SQUEEZE</b> ⚠️\n\nThe AI detects a massive <b>Oversold Squeeze</b> on the 5-min chart.\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Deeply Oversold)\n📈 <b>Bollinger Bands:</b> Touching extreme lower support at ${bbData.lower.toFixed(2)}`,
+                            strikeGuide: `${strikePriceNum} CE (PREPARE)`,
+                            expiryGuide: `${expiryDateStr} Expiry`,
+                            rules: [
+                                "⚠️ This is an EARLY PREDICTION, not a confirmed breakout.",
+                                "🚨 DO NOT BUY YET. Open Angle One and prepare your Strike.",
+                                "⏱️ A massive bounce is mathematically likely in the next 5-15 minutes.",
+                                "✅ Wait for the 'CONFIRMED BREAKOUT' message before buying."
+                            ]
+                        }
                     };
                 } else if (currentRSI > 70 && currentPrice >= bbData.upper * 0.998) {
                     return {
                         status: 'EARLY_WARNING',
                         spotPrice: spotDisplay,
                         instrumentName: instrumentName,
-                        message: `⚠️ <b>EARLY PREDICTION ALERT: PUT (PE) REVERSAL PENDING</b> ⚠️\n\nThe AI detects a massive <b>Overbought Squeeze</b> on the 5-min chart.\n\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Dangerously Overbought)\n📉 <b>Bollinger Bands:</b> Touching extreme upper resistance at ${bbData.upper.toFixed(2)}\n\n<i>Get ready on Angle One! A massive crash (PUT) is mathematically likely in the next 5-15 minutes. Wait for the final crossover confirmation!</i>`
+                        trade: {
+                            type: 'PE (PUT) [EARLY PREDICTION]',
+                            logic: `⚠️ <b>PREDICTIVE REVERSAL SQUEEZE</b> ⚠️\n\nThe AI detects a massive <b>Overbought Squeeze</b> on the 5-min chart.\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Dangerously Overbought)\n📉 <b>Bollinger Bands:</b> Touching extreme upper resistance at ${bbData.upper.toFixed(2)}`,
+                            strikeGuide: `${strikePriceNum} PE (PREPARE)`,
+                            expiryGuide: `${expiryDateStr} Expiry`,
+                            rules: [
+                                "⚠️ This is an EARLY PREDICTION, not a confirmed breakout.",
+                                "🚨 DO NOT BUY YET. Open Angle One and prepare your Strike.",
+                                "⏱️ A massive crash is mathematically likely in the next 5-15 minutes.",
+                                "✅ Wait for the 'CONFIRMED BREAKOUT' message before buying."
+                            ]
+                        }
                     };
                 }
             }
