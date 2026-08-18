@@ -110,10 +110,11 @@ async function getFNOTrade(instrumentType = 'nifty') {
         let fetchedViaAngleOne = false;
 
         // --- NEW: ANGLE ONE TRUE INDIAN HISTORICAL DATA ---
+        let a1Exchange = 'NSE';
+        let a1Token = '26000'; // NIFTY
+        
         try {
             await angleOneMapping.init();
-            let a1Exchange = 'NSE';
-            let a1Token = '26000'; // NIFTY
             
             if (instrumentType.toLowerCase() === 'crude') {
                 a1Exchange = 'MCX';
@@ -185,9 +186,18 @@ async function getFNOTrade(instrumentType = 'nifty') {
         let currentPrice = closes[closes.length - 1];
         
         // --- 0-SECOND LIVE PRICE OVERRIDE ---
-        // If Angle One historical failed (rate limit) and we fell back to Yahoo 15-min delayed charts,
-        // ALWAYS override the signal price with the true 0-second Live Angle One Spot Price!
-        if (!fetchedViaAngleOne) {
+        // Angle One's historical API is often delayed by 15-30 mins. We MUST overwrite the last historical candle with the true 0-second live LTP.
+        if (fetchedViaAngleOne) {
+            try {
+                const liveLtp = await angleOneService.getQuote(a1Exchange, a1Token);
+                if (liveLtp && liveLtp > 0) {
+                    currentPrice = liveLtp;
+                }
+            } catch (err) {
+                console.error("Angle One Live LTP Override Failed:", err.message);
+            }
+        } else {
+            // For Yahoo Finance fallbacks
             try {
                 const stockService = require('./stockService');
                 const livePrice = await stockService.getStockPrice(symbol);
