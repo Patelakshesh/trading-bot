@@ -95,6 +95,17 @@ async function getFNOTrade(instrumentType = 'nifty') {
             stepSize = 10; 
             useTradingView = false; // We don't need TVC proxy anymore!
             tvSymbol = 'MCX:CRUDEOIL1!'; 
+            
+            // KILL SWITCH: DO NOT TRADE CRUDE OIL DURING INDIAN DAYTIME (10:00 AM to 5:00 PM IST)
+            // Moved to the top so API errors don't hide this message!
+            const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+            const hourIST = nowIST.getUTCHours();
+            if (hourIST >= 10 && hourIST < 17) {
+                return {
+                    status: 'NO_TRADE',
+                    message: `⚠️ DAYTIME KILL SWITCH ACTIVE: Do NOT trade Crude Oil during Indian Daytime (10 AM to 5 PM). The volume is completely dead and filled with localized MCX traps and Theta decay. Wait for the US Pre-Market at 5:00 PM!`
+                };
+            }
         } else if (instrumentType.toLowerCase() === 'gold') {
             symbol = 'GC=F';
             instrumentName = 'GOLD (MCX)';
@@ -286,19 +297,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
             strikePriceNum = "ATM";
         }
 
-        // KILL SWITCH: DO NOT TRADE CRUDE OIL DURING INDIAN DAYTIME (10:00 AM to 5:00 PM IST)
-        // Indian daytime volume is localized MCX manipulation. True volume starts at 5:00 PM and 7:00 PM.
-        if (instrumentType.toLowerCase() === 'crude') {
-            const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
-            const hourIST = nowIST.getUTCHours();
-            // 10:00 AM to 5:00 PM is hourIST 10 to 16
-            if (hourIST >= 10 && hourIST < 17) {
-                return {
-                    status: 'NO_TRADE',
-                    message: `⚠️ DAYTIME KILL SWITCH ACTIVE: Current CRUDE OIL Spot is ₹${currentPrice.toFixed(2)}. \n\nDo NOT trade Crude Oil during Indian Daytime (10 AM to 5 PM). The volume is completely dead and filled with localized MCX traps and Theta decay. Wait for the US Pre-Market at 5:00 PM!`
-                };
-            }
-        }
+
 
         // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
         if (instrumentType.toLowerCase() === 'nifty') {
