@@ -98,10 +98,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                                 `📅 <i>Expiry:</i> ${tr.expiryGuide}\n\n` +
                                 `🧠 <b>AI Logic:</b> ${tr.logic}\n\n` +
                                 `⚠️ <b>STRICT TRADING RULES (For your ₹3,500 Capital):</b>\n` +
-                                `1️⃣ ${tr.rules[0]}\n` +
-                                `2️⃣ ${tr.rules[1]}\n` +
-                                `3️⃣ ${tr.rules[2]}\n` +
-                                `4️⃣ ${tr.rules[3]}\n\n` +
+                                `🛡️ <b>Rules:</b>\n- ${tr.rules.filter(Boolean).join('\n- ')}\n\n` +
                                 `<i>Note: Option Buying is extremely risky. Respect the Stop Loss!</i>`;
                 
                 await bot.editMessageText(msgText, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
@@ -1607,7 +1604,7 @@ cron.schedule('*/2 * * * *', async () => {
 
                     const fnoMsg = `🚨 <b>INSTANT F&O AUTO-ALERT</b> 🚨\n\n` +
                                    `🔥 <b>Asset:</b> ${fnoResult.instrumentName || asset.toUpperCase()}\n` +
-                                   `💰 <b>Spot Price:</b> ₹${fnoResult.spotPrice}\n\n` +
+                                   `💰 <b>Spot Price:</b> ${fnoResult.spotPrice}\n\n` +
                                    `${formattedMessage}\n\n` +
                                    `⚡ <b>Action:</b> Execute INSTANTLY.`;
                     
