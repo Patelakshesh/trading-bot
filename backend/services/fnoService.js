@@ -342,7 +342,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
 
         // CALL OPTION LOGIC
         const standardCall = ema5 > ema20 && prevEma5 <= prevEma20 && validGap && candleGain > 0 && currentRSI >= 45 && currentRSI <= 68 && currentADX >= 22 && (ema200 ? currentPrice >= ema200 : true);
-        const usVolumeCall = isUSVolumeBreakout && ema5 > ema20 && candleGain > 0.1; // Bypass macro rules if US Volume is exploding upwards
+        const usVolumeCall = isUSVolumeBreakout && ema5 > ema20 && candleGain > 0.0005; // Bypass macro rules if US Volume is exploding upwards
 
         if (standardCall || usVolumeCall) {
             if (standardCall && !usVolumeCall && ema200 && currentPrice < ema200) {
@@ -355,10 +355,10 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 : `🔥 FRESH EXPLOSIVE BREAKOUT: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed the 20-EMA on bullish volume in alignment with the macro trend. High-probability entry!`;
         } 
         else if (ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true) || 
-                 (isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.1)) {
+                 (isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.0005)) {
             
             const standardPut = ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true);
-            const usVolumePut = isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.1;
+            const usVolumePut = isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.0005;
             
             if (standardPut && !usVolumePut && ema200 && currentPrice > ema200) {
                 return { status: 'NO_TRADE', message: `⚠️ MACRO TREND BLOCK: 5-min trend is DOWN, but price is above the 1-Hour (200) EMA. Ignoring fake pullback!` };
