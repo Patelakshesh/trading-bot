@@ -317,7 +317,20 @@ async function getFNOTrade(instrumentType = 'nifty') {
         } catch(e) {}
 
         // --- NEW QUANT FILTERS FROM WIN_RATE_MAXIMIZE.md ---
-        if (instrumentType.toLowerCase() === 'crude' && currentADX < 22) {
+        // CALCULATE INSTITUTIONAL VOLUME SPIKE (For cracking US 7PM / 8PM News moves)
+        let currentVolume = lastCandle.volume || 0;
+        let avgVolume = 1;
+        try {
+            const recentVols = quotes.slice(-21, -1).map(q => q.volume || 0);
+            avgVolume = recentVols.reduce((a, b) => a + b, 0) / recentVols.length || 1;
+        } catch(e) {}
+        const volumeSpikeMultiplier = currentVolume / avgVolume;
+        const nowISTTime = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+        const isUSSession = nowISTTime.getHours() >= 19 && nowISTTime.getHours() <= 23; // 7 PM to 11 PM
+        const isUSVolumeBreakout = isUSSession && volumeSpikeMultiplier >= 2.5; // Massive 250% volume spike
+
+        // Do not kill the trade if there is a massive US volume breakout!
+        if (instrumentType.toLowerCase() === 'crude' && currentADX < 22 && !isUSVolumeBreakout) {
             return {
                 status: 'NO_TRADE',
                 message: `⚠️ LOW MOMENTUM KILL SWITCH: ${instrumentName} ADX is ${currentADX.toFixed(1)}. \n\nThe market is sideways. Buying options now guarantees loss via Theta decay. Only trade when ADX > 22.`
@@ -327,23 +340,33 @@ async function getFNOTrade(instrumentType = 'nifty') {
         const emaGapPercent = (Math.abs(ema5 - ema20) / currentPrice) * 100;
         const validGap = emaGapPercent >= 0.05;
 
-        // CALL OPTION LOGIC (Requires valid gap + ADX > 22 + RSI healthy + Price > 200-EMA macro trend)
-        if (ema5 > ema20 && prevEma5 <= prevEma20 && validGap && candleGain > 0 && currentRSI >= 45 && currentRSI <= 68 && currentADX >= 22) {
-            if (ema200 && currentPrice < ema200) {
+        // CALL OPTION LOGIC
+        const standardCall = ema5 > ema20 && prevEma5 <= prevEma20 && validGap && candleGain > 0 && currentRSI >= 45 && currentRSI <= 68 && currentADX >= 22 && (ema200 ? currentPrice >= ema200 : true);
+        const usVolumeCall = isUSVolumeBreakout && ema5 > ema20 && candleGain > 0.1; // Bypass macro rules if US Volume is exploding upwards
+
+        if (standardCall || usVolumeCall) {
+            if (standardCall && !usVolumeCall && ema200 && currentPrice < ema200) {
                 return { status: 'NO_TRADE', message: `⚠️ MACRO TREND BLOCK: 5-min trend is UP, but price is below the 1-Hour (200) EMA. Ignoring fake pullback!` };
             }
             signal = "BUY";
             optionType = "CE (CALL)";
-            logic = `🔥 FRESH EXPLOSIVE BREAKOUT: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed the 20-EMA on bullish volume in alignment with the macro trend. High-probability entry!`;
+            logic = usVolumeCall 
+                ? `🗽 <b>US OPENING VOLUME BREAKOUT!</b>\nMassive ${volumeSpikeMultiplier.toFixed(1)}x Volume Spike detected! American Institutions are aggressively buying. Bypassing standard filters to catch the explosion!` 
+                : `🔥 FRESH EXPLOSIVE BREAKOUT: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed the 20-EMA on bullish volume in alignment with the macro trend. High-probability entry!`;
         } 
-        // PUT OPTION LOGIC (Requires valid gap + ADX > 22 + RSI healthy bearish + Price < 200-EMA macro trend)
-        else if (ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22) {
-            if (ema200 && currentPrice > ema200) {
+        // PUT OPTION LOGIC
+        const standardPut = ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true);
+        const usVolumePut = isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.1; // Bypass macro rules if US Volume is exploding downwards
+
+        else if (standardPut || usVolumePut) {
+            if (standardPut && !usVolumePut && ema200 && currentPrice > ema200) {
                 return { status: 'NO_TRADE', message: `⚠️ MACRO TREND BLOCK: 5-min trend is DOWN, but price is above the 1-Hour (200) EMA. Ignoring fake pullback!` };
             }
             signal = "BUY";
             optionType = "PE (PUT)";
-            logic = `🩸 FRESH BEARISH BREAKDOWN: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed below 20-EMA on selling volume in alignment with the macro trend. Massive short trigger!`;
+            logic = usVolumePut 
+                ? `🗽 <b>US OPENING VOLUME BREAKDOWN!</b>\nMassive ${volumeSpikeMultiplier.toFixed(1)}x Volume Spike detected! American Institutions are aggressively dumping. Bypassing standard filters to catch the crash!` 
+                : `🩸 FRESH BEARISH BREAKDOWN: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed below 20-EMA on selling volume in alignment with the macro trend. Massive short trigger!`;
         }
         else {
             let spotDisplay = `${currentPrice.toFixed(2)}`;
