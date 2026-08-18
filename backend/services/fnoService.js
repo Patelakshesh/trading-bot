@@ -354,7 +354,6 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 ? `🗽 <b>US OPENING VOLUME BREAKOUT!</b>\nMassive ${volumeSpikeMultiplier.toFixed(1)}x Volume Spike detected! American Institutions are aggressively buying. Bypassing standard filters to catch the explosion!` 
                 : `🔥 FRESH EXPLOSIVE BREAKOUT: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed the 20-EMA on bullish volume in alignment with the macro trend. High-probability entry!`;
         } 
-        } 
         else if (ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true) || 
                  (isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.1)) {
             
