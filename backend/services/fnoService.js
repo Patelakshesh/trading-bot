@@ -354,11 +354,13 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 ? `🗽 <b>US OPENING VOLUME BREAKOUT!</b>\nMassive ${volumeSpikeMultiplier.toFixed(1)}x Volume Spike detected! American Institutions are aggressively buying. Bypassing standard filters to catch the explosion!` 
                 : `🔥 FRESH EXPLOSIVE BREAKOUT: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed the 20-EMA on bullish volume in alignment with the macro trend. High-probability entry!`;
         } 
-        // PUT OPTION LOGIC
-        const standardPut = ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true);
-        const usVolumePut = isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.1; // Bypass macro rules if US Volume is exploding downwards
-
-        else if (standardPut || usVolumePut) {
+        } 
+        else if (ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true) || 
+                 (isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.1)) {
+            
+            const standardPut = ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true);
+            const usVolumePut = isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.1;
+            
             if (standardPut && !usVolumePut && ema200 && currentPrice > ema200) {
                 return { status: 'NO_TRADE', message: `⚠️ MACRO TREND BLOCK: 5-min trend is DOWN, but price is above the 1-Hour (200) EMA. Ignoring fake pullback!` };
             }
