@@ -149,9 +149,11 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 const response = `⏱️ <b>PRESSURE NORMAL</b>\n\n${requestedAsset.toUpperCase()} is currently trading in a normal range. The Bollinger Bands are not tightly squeezed, and there is no extreme RSI divergence.\n\n${rsiText}\n\n<i>No immediate explosion is predicted right now. The bot will automatically alert you when pressure builds up!</i>`;
                 
                 await bot.editMessageText(response, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+            } else if (fnoResult.status === 'ERROR') {
+                await bot.editMessageText(`❌ <b>API ERROR</b>\n\nCould not scan pressure for ${requestedAsset.toUpperCase()}. The Angle One API might be rate-limiting. Try again in 1 minute.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             } else {
-                // If TRADE_FOUND or ERROR
-                await bot.editMessageText(`🚨 <b>PRESSURE RELEASED!</b>\n\nThe explosion has already started. Type /fno to see the active confirmed trade!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                // If TRADE_FOUND
+                await bot.editMessageText(`🚨 <b>PRESSURE RELEASED!</b>\n\nThe explosion has already started. Type <code>/fno ${requestedAsset}</code> to see the active confirmed trade!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             }
         } catch(e) {
             await bot.editMessageText(`❌ System error analyzing pressure.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
