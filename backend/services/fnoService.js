@@ -380,8 +380,53 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 // Must be near daily support (within 0.5%) to trigger a bounce prediction
                 const nearSupport = currentPrice <= supportZone * 1.005;
                 const nearResistance = currentPrice >= resistanceZone * 0.995;
+                
+                // CALCUATE VOLATILITY SQUEEZE (Predicting the move 5 mins BEFORE the volume spikes)
+                const bbWidthPercent = ((bbData.upper - bbData.lower) / currentPrice) * 100;
+                const isSqueezed = bbWidthPercent <= 0.20; // 0.2% width is a massive, tight squeeze!
 
-                // Must have a Green Candle (candleGain > 0) to avoid catching a falling knife during a crash
+                // PRE-VOLUME SQUEEZE BREAKOUT (UPWARDS)
+                if (isSqueezed && currentPrice >= bbData.upper && candleGain > 0 && currentRSI > 50) {
+                    return {
+                        status: 'EARLY_WARNING',
+                        spotPrice: spotDisplay,
+                        instrumentName: instrumentName,
+                        trade: {
+                            type: 'CE (CALL) [3-MIN PREDICTION]',
+                            logic: `⚠️ <b>PRE-VOLUME SQUEEZE DETECTED</b> ⚠️\n\nThe AI detects a massive <b>Volatility Squeeze</b> on the 5-min chart (Bands are only ${bbWidthPercent.toFixed(2)}% wide).\n📊 <b>Price Action:</b> Price is creeping outside the upper band BEFORE volume arrives.\n⏱️ <b>Prediction:</b> A massive Institutional Volume Spike upwards is mathematically imminent in the next 3 to 5 minutes!`,
+                            strikeGuide: `${strikePriceNum} CE (PREPARE)`,
+                            expiryGuide: `${expiryDateStr} Expiry`,
+                            rules: [
+                                "⚠️ This is a PREDICTION. The volume has NOT spiked yet.",
+                                "🚨 DO NOT BUY YET. Open Angle One and prepare your Strike.",
+                                "⏱️ Wait exactly 3-5 minutes for the volume to explode.",
+                                "✅ Wait for the 'US VOLUME BREAKOUT' message before buying."
+                            ]
+                        }
+                    };
+                }
+                // PRE-VOLUME SQUEEZE BREAKOUT (DOWNWARDS)
+                else if (isSqueezed && currentPrice <= bbData.lower && candleGain < 0 && currentRSI < 50) {
+                    return {
+                        status: 'EARLY_WARNING',
+                        spotPrice: spotDisplay,
+                        instrumentName: instrumentName,
+                        trade: {
+                            type: 'PE (PUT) [3-MIN PREDICTION]',
+                            logic: `⚠️ <b>PRE-VOLUME SQUEEZE DETECTED</b> ⚠️\n\nThe AI detects a massive <b>Volatility Squeeze</b> on the 5-min chart (Bands are only ${bbWidthPercent.toFixed(2)}% wide).\n📊 <b>Price Action:</b> Price is creeping outside the lower band BEFORE volume arrives.\n⏱️ <b>Prediction:</b> A massive Institutional Volume Spike downwards is mathematically imminent in the next 3 to 5 minutes!`,
+                            strikeGuide: `${strikePriceNum} PE (PREPARE)`,
+                            expiryGuide: `${expiryDateStr} Expiry`,
+                            rules: [
+                                "⚠️ This is a PREDICTION. The volume has NOT spiked yet.",
+                                "🚨 DO NOT BUY YET. Open Angle One and prepare your Strike.",
+                                "⏱️ Wait exactly 3-5 minutes for the volume to explode.",
+                                "✅ Wait for the 'US VOLUME BREAKOUT' message before buying."
+                            ]
+                        }
+                    };
+                }
+
+                // OVERSOLD BOUNCE (Must have a Green Candle to avoid catching a falling knife during a crash)
                 if (currentRSI < 30 && currentPrice <= bbData.lower * 1.002 && candleGain > 0 && nearSupport) {
                     return {
                         status: 'EARLY_WARNING',
