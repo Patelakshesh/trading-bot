@@ -243,11 +243,18 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 currentADX = adxResult[adxResult.length - 1].adx;
             }
         } catch(e) { console.error("ADX calculation error"); }
+        // --- PRO-TRADER MULTI-TIMEFRAME ANALYSIS: SUPPORT & RESISTANCE ---
+        let supportZone = currentPrice;
+        let resistanceZone = currentPrice;
+        try {
+            // Analyze the last 100 candles (approx 1 full trading day of 5-min candles)
+            const recentQuotes = quotes.slice(-100);
+            supportZone = Math.min(...recentQuotes.map(q => q.low));
+            resistanceZone = Math.max(...recentQuotes.map(q => q.high));
+        } catch(e) { console.error("S/R calculation error"); }
 
         const newsSpikeWarning = await checkUpcomingNews(instrumentType);
         let preMessage = newsSpikeWarning ? `${newsSpikeWarning}\n\n` : '';
-        
-
         let adxWarning = '';
         if (currentADX < 22) {
             adxWarning = `⚠️ ADX (Momentum) is low at ${currentADX.toFixed(1)}. This means the trend is weak or just starting. Use strict stop-loss!`;
@@ -344,17 +351,21 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 spotDisplay += ` ($) / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
             }
 
-            // EARLY WARNING PREDICTIVE DETECTOR (RSI DIVERGENCE + BOLLINGER BAND SQUEEZE + REJECTION WICK)
+            // EARLY WARNING PREDICTIVE DETECTOR (RSI DIVERGENCE + BOLLINGER BAND SQUEEZE + REJECTION WICK + MTFA SUPPORT)
             if (bbData) {
+                // Must be near daily support (within 0.5%) to trigger a bounce prediction
+                const nearSupport = currentPrice <= supportZone * 1.005;
+                const nearResistance = currentPrice >= resistanceZone * 0.995;
+
                 // Must have a Green Candle (candleGain > 0) to avoid catching a falling knife during a crash
-                if (currentRSI < 30 && currentPrice <= bbData.lower * 1.002 && candleGain > 0) {
+                if (currentRSI < 30 && currentPrice <= bbData.lower * 1.002 && candleGain > 0 && nearSupport) {
                     return {
                         status: 'EARLY_WARNING',
                         spotPrice: spotDisplay,
                         instrumentName: instrumentName,
                         trade: {
                             type: 'CE (CALL) [EARLY PREDICTION]',
-                            logic: `⚠️ <b>PREDICTIVE REVERSAL SQUEEZE</b> ⚠️\n\nThe AI detects a massive <b>Oversold Squeeze</b> on the 5-min chart.\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Deeply Oversold)\n📈 <b>Bollinger Bands:</b> Touching extreme lower support at ${bbData.lower.toFixed(2)}\n🕯️ <b>Price Action:</b> Green Rejection Candle Detected!`,
+                            logic: `⚠️ <b>PREDICTIVE REVERSAL SQUEEZE</b> ⚠️\n\nThe AI detects a massive <b>Oversold Squeeze</b> on the 5-min chart.\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Deeply Oversold)\n📈 <b>Bollinger Bands:</b> Touching extreme lower support at ${bbData.lower.toFixed(2)}\n🕯️ <b>Price Action:</b> Green Rejection Candle Detected!\n🛡️ <b>MTFA Support:</b> Bouncing directly off the Daily Support Zone (${supportZone.toFixed(2)})!`,
                             strikeGuide: `${strikePriceNum} CE (PREPARE)`,
                             expiryGuide: `${expiryDateStr} Expiry`,
                             rules: [
@@ -366,14 +377,14 @@ async function getFNOTrade(instrumentType = 'nifty') {
                         }
                     };
                 // Must have a Red Candle (candleGain < 0) to avoid getting run over by a bull run
-                } else if (currentRSI > 70 && currentPrice >= bbData.upper * 0.998 && candleGain < 0) {
+                } else if (currentRSI > 70 && currentPrice >= bbData.upper * 0.998 && candleGain < 0 && nearResistance) {
                     return {
                         status: 'EARLY_WARNING',
                         spotPrice: spotDisplay,
                         instrumentName: instrumentName,
                         trade: {
                             type: 'PE (PUT) [EARLY PREDICTION]',
-                            logic: `⚠️ <b>PREDICTIVE REVERSAL SQUEEZE</b> ⚠️\n\nThe AI detects a massive <b>Overbought Squeeze</b> on the 5-min chart.\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Dangerously Overbought)\n📉 <b>Bollinger Bands:</b> Touching extreme upper resistance at ${bbData.upper.toFixed(2)}`,
+                            logic: `⚠️ <b>PREDICTIVE REVERSAL SQUEEZE</b> ⚠️\n\nThe AI detects a massive <b>Overbought Squeeze</b> on the 5-min chart.\n📊 <b>RSI:</b> ${currentRSI.toFixed(1)} (Dangerously Overbought)\n📉 <b>Bollinger Bands:</b> Touching extreme upper resistance at ${bbData.upper.toFixed(2)}\n🕯️ <b>Price Action:</b> Red Rejection Candle Detected!\n🛡️ <b>MTFA Resistance:</b> Rejecting directly off the Daily Resistance Zone (${resistanceZone.toFixed(2)})!`,
                             strikeGuide: `${strikePriceNum} PE (PREPARE)`,
                             expiryGuide: `${expiryDateStr} Expiry`,
                             rules: [
