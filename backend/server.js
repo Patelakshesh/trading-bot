@@ -143,12 +143,24 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
 
                 await bot.editMessageText(warningMsg, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             } else if (fnoResult.status === 'NO_TRADE') {
-                // Extract RSI if possible, otherwise give a standard response
-                const rsiMatch = fnoResult.message.match(/RSI is ([\d.]+)/);
-                const rsiText = rsiMatch ? `Current RSI is <b>${rsiMatch[1]}</b>.` : '';
-                const response = `⏱️ <b>PRESSURE NORMAL</b>\n\n${requestedAsset.toUpperCase()} is currently trading in a normal range. The Bollinger Bands are not tightly squeezed, and there is no extreme RSI divergence.\n\n${rsiText}\n\n<i>No immediate explosion is predicted right now. The bot will automatically alert you when pressure builds up!</i>`;
-                
-                await bot.editMessageText(response, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                if (fnoResult.pressureData) {
+                    const p = fnoResult.pressureData;
+                    const response = `⏱️ <b>PRESSURE NORMAL</b>\n\n` +
+                                     `🔥 <b>Asset:</b> ${requestedAsset.toUpperCase()}\n` +
+                                     `💰 <b>Spot Price:</b> ${p.spotDisplay}\n\n` +
+                                     `<b>--- PREDICTIVE METRICS ---</b>\n` +
+                                     `📊 <b>RSI:</b> ${p.rsi}\n` +
+                                     `📈 <b>Upper Bollinger:</b> ${p.bbUpper}\n` +
+                                     `📉 <b>Lower Bollinger:</b> ${p.bbLower}\n` +
+                                     `🛡️ <b>Daily Support:</b> ${p.support}\n` +
+                                     `⚔️ <b>Daily Resistance:</b> ${p.resistance}\n\n` +
+                                     `<b>Verdict:</b> The market is currently trading in a normal range. It is not squeezing against the outer bands, nor is it sitting directly on daily support/resistance. No immediate reversal is predicted.\n\n` +
+                                     `<i>The bot will automatically alert you when extreme pressure builds up!</i>`;
+                    await bot.editMessageText(response, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                } else {
+                    const response = `⏱️ <b>PRESSURE NORMAL</b>\n\n${requestedAsset.toUpperCase()} is currently trading in a normal range. No immediate explosion is predicted right now.`;
+                    await bot.editMessageText(response, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                }
             } else if (fnoResult.status === 'ERROR') {
                 await bot.editMessageText(`❌ <b>API ERROR</b>\n\nCould not scan pressure for ${requestedAsset.toUpperCase()}. The Angle One API might be rate-limiting. Try again in 1 minute.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             } else {

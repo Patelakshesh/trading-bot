@@ -403,7 +403,15 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 message: preMessage + `Current ${instrumentName} Spot: ${spotDisplay}.\n\n` + 
                          `${adxWarning}\nRSI is ${currentRSI.toFixed(1)}.\n` +
                          `📉 Trend Check: 5-EMA is at ${ema5.toFixed(2)} | 20-EMA is at ${ema20.toFixed(2)}.\n` +
-                         `No clear crossover detected. Wait for a strong breakout.`
+                         `No clear crossover detected. Wait for a strong breakout.`,
+                pressureData: {
+                    spotDisplay: spotDisplay,
+                    rsi: currentRSI.toFixed(1),
+                    bbUpper: bbData ? bbData.upper.toFixed(2) : "N/A",
+                    bbLower: bbData ? bbData.lower.toFixed(2) : "N/A",
+                    support: supportZone.toFixed(2),
+                    resistance: resistanceZone.toFixed(2)
+                }
             };
         }
 
