@@ -1,35 +1,36 @@
 const { ADX } = require('technicalindicators');
-const TradingView = require('@mathieuc/tradingview');
+const YahooFinance = require('yahoo-finance2').default;
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHistorical'] });
 
 async function simulateAutoAlerts() {
     console.log("==================================================");
-    console.log("📊 AUTO-ALERT SPAM SIMULATION (CRUDE OIL FULL DAY)");
+    console.log("📊 AUTO-ALERT SIMULATION: YESTERDAY's TRADES");
     console.log("==================================================");
-    console.log("Simulating how many Telegram notifications you will get in a day...");
+    console.log("Simulating the fixed bot logic on yesterday's exact market data...");
 
     try {
-        const client = new TradingView.Client();
-        const chart = new client.Session.Chart();
+        const now = new Date();
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(12, 0, 0, 0); // Start from 12:00 PM yesterday
         
-        console.log("Fetching 5-minute historical data for TVC:USOIL (Last 100 candles) ...");
-        chart.setMarket('TVC:USOIL', { timeframe: '5' });
-
-        const quotes = await new Promise((resolve, reject) => {
-            chart.onUpdate(() => {
-                const q = chart.periods.map(p => ({
-                    timeStr: new Date(p.time * 1000).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute:'2-digit' }),
-                    hour: new Date(p.time * 1000).getHours(),
-                    minute: new Date(p.time * 1000).getMinutes(),
-                    timestamp: p.time * 1000,
-                    open: p.open,
-                    high: p.max,
-                    low: p.min,
-                    close: p.close
-                }));
-                client.end();
-                resolve(q);
-            });
-            setTimeout(() => { client.end(); reject(new Error('TV Timeout')); }, 5000);
+        const period1 = Math.floor(yesterday.getTime() / 1000);
+        
+        const result = await yahooFinance.chart('CL=F', { interval: '5m', period1: period1 });
+        const rawQuotes = result.quotes.filter(q => q.close !== null);
+        
+        const quotes = rawQuotes.map(q => {
+            const d = new Date(q.date);
+            return {
+                timeStr: d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute:'2-digit' }),
+                hour: d.getHours(),
+                minute: d.getMinutes(),
+                timestamp: d.getTime(),
+                open: q.open,
+                high: q.high,
+                low: q.low,
+                close: q.close
+            };
         });
 
         if (!quotes || quotes.length < 50) {
@@ -42,7 +43,6 @@ async function simulateAutoAlerts() {
 
         console.log("\n--- TIMELINE OF ALERTS ---");
         
-        // Start from candle 30 to allow EMA/ADX calculation
         for (let i = 30; i < quotes.length; i++) {
             const currentSlice = quotes.slice(0, i + 1);
             const closes = currentSlice.map(q => q.close);
@@ -73,24 +73,20 @@ async function simulateAutoAlerts() {
             }
 
             if (tradeType !== "NO_TRADE") {
-                // Simulate server.js rate limiter (1 per 15 mins per type)
                 const currentMinuteBlock = Math.floor(lastCandle.minute / 15);
                 const fnoAlertKey = `FNO_ALERT_crude_${tradeType}_${lastCandle.hour}_${currentMinuteBlock}`;
                 
                 if (!sentAlertsMemory.has(fnoAlertKey)) {
                     sentAlertsMemory.add(fnoAlertKey);
                     totalAlerts++;
-                    console.log(`🔔 [${lastCandle.timeStr}] AUTO-ALERT SENT: BUY ${tradeType} | Price: ₹${lastCandle.close} | ADX: ${currentADX.toFixed(1)}`);
-                } else {
-                    // console.log(`🔕 [${lastCandle.timeStr}] Suppressed Duplicate ${tradeType} alert to prevent spam.`);
+                    console.log(`🔔 [${lastCandle.timeStr}] AUTO-ALERT: BUY ${tradeType} | Spot: $${lastCandle.close.toFixed(2)} | ADX: ${currentADX.toFixed(1)}`);
                 }
             }
         }
 
         console.log("\n==================================================");
-        console.log(`✅ TOTAL NOTIFICATIONS SENT IN 8+ HOURS: ${totalAlerts}`);
+        console.log(`✅ TOTAL ALERTS SENT IN YESTERDAY'S SESSION: ${totalAlerts}`);
         console.log("==================================================");
-        console.log("Conclusion: The 15-minute block filter in server.js successfully prevents spam while ensuring you get the breakout alerts.");
 
     } catch (err) {
         console.error("Failed to fetch historical data for simulation.", err.message);

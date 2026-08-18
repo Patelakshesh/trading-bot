@@ -207,10 +207,12 @@ async function getFNOTrade(instrumentType = 'nifty') {
 
         const ema5Data = calculateEMA(closes, 5);
         const ema20Data = calculateEMA(closes, 20);
+        const ema200Data = calculateEMA(closes, 200); // MACRO TREND SHIELD
         const ema5 = ema5Data.current;
         const prevEma5 = ema5Data.prev;
         const ema20 = ema20Data.current;
         const prevEma20 = ema20Data.prev;
+        const ema200 = ema200Data.current;
         
         const lastCandle = quotes[quotes.length - 1];
         const prevCandle = quotes[quotes.length - 2];
@@ -320,17 +322,23 @@ async function getFNOTrade(instrumentType = 'nifty') {
         const emaGapPercent = (Math.abs(ema5 - ema20) / currentPrice) * 100;
         const validGap = emaGapPercent >= 0.05;
 
-        // CALL OPTION LOGIC (Requires valid gap + ADX > 22 + RSI between 45 and 68)
-        if (ema5 > ema20 && validGap && candleGain > 0 && currentRSI >= 45 && currentRSI <= 68 && currentADX >= 22) {
+        // CALL OPTION LOGIC (Requires valid gap + ADX > 22 + RSI healthy + Price > 200-EMA macro trend)
+        if (ema5 > ema20 && prevEma5 <= prevEma20 && validGap && candleGain > 0 && currentRSI >= 45 && currentRSI <= 68 && currentADX >= 22) {
+            if (ema200 && currentPrice < ema200) {
+                return { status: 'NO_TRADE', message: `⚠️ MACRO TREND BLOCK: 5-min trend is UP, but price is below the 1-Hour (200) EMA. Ignoring fake pullback!` };
+            }
             signal = "BUY";
             optionType = "CE (CALL)";
-            logic = `🔥 EXPLOSIVE TREND CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is healthy (${currentRSI.toFixed(1)}). The EMA gap has widened to a breakout level on bullish volume. This is a high-probability entry setup!`;
+            logic = `🔥 FRESH EXPLOSIVE BREAKOUT: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed the 20-EMA on bullish volume in alignment with the macro trend. High-probability entry!`;
         } 
-        // PUT OPTION LOGIC (Requires valid gap + ADX > 22 + RSI between 32 and 55)
-        else if (ema5 < ema20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22) {
+        // PUT OPTION LOGIC (Requires valid gap + ADX > 22 + RSI healthy bearish + Price < 200-EMA macro trend)
+        else if (ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22) {
+            if (ema200 && currentPrice > ema200) {
+                return { status: 'NO_TRADE', message: `⚠️ MACRO TREND BLOCK: 5-min trend is DOWN, but price is above the 1-Hour (200) EMA. Ignoring fake pullback!` };
+            }
             signal = "BUY";
             optionType = "PE (PUT)";
-            logic = `🩸 BEARISH BREAKDOWN CONFIRMED: ${instrumentName} ADX is high (${currentADX.toFixed(1)}) and RSI is healthy bearish (${currentRSI.toFixed(1)}). The EMA gap has widened downward on selling volume. Massive short trigger activated!`;
+            logic = `🩸 FRESH BEARISH BREAKDOWN: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed below 20-EMA on selling volume in alignment with the macro trend. Massive short trigger!`;
         }
         else {
             let spotDisplay = `${currentPrice.toFixed(2)}`;
