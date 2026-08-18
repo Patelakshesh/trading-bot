@@ -48,8 +48,15 @@ async function simulateAutoAlerts() {
             const closes = currentSlice.map(q => q.close);
             
             // EMAs
-            const ema5 = calcEMA(closes, 5).current;
-            const ema20 = calcEMA(closes, 20).current;
+            const ema5Data = calcEMA(closes, 5);
+            const ema20Data = calcEMA(closes, 20);
+            const ema200Data = calcEMA(closes, 200);
+            
+            const ema5 = ema5Data.current;
+            const prevEma5 = ema5Data.prev;
+            const ema20 = ema20Data.current;
+            const prevEma20 = ema20Data.prev;
+            const ema200 = ema200Data.current;
             
             // Candle Gain
             const lastCandle = currentSlice[currentSlice.length - 1];
@@ -64,12 +71,21 @@ async function simulateAutoAlerts() {
             });
             const currentADX = adxResult.length > 0 ? adxResult[adxResult.length - 1].adx : 0;
 
-            // Signal Logic
+            // Signal Logic with Macro Shield and Fresh Crossover
             let tradeType = "NO_TRADE";
-            if (ema5 < ema20 && candleGain < 0 && currentADX > 22) {
-                tradeType = "PUT";
-            } else if (ema5 > ema20 && candleGain > 0 && currentADX > 22) {
-                tradeType = "CALL";
+            
+            if (ema5 < ema20 && prevEma5 >= prevEma20 && candleGain < 0 && currentADX >= 22) {
+                if (ema200 && lastCandle.close > ema200) {
+                    // console.log(`[${lastCandle.timeStr}] BLOCKED PUT (Macro Trend UP)`);
+                } else {
+                    tradeType = "PUT";
+                }
+            } else if (ema5 > ema20 && prevEma5 <= prevEma20 && candleGain > 0 && currentADX >= 22) {
+                if (ema200 && lastCandle.close < ema200) {
+                    // console.log(`[${lastCandle.timeStr}] BLOCKED CALL (Macro Trend DOWN)`);
+                } else {
+                    tradeType = "CALL";
+                }
             }
 
             if (tradeType !== "NO_TRADE") {

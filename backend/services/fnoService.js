@@ -280,10 +280,10 @@ async function getFNOTrade(instrumentType = 'nifty') {
         if (instrumentType.toLowerCase() === 'nifty') {
             strikePriceNum = Math.round(currentPrice / 50) * 50; 
         } else if (instrumentType.toLowerCase() === 'crude') {
-            // FIX: DO NOT calculate MCX price using WTI * INR. Indian Futures have massive premiums and expiry rollovers.
-            strikePriceNum = "ATM (Look at your Broker)";
+            // Angle One fetches the true Indian MCX Spot Price now!
+            strikePriceNum = Math.round(currentPrice / 50) * 50;
         } else if (instrumentType.toLowerCase() === 'gold') {
-            strikePriceNum = "ATM (Look at Broker)";
+            strikePriceNum = "ATM";
         }
 
         // KILL SWITCH: DO NOT TRADE CRUDE OIL DURING INDIAN DAYTIME (10:00 AM to 5:00 PM IST)
@@ -396,15 +396,20 @@ async function getFNOTrade(instrumentType = 'nifty') {
         let dynamicTarget = "";
         let dynamicSL = "";
         
-        if (currentADX >= 30) {
-            dynamicTarget = "🎯 TARGET: +4% to +5% (MASSIVE MOMENTUM DETECTED! Let the profits run!)";
-            dynamicSL = "🛑 STOP LOSS: -2% (Give it room to breathe, huge trend active).";
-        } else if (currentADX >= 25) {
-            dynamicTarget = "🎯 TARGET: +2% to +3% (Strong momentum. Solid base hit).";
-            dynamicSL = "🛑 STOP LOSS: -1.5% (Standard risk).";
+        if (instrumentType.toLowerCase() === 'crude') {
+            dynamicTarget = "🎯 TARGET: +35 Points (₹700 Profit per lot)";
+            dynamicSL = "🛑 STOP LOSS: -15 Points (Strict ₹300 Risk limit)";
         } else {
-            dynamicTarget = "🎯 TARGET: +1% to +1.5% (Low momentum / Early trend. Take fast profits!)";
-            dynamicSL = "🛑 STOP LOSS: -1% (STRICT - Cut losses instantly if it reverses).";
+            if (currentADX >= 30) {
+                dynamicTarget = "🎯 TARGET: +4% to +5% (MASSIVE MOMENTUM DETECTED! Let the profits run!)";
+                dynamicSL = "🛑 STOP LOSS: -2% (Give it room to breathe, huge trend active).";
+            } else if (currentADX >= 25) {
+                dynamicTarget = "🎯 TARGET: +2% to +3% (Strong momentum. Solid base hit).";
+                dynamicSL = "🛑 STOP LOSS: -1.5% (Standard risk).";
+            } else {
+                dynamicTarget = "🎯 TARGET: +1% to +1.5% (Low momentum / Early trend. Take fast profits!)";
+                dynamicSL = "🛑 STOP LOSS: -1% (STRICT - Cut losses instantly if it reverses).";
+            }
         }
 
         // Return the Option Trade Plan

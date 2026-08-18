@@ -1,14 +1,14 @@
 const { getFNOTrade } = require('../services/fnoService');
 
-async function checkLiveCrude() {
+async function testFnO() {
+    console.log("Testing getFNOTrade('crude')...");
     try {
-        console.log("Fetching Live Crude Oil Metrics...");
         const result = await getFNOTrade('crude');
         console.log(JSON.stringify(result, null, 2));
-    } catch(err) {
-        console.error(err);
+    } catch (e) {
+        console.error("Error running getFNOTrade:", e);
     }
     process.exit(0);
 }
 
-checkLiveCrude();
+testFnO();
