@@ -1586,6 +1586,7 @@ cron.schedule('*/2 * * * *', async () => {
         const { getFNOTrade } = require('./services/fnoService');
         for (const asset of ['crude', 'nifty']) {
             const fnoResult = await getFNOTrade(asset);
+            await new Promise(r => setTimeout(r, 2000)); // Prevent Angle One rate limit
             if (fnoResult.status !== 'NO_TRADE' && fnoResult.status !== 'ERROR') {
                 const tradeType = fnoResult.trade ? fnoResult.trade.type.substring(0,2) : 'UKN';
                 const currentMinuteBlock = Math.floor(new Date().getMinutes() / 15);
