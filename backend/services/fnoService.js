@@ -173,8 +173,12 @@ async function getFNOTrade(instrumentType = 'nifty') {
             d.setDate(d.getDate() - 5);
             const p1 = Math.floor(d.getTime()/1000);
             
+            let yhSymbol = symbol;
+            if (instrumentType.toLowerCase() === 'crude') yhSymbol = 'CL=F';
+            else if (instrumentType.toLowerCase() === 'gold') yhSymbol = 'GC=F';
+            
             const queryOptions = { period1: p1, interval: '5m' };
-            const result = await yahooFinance.chart(symbol, queryOptions);
+            const result = await yahooFinance.chart(yhSymbol, queryOptions);
             quotes = result.quotes.filter(q => q.close !== null);
         }
         
