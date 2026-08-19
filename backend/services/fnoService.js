@@ -360,7 +360,12 @@ async function getFNOTrade(instrumentType = 'nifty') {
         const standardCall = ema5 > ema20 && prevEma5 <= prevEma20 && validGap && candleGain > 0 && currentRSI >= 45 && currentRSI <= 68 && currentADX >= 22 && (ema200 ? currentPrice >= ema200 : true);
         const usVolumeCall = isUSVolumeBreakout && ema5 > ema20 && candleGain > 0.0005; // Bypass macro rules if US Volume is exploding upwards
 
+        const isCallExhausted = candleGain >= 0.25; // If it pumped 0.25%+ in a single 5m candle, the spike is OVER.
+
         if (standardCall || usVolumeCall) {
+            if (isCallExhausted) {
+                return { status: 'NO_TRADE', message: `🚫 EXHAUSTION TRAP BLOCKED: The price just spiked a massive ${candleGain.toFixed(2)}% in a single candle. The breakout is already over. If you buy a CE now, you will get trapped at the exact top. Wait for a pullback!` };
+            }
             if (standardCall && !usVolumeCall && ema200 && currentPrice < ema200) {
                 return { status: 'NO_TRADE', message: `⚠️ MACRO TREND BLOCK: 5-min trend is UP, but price is below the 1-Hour (200) EMA. Ignoring fake pullback!` };
             }
@@ -376,6 +381,12 @@ async function getFNOTrade(instrumentType = 'nifty') {
             const standardPut = ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true);
             const usVolumePut = isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.0005;
             
+            const isPutExhausted = candleGain <= -0.25; // If it dumped 0.25%+ in a single 5m candle, the crash is OVER.
+
+            if (isPutExhausted) {
+                return { status: 'NO_TRADE', message: `🚫 EXHAUSTION TRAP BLOCKED: The price just crashed a massive ${Math.abs(candleGain).toFixed(2)}% in a single candle. The breakdown is already over. If you buy a PE now, you will get trapped at the exact bottom. Wait for a pullback!` };
+            }
+
             if (standardPut && !usVolumePut && ema200 && currentPrice > ema200) {
                 return { status: 'NO_TRADE', message: `⚠️ MACRO TREND BLOCK: 5-min trend is DOWN, but price is above the 1-Hour (200) EMA. Ignoring fake pullback!` };
             }
