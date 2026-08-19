@@ -341,8 +341,8 @@ async function getFNOTrade(instrumentType = 'nifty') {
             avgVolume = recentVols.reduce((a, b) => a + b, 0) / recentVols.length || 1;
         } catch(e) {}
         const volumeSpikeMultiplier = currentVolume / avgVolume;
-        const nowISTTime = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
-        const isUSSession = nowISTTime.getHours() >= 19 && nowISTTime.getHours() <= 23; // 7 PM to 11 PM
+        const istHour = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
+        const isUSSession = istHour >= 19 && istHour <= 23; // 7 PM to 11 PM IST
         const isUSVolumeBreakout = isUSSession && volumeSpikeMultiplier >= 2.5; // Massive 250% volume spike
 
         // Do not kill the trade if there is a massive US volume breakout!
