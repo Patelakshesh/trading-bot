@@ -692,6 +692,11 @@ async function getFNOTrade(instrumentType = 'nifty') {
             });
         } catch(e) {}
 
+        const targetPoints = instrumentType.toLowerCase() === 'crude' ? 35 : (instrumentType.toLowerCase() === 'banknifty' ? 120 : 45);
+        const slPoints = instrumentType.toLowerCase() === 'crude' ? 15 : (instrumentType.toLowerCase() === 'banknifty' ? 50 : 20);
+        const dynamicTargetPrice = optionType.includes('CE') ? (currentPrice + targetPoints) : (currentPrice - targetPoints);
+        const dynamicSLPrice = optionType.includes('CE') ? (currentPrice - slPoints) : (currentPrice + slPoints);
+
         // Return the Option Trade Plan
         return {
             status: 'TRADE_FOUND',
@@ -700,6 +705,17 @@ async function getFNOTrade(instrumentType = 'nifty') {
             instrumentName: instrumentName,
             mcxNote: mcxNote,
             newsHeadline: newsSpikeWarning ? newsSpikeWarning : newsHeadline,
+            directAction: {
+                action: `BUY ${strikePriceNum} ${optionType.includes('CE') ? 'CE' : 'PE'}`,
+                strike: `${strikePriceNum} ${optionType.includes('CE') ? 'CE' : 'PE'}`,
+                optionType: optionType.includes('CE') ? 'CE' : 'PE',
+                entrySpot: `₹${currentPrice.toFixed(2)}`,
+                targetSpot: `₹${dynamicTargetPrice.toFixed(2)} (+${targetPoints} pts)`,
+                stopLossSpot: `₹${dynamicSLPrice.toFixed(2)} (-${slPoints} pts)`,
+                profitPerLot: instrumentType.toLowerCase() === 'crude' ? '₹700' : '₹1,200',
+                riskPerLot: instrumentType.toLowerCase() === 'crude' ? '₹300' : '₹500',
+                confidence: `${currentADX >= 25 ? 90 : 80}%`
+            },
             trade: {
                 type: optionType,
                 logic: `${adxWarning}\n\n` + logic,

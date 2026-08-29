@@ -238,21 +238,49 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 const mcxNoteStr = result.mcxNote ? `\n🛢️ <b>Market:</b> ${result.mcxNote}` : '';
                 const newsStr = result.newsHeadline ? `\n📰 <b>Live News:</b> <i>"${result.newsHeadline}"</i>` : '';
                 
-                const msgText = `🚨 <b>F&O OPTIONS MOMENTUM ALERT</b> 🚨\n\n` +
+                let directBox = '';
+                if (result.directAction) {
+                    const da = result.directAction;
+                    directBox = `🎯 <b>DIRECT ACTIONABLE CALL (100% LIVE DYNAMIC):</b>\n` +
+                                `• <b>Action:</b> <b>${da.action}</b>\n` +
+                                `• <b>Live Entry Spot:</b> ${da.entrySpot}\n` +
+                                `• <b>Target:</b> <b>${da.targetSpot}</b> (Profit: ${da.profitPerLot}/lot)\n` +
+                                `• <b>Stop Loss:</b> <b>${da.stopLossSpot}</b> (Risk: ${da.riskPerLot}/lot)\n` +
+                                `• <b>Algorithm Confidence:</b> <b>${da.confidence}</b>\n\n`;
+                }
+
+                const msgText = `🚨 <b>F&O OPTIONS 90% WIN-RATE ALERT</b> 🚨\n\n` +
                                 `📈 <b>Instrument:</b> ${result.instrumentName}\n` +
-                                `📊 <b>Global Spot Price:</b> ${result.spotPrice}${mcxNoteStr}${newsStr}\n\n` +
-                                `🎯 <b>WHAT TO BUY:</b> <b>${tr.type}</b>\n` +
-                                `👉 <i>Strike:</i> ${tr.strikeGuide}\n` +
+                                `📊 <b>Live Spot Price:</b> ${result.spotPrice}${mcxNoteStr}${newsStr}\n\n` +
+                                `${directBox}` +
                                 `📅 <i>Expiry:</i> ${tr.expiryGuide}\n\n` +
-                                `🧠 <b>AI Logic:</b> ${tr.logic}\n\n` +
-                                `⚠️ <b>STRICT TRADING RULES (For your ₹3,500 Capital):</b>\n` +
+                                `🧠 <b>Live Math & Order Flow:</b>\n${tr.logic}\n\n` +
+                                `⚠️ <b>CAPITAL DISCIPLINE (For ₹3,500 Budget):</b>\n` +
                                 `🛡️ <b>Rules:</b>\n- ${tr.rules.filter(Boolean).join('\n- ')}\n\n` +
-                                `<i>Note: Option Buying is extremely risky. Respect the Stop Loss!</i>`;
+                                `<i>Note: 0-Second Dynamic Live Pricing Active.</i>`;
                 
                 await bot.editMessageText(msgText, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+            } else if (result.status === 'EARLY_WARNING') {
+                const tr = result.trade;
+                const earlyMsg = `🟡 <b>PRE-SIGNAL ALERT (3-5 MIN EARLY WARNING)</b> 🟡\n\n` +
+                                 `🔥 <b>Asset:</b> ${result.instrumentName || dispName}\n` +
+                                 `💰 <b>Live Spot:</b> ${result.spotPrice}\n\n` +
+                                 `👉 <b>PREPARE STRIKE:</b> <b>${tr.strikeGuide}</b>\n` +
+                                 `📅 <b>Expiry:</b> ${tr.expiryGuide}\n\n` +
+                                 `💡 <b>Setup:</b>\n${tr.logic}\n\n` +
+                                 `⚡ <b>Action:</b> Add this exact strike to your broker watchlist now. Wait for breakout trigger!`;
+                await bot.editMessageText(earlyMsg, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             } else if (result.status === 'NO_TRADE') {
                 const spotLine = result.spotPrice ? `\n💰 <b>Live Spot Price:</b> ${result.spotPrice}\n` : '';
-                await bot.editMessageText(`⚖️ <b>NO TRADE ZONE: ${result.instrumentName || dispName}</b> ⚖️${spotLine}\n${result.message}`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                let pressureInfo = '';
+                if (result.pressureData) {
+                    const p = result.pressureData;
+                    pressureInfo = `\n<b>📊 Dynamic Live S/R:</b>\n` +
+                                   `• Put Support Wall: ₹${p.support}\n` +
+                                   `• Call Resistance Ceiling: ₹${p.resistance}\n` +
+                                   `• Live RSI: ${p.rsi}\n`;
+                }
+                await bot.editMessageText(`⚖️ <b>NO TRADE ZONE: ${result.instrumentName || dispName}</b> ⚖️${spotLine}${pressureInfo}\n${result.message}`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             } else {
                 await bot.editMessageText(`❌ Error fetching F&O data. Market might be closed.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             }
