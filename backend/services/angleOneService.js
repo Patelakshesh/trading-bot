@@ -101,6 +101,11 @@ class AngleOneService {
     };
   }
   async getQuote(exchange, token) {
+    const details = await this.getFullQuoteDetails(exchange, token);
+    return details ? details.ltp : null;
+  }
+
+  async getFullQuoteDetails(exchange, token) {
     await this.ensureLoggedIn();
     if (!this.jwtToken) return null;
     try {
@@ -109,7 +114,7 @@ class AngleOneService {
         {
           mode: "FULL",
           exchangeTokens: {
-            [exchange]: [token]
+            [exchange]: [token.toString()]
           }
         },
         { headers: this.getHeaders() }
@@ -117,37 +122,98 @@ class AngleOneService {
       
       if (response.data && response.data.status && response.data.data && response.data.data.fetched) {
         const fetchedData = response.data.data.fetched;
-        const item = fetchedData.find(f => f.exchange === exchange);
-        if (item && item.ltp) {
-          return item.ltp;
+        const item = fetchedData.find(f => f.exchange === exchange || f.tradingSymbol);
+        if (item) {
+          return {
+            ltp: parseFloat(item.ltp || 0),
+            open: parseFloat(item.open || 0),
+            high: parseFloat(item.high || 0),
+            low: parseFloat(item.low || 0),
+            close: parseFloat(item.close || 0),
+            opnInterest: parseFloat(item.opnInterest || 0),
+            totBuyQuan: parseFloat(item.totBuyQuan || 0),
+            totSellQuan: parseFloat(item.totSellQuan || 0),
+            volume: parseFloat(item.tradeVolume || item.volume || 0),
+            depth: item.depth || null,
+            symbolToken: item.symbolToken || token
+          };
         }
       }
       return null;
     } catch (err) {
-      // 401 = token expired mid-session — force re-login once and retry
       if (err.response?.status === 401) {
-        console.warn(`⚠️ [AngleOne] 401 on getQuote. Forcing re-login and retrying...`);
-        this.jwtToken = null; // Force ensureLoggedIn to re-login
+        console.warn(`⚠️ [AngleOne] 401 on getFullQuoteDetails. Forcing re-login and retrying...`);
+        this.jwtToken = null;
         const ok = await this.ensureLoggedIn();
         if (ok) {
           try {
             const retry = await axios.post(
               'https://apiconnect.angelbroking.com/rest/secure/angelbroking/market/v1/quote/',
-              { mode: "FULL", exchangeTokens: { [exchange]: [token] } },
+              { mode: "FULL", exchangeTokens: { [exchange]: [token.toString()] } },
               { headers: this.getHeaders() }
             );
             if (retry.data?.data?.fetched) {
-              const item = retry.data.data.fetched.find(f => f.exchange === exchange);
-              if (item?.ltp) return item.ltp;
+              const item = retry.data.data.fetched.find(f => f.exchange === exchange || f.tradingSymbol);
+              if (item) {
+                return {
+                  ltp: parseFloat(item.ltp || 0),
+                  open: parseFloat(item.open || 0),
+                  high: parseFloat(item.high || 0),
+                  low: parseFloat(item.low || 0),
+                  close: parseFloat(item.close || 0),
+                  opnInterest: parseFloat(item.opnInterest || 0),
+                  totBuyQuan: parseFloat(item.totBuyQuan || 0),
+                  totSellQuan: parseFloat(item.totSellQuan || 0),
+                  volume: parseFloat(item.tradeVolume || item.volume || 0),
+                  depth: item.depth || null,
+                  symbolToken: item.symbolToken || token
+                };
+              }
             }
           } catch (retryErr) {
-            console.error(`❌ [AngleOne] Retry also failed for getQuote:`, retryErr.message);
+            console.error(`❌ [AngleOne] Retry also failed for getFullQuoteDetails:`, retryErr.message);
           }
         }
       } else {
         console.error(`❌ Angle One Quote Error for ${exchange}:${token}:`, err.response?.data || err.message);
       }
       return null;
+    }
+  }
+
+  async getMultiQuotes(exchange, tokens = []) {
+    await this.ensureLoggedIn();
+    if (!this.jwtToken || !tokens.length) return [];
+    try {
+      const response = await axios.post(
+        'https://apiconnect.angelbroking.com/rest/secure/angelbroking/market/v1/quote/',
+        {
+          mode: "FULL",
+          exchangeTokens: {
+            [exchange]: tokens.map(t => t.toString())
+          }
+        },
+        { headers: this.getHeaders() }
+      );
+
+      if (response.data && response.data.status && response.data.data && response.data.data.fetched) {
+        return response.data.data.fetched.map(item => ({
+          ltp: parseFloat(item.ltp || 0),
+          open: parseFloat(item.open || 0),
+          high: parseFloat(item.high || 0),
+          low: parseFloat(item.low || 0),
+          close: parseFloat(item.close || 0),
+          opnInterest: parseFloat(item.opnInterest || 0),
+          totBuyQuan: parseFloat(item.totBuyQuan || 0),
+          totSellQuan: parseFloat(item.totSellQuan || 0),
+          volume: parseFloat(item.tradeVolume || item.volume || 0),
+          symbolToken: item.symbolToken,
+          tradingSymbol: item.tradingSymbol
+        }));
+      }
+      return [];
+    } catch (e) {
+      return [];
     }
   }
 

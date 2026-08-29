@@ -3,6 +3,9 @@ const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey', 'ripHis
 const { checkUpcomingNews } = require('./newsCalendarService');
 const angleOneService = require('./angleOneService');
 const angleOneMapping = require('./angleOneMapping');
+const optionChainService = require('./optionChainService');
+const preSignalDetector = require('./preSignalDetector');
+const SignalLog = require('../models/SignalLog');
 
 // 🔮 PHASE 4: GLOBAL NIFTY DIRECTION PREDICTOR
 async function predictNiftyDirection() {
@@ -85,23 +88,55 @@ async function getFNOTrade(instrumentType = 'nifty') {
         let instrumentName = 'NIFTY 50';
         let mcxNote = '';
         let stepSize = 50;
-        let useTradingView = true; // Enabled globally now!
-        let tvSymbol = 'NSE:NIFTY'; // Nifty 0-sec live
+        let useTradingView = true;
+        let tvSymbol = 'NSE:NIFTY';
+        let a1Exchange = 'NSE';
+        let a1Token = '26000'; // NIFTY
 
-        if (instrumentType.toLowerCase() === 'crude') {
+        const instLower = instrumentType.toLowerCase();
+
+        if (instLower === 'banknifty' || instLower === 'bnf') {
+            symbol = '^NSEBANK';
+            instrumentName = 'BANK NIFTY';
+            stepSize = 100;
+            tvSymbol = 'NSE:BANKNIFTY';
+            a1Exchange = 'NSE';
+            a1Token = '26009';
+        } else if (instLower === 'crude' || instLower === 'crudeoil' || instLower === 'crudeoilm') {
             symbol = 'CRUDEOILM.MCX'; 
             instrumentName = 'CRUDE OIL MINI (MCX)';
             mcxNote = "Crude Oil Mini Options (Scanning true Indian MCX Market directly via Angle One)";
             stepSize = 10; 
-            useTradingView = false; // We don't need TVC proxy anymore!
-            tvSymbol = 'MCX:CRUDEOIL1!'; 
-        } else if (instrumentType.toLowerCase() === 'gold') {
+            useTradingView = false;
+            tvSymbol = 'MCX:CRUDEOIL1!';
+            a1Exchange = 'MCX';
+        } else if (instLower === 'gold' || instLower === 'goldm') {
             symbol = 'GC=F';
             instrumentName = 'GOLD (MCX)';
             mcxNote = "Gold Options (Trade the MCX current month expiry)";
             stepSize = 10; 
             useTradingView = true;
             tvSymbol = 'TVC:GOLD';
+            a1Exchange = 'MCX';
+            a1Token = '237072';
+        } else if (instLower === 'silver' || instLower === 'silverm' || instLower === 'silvermic') {
+            symbol = 'SI=F';
+            instrumentName = 'SILVER MINI (MCX)';
+            mcxNote = "Silver Mini Options & Futures (MCX)";
+            stepSize = 100;
+            useTradingView = true;
+            tvSymbol = 'TVC:SILVER';
+            a1Exchange = 'MCX';
+            a1Token = '237073';
+        } else if (instLower === 'natgas' || instLower === 'naturalgas' || instLower === 'natgasmini') {
+            symbol = 'NG=F';
+            instrumentName = 'NATURAL GAS MINI (MCX)';
+            mcxNote = "Natural Gas Mini (MCX)";
+            stepSize = 1;
+            useTradingView = true;
+            tvSymbol = 'TVC:NATURALGAS';
+            a1Exchange = 'MCX';
+            a1Token = '237074';
         }
 
         console.log(`Fetching data for F&O Analysis: ${instrumentName} (${symbol})`);
@@ -109,22 +144,13 @@ async function getFNOTrade(instrumentType = 'nifty') {
         let quotes = [];
         let fetchedViaAngleOne = false;
 
-        // --- NEW: ANGLE ONE TRUE INDIAN HISTORICAL DATA ---
-        let a1Exchange = 'NSE';
-        let a1Token = '26000'; // NIFTY
-        
         try {
             await angleOneMapping.init();
             
-            if (instrumentType.toLowerCase() === 'crude') {
-                a1Exchange = 'MCX';
-                // Auto-roller: reads nearest non-expired CRUDEOILM contract from AngleOne instrument master
+            if (instLower.includes('crude')) {
                 const crudeToken = angleOneMapping.getCrudeOilMiniToken();
-                a1Token = crudeToken ? crudeToken.token : '560978'; // fallback only if mapping fully failed
+                a1Token = crudeToken ? crudeToken.token : '565900';
                 console.log(`🔄 [CrudeAutoRoller] Active token: ${a1Token}`);
-            } else if (instrumentType.toLowerCase() === 'gold') {
-                a1Exchange = 'MCX';
-                a1Token = '237072'; // GOLD
             }
             
             console.log(`🚀 Fetching True Indian Market Data from Angle One for ${instrumentName}...`);
@@ -541,6 +567,34 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 }
             }
 
+            // Check Early Pre-Signal Detector (3-5 min before breakout)
+            try {
+                const preSignal = await preSignalDetector.scanPreSignal(instrumentType, quotes, currentPrice);
+                if (preSignal) {
+                    return {
+                        status: 'EARLY_WARNING',
+                        phase: 'PREPARE',
+                        spotPrice: spotDisplay,
+                        instrumentName: instrumentName,
+                        trade: {
+                            type: `${preSignal.direction.replace('_', ' ')} [3-5 MIN PRE-SIGNAL]`,
+                            logic: `⚠️ <b>${preSignal.setupName}</b> ⚠️\n\n` +
+                                   preSignal.rationale.join('\n') + `\n\n` +
+                                   `⏱️ <b>Pre-Signal Trigger:</b> ₹${preSignal.triggerPrice}\n` +
+                                   `🎯 <b>Expected Target:</b> ₹${preSignal.targetPrice} | 🛡️ <b>SL:</b> ₹${preSignal.stopLossPrice}`,
+                            strikeGuide: `${strikePriceNum} ${preSignal.direction.includes('CE') ? 'CE' : 'PE'} (PREPARE STRIKE)`,
+                            expiryGuide: `${expiryDateStr} Expiry`,
+                            rules: [
+                                "⚠️ This is a PRE-SIGNAL (Energy is coiling).",
+                                "🚨 DO NOT BUY YET. Open your broker app and add this strike to watchlist.",
+                                `⏱️ When price breaks ₹${preSignal.triggerPrice}, buy instantly!`,
+                                "✅ Wait for the 'CONFIRMED BREAKOUT' execution alert."
+                            ]
+                        }
+                    };
+                }
+            } catch (e) {}
+
             return {
                 status: 'NO_TRADE',
                 spotPrice: spotDisplay,
@@ -611,9 +665,37 @@ async function getFNOTrade(instrumentType = 'nifty') {
             }
         }
 
+        // Log trade in SignalLog
+        try {
+            const sigId = `SIG_${instrumentType.toUpperCase()}_${Date.now()}`;
+            await SignalLog.create({
+                signalId: sigId,
+                asset: instrumentType.toUpperCase(),
+                strategy: isUSVolumeBreakout ? 'US_VOLUME_BREAKOUT' : 'MTFA_CONFLUENCE',
+                phase: 'EXECUTE',
+                direction: optionType.includes('CE') ? 'BUY_CE' : 'BUY_PE',
+                strike: strikePriceNum ? strikePriceNum.toString() : 'ATM',
+                expiry: expiryDateStr,
+                spotPriceAtSignal: currentPrice,
+                recommendedEntry: currentPrice,
+                targetPrice: optionType.includes('CE') ? currentPrice * 1.015 : currentPrice * 0.985,
+                stopLossPrice: optionType.includes('CE') ? currentPrice * 0.993 : currentPrice * 1.007,
+                confidenceScore: currentADX >= 25 ? 88 : 75,
+                catalysts: [logic.substring(0, 100)],
+                metricsSnapshot: {
+                    adx: currentADX,
+                    rsi: currentRSI,
+                    bbWidth: bbData ? ((bbData.upper - bbData.lower) / currentPrice) * 100 : 1,
+                    pcr: 1.1,
+                    volumeMultiplier: volumeSpikeMultiplier
+                }
+            });
+        } catch(e) {}
+
         // Return the Option Trade Plan
         return {
             status: 'TRADE_FOUND',
+            phase: 'EXECUTE',
             spotPrice: spotDisplay,
             instrumentName: instrumentName,
             mcxNote: mcxNote,
