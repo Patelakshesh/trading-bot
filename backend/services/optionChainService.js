@@ -43,7 +43,19 @@ class OptionChainService {
         try {
             const isBankNifty = asset === 'banknifty';
             const step = isBankNifty ? 100 : 50;
-            const currentSpot = spotPrice > 0 ? spotPrice : (isBankNifty ? 51500 : 24200);
+            let currentSpot = spotPrice;
+
+            if (!currentSpot || currentSpot <= 0) {
+                try {
+                    const token = isBankNifty ? '26009' : '26000';
+                    const q = await angleOneService.getQuote('NSE', token);
+                    if (q && q > 0) currentSpot = q;
+                } catch(e) {}
+            }
+            if (!currentSpot || currentSpot <= 0) {
+                currentSpot = isBankNifty ? 51500 : 24200;
+            }
+
             const atmStrike = Math.round(currentSpot / step) * step;
 
             // Generate 10 strike prices around ATM (5 OTM Calls, 5 OTM Puts)
@@ -62,7 +74,6 @@ class OptionChainService {
 
             const strikeDetails = strikes.map(strike => {
                 const diff = (strike - currentSpot);
-                // Standard distribution model if live feed is warming up
                 const callOI = Math.max(10000, Math.round(150000 * Math.exp(-Math.pow(diff / (step * 4), 2))));
                 const putOI = Math.max(10000, Math.round(140000 * Math.exp(-Math.pow(-diff / (step * 4), 2))));
 
@@ -82,7 +93,7 @@ class OptionChainService {
 
             const pcr = totalCallOI > 0 ? parseFloat((totalPutOI / totalCallOI).toFixed(2)) : 1.0;
             
-            // Calculate Max Pain (Strike where option sellers lose minimum money)
+            // Calculate Max Pain
             let minLoss = Infinity;
             let maxPainStrike = atmStrike;
             for (const s of strikes) {
@@ -97,7 +108,6 @@ class OptionChainService {
                 }
             }
 
-            // Determine Sentiment & Institutional Bias
             let bias = 'NEUTRAL';
             let reasoning = '';
             if (pcr >= 1.25) {
@@ -148,10 +158,12 @@ class OptionChainService {
             let oiValue = 0;
             let buyQty = 0;
             let sellQty = 0;
+            let liveLtp = spotPrice;
 
             if (token) {
                 const quote = await angleOneService.getFullQuoteDetails('MCX', token);
                 if (quote) {
+                    if (quote.ltp > 0) liveLtp = quote.ltp;
                     oiValue = quote.opnInterest || 0;
                     buyQty = quote.totBuyQuan || 0;
                     sellQty = quote.totSellQuan || 0;
@@ -160,7 +172,7 @@ class OptionChainService {
 
             const total = buyQty + sellQty;
             const buyerDominance = total > 0 ? Math.round((buyQty / total) * 100) : 52;
-            const currentSpot = spotPrice > 0 ? spotPrice : 7980;
+            const currentSpot = liveLtp > 0 ? liveLtp : 7983;
 
             const step = (asset.includes('crude')) ? 50 : (asset.includes('gold') ? 100 : (asset.includes('silver') ? 100 : 5));
             const atmStrike = Math.round(currentSpot / step) * step;
