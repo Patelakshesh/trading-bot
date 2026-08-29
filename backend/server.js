@@ -34,6 +34,15 @@ const sentAlertsMemory = new Set();
 
 // ─── INDIAN MARKET HOURS HELPER ──────────────────────────────────────────────
 // NSE/BSE: Monday–Friday, 9:15 AM – 3:30 PM IST
+function isWeekend() {
+    const now = new Date();
+    // Convert to IST (UTC+5:30)
+    const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+    const ist = new Date(now.getTime() + IST_OFFSET);
+    const day = ist.getUTCDay(); // 0=Sun, 6=Sat
+    return day === 0 || day === 6;
+}
+
 function isMarketOpen() {
     const now = new Date();
     // Convert to IST (UTC+5:30)
@@ -105,7 +114,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 
                 await bot.editMessageText(msgText, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             } else if (result.status === 'NO_TRADE') {
-                await bot.editMessageText(`⚖️ <b>NO TRADE ZONE</b>\n\n${result.message}`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                const spotLine = result.spotPrice ? `\n💰 <b>Live Spot Price:</b> ${result.spotPrice}\n` : '';
+                await bot.editMessageText(`⚖️ <b>NO TRADE ZONE: ${result.instrumentName || dispName}</b> ⚖️${spotLine}\n${result.message}`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             } else {
                 await bot.editMessageText(`❌ Error fetching F&O data. Market might be closed.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             }
@@ -1342,6 +1352,10 @@ setInterval(async () => {
 
 // Extract AI Workflow so it can be triggered by external cron services (cron-job.org)
 const runDailyAnalysis = async () => {
+    if (isWeekend()) {
+        console.log('[AI Analysis] Weekend detected. Skipping daily analysis & notifications.');
+        return;
+    }
     console.log('Running daily AI portfolio analysis...');
 
     try {
@@ -1469,6 +1483,7 @@ cron.schedule('*/15 * * * *', runDailyAnalysis, {
 
 // MATHEMATICAL STOP-LOSS, TAKE-PROFIT, AND NEWS ALERT CRON JOB (Runs every 15 minutes)
 cron.schedule('*/15 * * * *', async () => {
+    if (isWeekend()) return;
     console.log('Running Auto-Alert Check...');
     if(!bot) return;
 
@@ -1572,10 +1587,10 @@ cron.schedule('*/15 * * * *', async () => {
 });
 
 // =========================================================================
-// 🚨 PRE-SPIKE NEW YORK OPENING BELL WARNING (Runs Daily at 6:55 PM IST)
+// 🚨 PRE-SPIKE NEW YORK OPENING BELL WARNING (Runs Daily at 6:55 PM IST, Mon–Fri)
 // =========================================================================
-cron.schedule('25 13 * * *', async () => {
-    if (!bot) return;
+cron.schedule('25 13 * * 1-5', async () => {
+    if (!bot || isWeekend()) return;
     try {
         const allUsers = await Portfolio.distinct('chatId');
         const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
@@ -1601,7 +1616,7 @@ cron.schedule('25 13 * * *', async () => {
 
 // INSTANT AUTO-NOTIFICATION BROADCASTER FOR F&O AND INTRADAY
 cron.schedule('*/2 * * * *', async () => {
-    if (!bot) return;
+    if (!bot || isWeekend()) return;
     try {
         console.log('Scanning for Instant Intraday & F&O Auto-Notifications...');
         const allUsers = await Portfolio.distinct('chatId');
@@ -1710,6 +1725,7 @@ cron.schedule('*/2 * * * *', async () => {
 // 🎯 TRADE LOGGER & TRAILING STOP-LOSS AUTO-CHECKER (Runs every 10 mins)
 // =========================================================================
 cron.schedule('*/10 * * * *', async () => {
+    if (isWeekend()) return;
     try {
         const pendingTrades = await TradeLog.find({ outcome: 'PENDING' });
         if (pendingTrades.length === 0) return;

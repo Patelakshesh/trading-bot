@@ -3,10 +3,10 @@ const { TOTP } = require('totp-generator');
 
 class AngleOneService {
   constructor() {
-    this.apiKey = process.env.ANGLE_ONE_API_KEY;
-    this.clientId = process.env.ANGLE_ONE_CLIENT_ID;
-    this.password = process.env.ANGLE_ONE_PASSWORD; // This is usually your MPIN
-    this.totpSecret = process.env.ANGLE_ONE_TOTP_SECRET;
+    this.apiKey = process.env.ANGLE_ONE_API_KEY || process.env.ANGEL_API_KEY;
+    this.clientId = process.env.ANGLE_ONE_CLIENT_ID || process.env.ANGEL_CLIENT_CODE;
+    this.password = process.env.ANGLE_ONE_PASSWORD || process.env.ANGEL_PASSWORD; // This is usually your MPIN
+    this.totpSecret = process.env.ANGLE_ONE_TOTP_SECRET || process.env.ANGEL_TOTP_SECRET;
     
     this.jwtToken = null;
     this.feedToken = null;

@@ -303,22 +303,24 @@ async function getFNOTrade(instrumentType = 'nifty') {
         if (instrumentType.toLowerCase() === 'nifty') {
             strikePriceNum = Math.round(currentPrice / 50) * 50; 
         } else if (instrumentType.toLowerCase() === 'crude') {
-            // Angle One fetches the true Indian MCX Spot Price now!
             strikePriceNum = Math.round(currentPrice / 50) * 50;
         } else if (instrumentType.toLowerCase() === 'gold') {
             strikePriceNum = "ATM";
         }
 
-
-
-        // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
-        if (instrumentType.toLowerCase() === 'nifty') {
-            const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
-            if (nowIST.getDay() === 4) { // Thursday (Expiry Day)
-                return {
-                    status: 'NO_TRADE',
-                    message: `🚫 EXPIRY DAY BLOCKED: Today is Thursday. Option premiums will decay to zero (Theta Decay). Unless you are a highly experienced Option Seller, trading Nifty options on expiry day is gambling. Capital protected.`
-                };
+        // Standardize Spot Price Display across Angel One & Fallback sources
+        let spotDisplay = `₹${currentPrice.toFixed(2)}`;
+        if (instrumentType.toLowerCase() === 'crude') {
+            if (fetchedViaAngleOne) {
+                spotDisplay = `₹${currentPrice.toFixed(2)} (MCX Spot)`;
+            } else {
+                spotDisplay = `$${currentPrice.toFixed(2)} / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
+            }
+        } else if (instrumentType.toLowerCase() === 'gold') {
+            if (fetchedViaAngleOne) {
+                spotDisplay = `₹${currentPrice.toFixed(2)} (MCX Spot)`;
+            } else {
+                spotDisplay = `$${currentPrice.toFixed(2)} / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
             }
         }
 
@@ -331,6 +333,29 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 bbData = bbResult[bbResult.length - 1];
             }
         } catch(e) {}
+
+        const buildPressureData = () => ({
+            spotDisplay: spotDisplay,
+            rsi: currentRSI.toFixed(1),
+            bbUpper: bbData ? bbData.upper.toFixed(2) : "N/A",
+            bbLower: bbData ? bbData.lower.toFixed(2) : "N/A",
+            support: supportZone.toFixed(2),
+            resistance: resistanceZone.toFixed(2)
+        });
+
+        // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
+        if (instrumentType.toLowerCase() === 'nifty') {
+            const nowIST = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+            if (nowIST.getDay() === 4) { // Thursday (Expiry Day)
+                return {
+                    status: 'NO_TRADE',
+                    spotPrice: spotDisplay,
+                    instrumentName: instrumentName,
+                    message: `🚫 EXPIRY DAY BLOCKED: Today is Thursday. Option premiums will decay to zero (Theta Decay). Unless you are a highly experienced Option Seller, trading Nifty options on expiry day is gambling. Capital protected.`,
+                    pressureData: buildPressureData()
+                };
+            }
+        }
 
         // --- NEW QUANT FILTERS FROM WIN_RATE_MAXIMIZE.md ---
         // CALCULATE INSTITUTIONAL VOLUME SPIKE (For cracking US 7PM / 8PM News moves)
@@ -349,7 +374,10 @@ async function getFNOTrade(instrumentType = 'nifty') {
         if (instrumentType.toLowerCase() === 'crude' && currentADX < 22 && !isUSVolumeBreakout) {
             return {
                 status: 'NO_TRADE',
-                message: `⚠️ LOW MOMENTUM KILL SWITCH: ${instrumentName} ADX is ${currentADX.toFixed(1)}. \n\nThe market is sideways. Buying options now guarantees loss via Theta decay. Only trade when ADX > 22.`
+                spotPrice: spotDisplay,
+                instrumentName: instrumentName,
+                message: `⚠️ LOW MOMENTUM KILL SWITCH: ${instrumentName} ADX is ${currentADX.toFixed(1)}. \n\nThe market is sideways. Buying options now guarantees loss via Theta decay. Only trade when ADX > 22.`,
+                pressureData: buildPressureData()
             };
         }
 
@@ -364,10 +392,22 @@ async function getFNOTrade(instrumentType = 'nifty') {
 
         if (standardCall || usVolumeCall) {
             if (isCallExhausted) {
-                return { status: 'NO_TRADE', message: `🚫 EXHAUSTION TRAP BLOCKED: The price just spiked a massive ${candleGain.toFixed(2)}% in a single candle. The breakout is already over. If you buy a CE now, you will get trapped at the exact top. Wait for a pullback!` };
+                return { 
+                    status: 'NO_TRADE', 
+                    spotPrice: spotDisplay,
+                    instrumentName: instrumentName,
+                    message: `🚫 EXHAUSTION TRAP BLOCKED: The price just spiked a massive ${candleGain.toFixed(2)}% in a single candle. The breakout is already over. If you buy a CE now, you will get trapped at the exact top. Wait for a pullback!`,
+                    pressureData: buildPressureData()
+                };
             }
             if (standardCall && !usVolumeCall && ema200 && currentPrice < ema200) {
-                return { status: 'NO_TRADE', message: `⚠️ MACRO TREND BLOCK: 5-min trend is UP, but price is below the 1-Hour (200) EMA. Ignoring fake pullback!` };
+                return { 
+                    status: 'NO_TRADE', 
+                    spotPrice: spotDisplay,
+                    instrumentName: instrumentName,
+                    message: `⚠️ MACRO TREND BLOCK: 5-min trend is UP, but price is below the 1-Hour (200) EMA. Ignoring fake pullback!`,
+                    pressureData: buildPressureData()
+                };
             }
             signal = "BUY";
             optionType = "CE (CALL)";
@@ -384,11 +424,23 @@ async function getFNOTrade(instrumentType = 'nifty') {
             const isPutExhausted = candleGain <= -0.25; // If it dumped 0.25%+ in a single 5m candle, the crash is OVER.
 
             if (isPutExhausted) {
-                return { status: 'NO_TRADE', message: `🚫 EXHAUSTION TRAP BLOCKED: The price just crashed a massive ${Math.abs(candleGain).toFixed(2)}% in a single candle. The breakdown is already over. If you buy a PE now, you will get trapped at the exact bottom. Wait for a pullback!` };
+                return { 
+                    status: 'NO_TRADE', 
+                    spotPrice: spotDisplay,
+                    instrumentName: instrumentName,
+                    message: `🚫 EXHAUSTION TRAP BLOCKED: The price just crashed a massive ${Math.abs(candleGain).toFixed(2)}% in a single candle. The breakdown is already over. If you buy a PE now, you will get trapped at the exact bottom. Wait for a pullback!`,
+                    pressureData: buildPressureData()
+                };
             }
 
             if (standardPut && !usVolumePut && ema200 && currentPrice > ema200) {
-                return { status: 'NO_TRADE', message: `⚠️ MACRO TREND BLOCK: 5-min trend is DOWN, but price is above the 1-Hour (200) EMA. Ignoring fake pullback!` };
+                return { 
+                    status: 'NO_TRADE', 
+                    spotPrice: spotDisplay,
+                    instrumentName: instrumentName,
+                    message: `⚠️ MACRO TREND BLOCK: 5-min trend is DOWN, but price is above the 1-Hour (200) EMA. Ignoring fake pullback!`,
+                    pressureData: buildPressureData()
+                };
             }
             signal = "BUY";
             optionType = "PE (PUT)";
@@ -397,11 +449,6 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 : `🩸 FRESH BEARISH BREAKDOWN: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed below 20-EMA on selling volume in alignment with the macro trend. Massive short trigger!`;
         }
         else {
-            let spotDisplay = `${currentPrice.toFixed(2)}`;
-            if (instrumentType.toLowerCase() === 'crude') {
-                spotDisplay += ` ($) / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
-            }
-
             // EARLY WARNING PREDICTIVE DETECTOR (RSI DIVERGENCE + BOLLINGER BAND SQUEEZE + REJECTION WICK + MTFA SUPPORT)
             if (bbData) {
                 // Must be near daily support (within 0.5%) to trigger a bounce prediction
@@ -496,18 +543,13 @@ async function getFNOTrade(instrumentType = 'nifty') {
 
             return {
                 status: 'NO_TRADE',
+                spotPrice: spotDisplay,
+                instrumentName: instrumentName,
                 message: preMessage + `Current ${instrumentName} Spot: ${spotDisplay}.\n\n` + 
                          `${adxWarning}\nRSI is ${currentRSI.toFixed(1)}.\n` +
                          `📉 Trend Check: 5-EMA is at ${ema5.toFixed(2)} | 20-EMA is at ${ema20.toFixed(2)}.\n` +
                          `No clear crossover detected. Wait for a strong breakout.`,
-                pressureData: {
-                    spotDisplay: spotDisplay,
-                    rsi: currentRSI.toFixed(1),
-                    bbUpper: bbData ? bbData.upper.toFixed(2) : "N/A",
-                    bbLower: bbData ? bbData.lower.toFixed(2) : "N/A",
-                    support: supportZone.toFixed(2),
-                    resistance: resistanceZone.toFixed(2)
-                }
+                pressureData: buildPressureData()
             };
         }
 
@@ -530,21 +572,22 @@ async function getFNOTrade(instrumentType = 'nifty') {
             if (niftyPred.sentiment === 'BEARISH' && signal === 'BUY' && optionType === 'CE (CALL)') {
                 return {
                     status: 'NO_TRADE',
-                    message: `⚠️ GLOBAL TRAP DETECTED: Technicals show Nifty BUY, but Global Cues are BEARISH (${niftyPred.details}). Trade aborted.`
+                    spotPrice: spotDisplay,
+                    instrumentName: instrumentName,
+                    message: `⚠️ GLOBAL TRAP DETECTED: Technicals show Nifty BUY, but Global Cues are BEARISH (${niftyPred.details}). Trade aborted.`,
+                    pressureData: buildPressureData()
                 };
             }
             // If Nifty pred is BULLISH but technicals say BUY PUT, cancel.
             if (niftyPred.sentiment === 'BULLISH' && signal === 'BUY' && optionType === 'PE (PUT)') {
                 return {
                     status: 'NO_TRADE',
-                    message: `⚠️ GLOBAL TRAP DETECTED: Technicals show Nifty SELL, but Global Cues are BULLISH (${niftyPred.details}). Trade aborted.`
+                    spotPrice: spotDisplay,
+                    instrumentName: instrumentName,
+                    message: `⚠️ GLOBAL TRAP DETECTED: Technicals show Nifty SELL, but Global Cues are BULLISH (${niftyPred.details}). Trade aborted.`,
+                    pressureData: buildPressureData()
                 };
             }
-        }
-
-        let spotDisplay = `₹${currentPrice.toFixed(2)}`;
-        if (instrumentType.toLowerCase() === 'crude') {
-            spotDisplay = `₹${currentPrice.toFixed(2)} (MCX Spot)`;
         }
 
         let finalMessagePrefix = preMessage;
