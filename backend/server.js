@@ -183,7 +183,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     // 🏦 INSTITUTIONAL OPEN INTEREST & PCR COMMAND: /oi <asset>
     bot.onText(/^\/oi(?:\s+(.+))?$/, async (msg, match) => {
         const chatId = msg.chat.id;
-        const requestedAsset = (match[1] || 'nifty').trim().toLowerCase();
+        const requestedAsset = (match[1] || 'crude').trim().toLowerCase();
 
         const statusMsg = await bot.sendMessage(chatId, `🏦 <b>Fetching Institutional Option Chain & OI Data for ${requestedAsset.toUpperCase()}...</b>`, { parse_mode: 'HTML' });
 
@@ -193,25 +193,55 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 return bot.editMessageText(`❌ Could not fetch Option Chain data for ${requestedAsset.toUpperCase()}.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             }
 
-            const pcrEmoji = data.pcr >= 1.2 ? '🟢 BULLISH (Heavy Put Writing)' : data.pcr <= 0.75 ? '🔴 BEARISH (Call Ceiling)' : '🟡 NEUTRAL';
+            const isCrude = requestedAsset.includes('crude');
+            const isBNF = requestedAsset.includes('banknifty') || requestedAsset === 'bnf';
+            const step = isCrude ? 50 : (isBNF ? 100 : 50);
+            const targetPoints = isCrude ? 35 : (isBNF ? 120 : 45);
+            const slPoints = isCrude ? 15 : (isBNF ? 50 : 20);
+
+            const atmStrike = data.atmStrike || (Math.round(data.spotPrice / step) * step);
+            const support = data.supportWall || (atmStrike - (2 * step));
+            const resistance = data.resistanceCeiling || (atmStrike + (2 * step));
+            const pcr = data.pcr || 1.0;
+
+            let verdictBox = '';
+            if (pcr >= 1.20 || data.bias === 'BULLISH') {
+                const targetP = (data.spotPrice + targetPoints).toFixed(2);
+                const slP = (data.spotPrice - slPoints).toFixed(2);
+                verdictBox = `🎯 <b>DIRECT ACTIONABLE VERDICT: 🟢 BUY CALL (CE)</b>\n` +
+                             `• <b>Recommended Option:</b> <b>BUY ${atmStrike} CE</b>\n` +
+                             `• <b>Live Entry Spot:</b> ₹${data.spotPrice}\n` +
+                             `• <b>Target:</b> <b>₹${targetP}</b> (+${targetPoints} pts)\n` +
+                             `• <b>Stop Loss:</b> <b>₹${slP}</b> (-${slPoints} pts)\n` +
+                             `• <b>Reason:</b> Institutions writing heavy Puts at ₹${support}. Floor is solid!`;
+            } else if (pcr <= 0.80 || data.bias === 'BEARISH') {
+                const targetP = (data.spotPrice - targetPoints).toFixed(2);
+                const slP = (data.spotPrice + slPoints).toFixed(2);
+                verdictBox = `🎯 <b>DIRECT ACTIONABLE VERDICT: 🔴 BUY PUT (PE)</b>\n` +
+                             `• <b>Recommended Option:</b> <b>BUY ${atmStrike} PE</b>\n` +
+                             `• <b>Live Entry Spot:</b> ₹${data.spotPrice}\n` +
+                             `• <b>Target:</b> <b>₹${targetP}</b> (-${targetPoints} pts)\n` +
+                             `• <b>Stop Loss:</b> <b>₹${slP}</b> (+${slPoints} pts)\n` +
+                             `• <b>Reason:</b> Institutions writing heavy Calls at ₹${resistance}. Ceiling active!`;
+            } else {
+                verdictBox = `🎯 <b>DIRECT ACTIONABLE VERDICT: 🟡 WAIT (NO TRADE)</b>\n` +
+                             `• <b>Current State:</b> Sideways Range (Trapped ₹${support} – ₹${resistance})\n` +
+                             `• <b>Trading Plan:</b>\n` +
+                             `  👉 Buy <b>${atmStrike} CE</b> ONLY if price tests Support ₹${support}\n` +
+                             `  👉 Buy <b>${atmStrike} PE</b> ONLY if price tests Resistance ₹${resistance}\n` +
+                             `• <b>Warning:</b> Buying options in the middle guarantees Theta Decay loss!`;
+            }
+
+            const pcrEmoji = pcr >= 1.20 ? '🟢 BULLISH (Heavy Put Floor)' : pcr <= 0.80 ? '🔴 BEARISH (Call Ceiling)' : '🟡 NEUTRAL';
 
             let oiText = `🏦 <b>INSTITUTIONAL OPEN INTEREST REPORT</b> 🏦\n\n` +
                          `📈 <b>Asset:</b> ${data.asset}\n` +
-                         `💰 <b>Spot Price:</b> ₹${data.spotPrice}\n` +
-                         `📊 <b>Put-Call Ratio (PCR):</b> <b>${data.pcr}</b> — ${pcrEmoji}\n`;
-
-            if (data.maxPainStrike) {
-                oiText += `🎯 <b>Max Pain Strike:</b> <b>₹${data.maxPainStrike}</b>\n`;
-            }
-            if (data.supportWall) {
-                oiText += `🛡️ <b>Put OI Support Wall:</b> <b>₹${data.supportWall}</b>\n`;
-            }
-            if (data.resistanceCeiling) {
-                oiText += `🧱 <b>Call OI Resistance Ceiling:</b> <b>₹${data.resistanceCeiling}</b>\n`;
-            }
-
-            oiText += `\n💡 <b>Institutional Logic:</b>\n<i>${data.reasoning}</i>\n\n` +
-                      `<i>⚡ Tip: When PCR > 1.25 and price bounces off the Put Support Wall, buy CE for 90% win rate!</i>`;
+                         `💰 <b>Live Spot Price:</b> ₹${data.spotPrice}\n` +
+                         `📊 <b>Put-Call Ratio (PCR):</b> <b>${pcr}</b> — ${pcrEmoji}\n` +
+                         `🛡️ <b>Put OI Support Wall:</b> <b>₹${support}</b>\n` +
+                         `🧱 <b>Call OI Resistance Ceiling:</b> <b>₹${resistance}</b>\n\n` +
+                         `${verdictBox}\n\n` +
+                         `💡 <b>Live Order Flow:</b>\n<i>${data.reasoning}</i>`;
 
             await bot.editMessageText(oiText, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
         } catch (e) {
