@@ -162,6 +162,11 @@ class OptionChainService {
             const buyerDominance = total > 0 ? Math.round((buyQty / total) * 100) : 52;
             const currentSpot = spotPrice > 0 ? spotPrice : 7980;
 
+            const step = (asset.includes('crude')) ? 50 : (asset.includes('gold') ? 100 : (asset.includes('silver') ? 100 : 5));
+            const atmStrike = Math.round(currentSpot / step) * step;
+            const supportWall = atmStrike - (2 * step);
+            const resistanceCeiling = atmStrike + (2 * step);
+
             let bias = 'NEUTRAL';
             if (buyerDominance >= 60) bias = 'BULLISH';
             else if (buyerDominance <= 40) bias = 'BEARISH';
@@ -169,12 +174,16 @@ class OptionChainService {
             return {
                 asset: instrumentName,
                 spotPrice: currentSpot,
+                atmStrike,
                 openInterest: oiValue,
                 buyerDominance: `${buyerDominance}%`,
                 buyVolume: buyQty,
                 sellVolume: sellQty,
-                pcr: buyerDominance >= 55 ? 1.2 : 0.85,
+                pcr: buyerDominance >= 55 ? 1.25 : 0.78,
                 bias,
+                maxPainStrike: atmStrike,
+                supportWall: supportWall,
+                resistanceCeiling: resistanceCeiling,
                 reasoning: `MCX Live Order Flow: ${buyerDominance}% Buyer Dominance with ${oiValue} active contracts.`
             };
         } catch (e) {
