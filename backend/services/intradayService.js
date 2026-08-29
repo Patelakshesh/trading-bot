@@ -209,8 +209,27 @@ const SMALL_CAPS = [
     'PETRONET.NS', 'HINDPETRO.NS', 'CHENNPETRO.NS', 'MRPL.NS', 'GAIL.NS', 'GRANULES.NS', 'GLENMARK.NS'
 ];
 
-const ALL_CAP_UNIVERSE = [...LARGE_CAPS, ...MID_CAPS, ...SMALL_CAPS]; // Total 191 Stocks!
-const INTRADAY_UNIVERSE = ALL_CAP_UNIVERSE; // Aligns every strategy scanner directly to all 191 stocks!
+const path = require('path');
+const fs = require('fs');
+
+let NIFTY_500_UNIVERSE = [];
+try {
+    const n500Path = path.join(__dirname, '..', 'nifty500.json');
+    if (fs.existsSync(n500Path)) {
+        const raw = JSON.parse(fs.readFileSync(n500Path, 'utf8'));
+        if (Array.isArray(raw) && raw.length > 0) {
+            NIFTY_500_UNIVERSE = raw.map(sym => sym.endsWith('.NS') ? sym : `${sym}.NS`);
+        }
+    }
+} catch(e) {
+    console.error('Failed to load nifty500.json, falling back to 191 list');
+}
+
+const ALL_CAP_UNIVERSE = NIFTY_500_UNIVERSE.length >= 200 
+    ? Array.from(new Set([...NIFTY_500_UNIVERSE, ...LARGE_CAPS, ...MID_CAPS, ...SMALL_CAPS]))
+    : [...LARGE_CAPS, ...MID_CAPS, ...SMALL_CAPS];
+
+const INTRADAY_UNIVERSE = ALL_CAP_UNIVERSE; // Expanded to 500+ High-Alpha Indian Stocks!
 
 // SECTOR PEER MAPPINGS FOR ANTI-BULL TRAP CONFLUENCE
 const PEER_GROUPS = [

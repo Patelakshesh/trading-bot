@@ -14,6 +14,7 @@ const Watchlist = require('./models/Watchlist');
 const Admin = require('./models/Admin');
 const TradeLog = require('./models/TradeLog');
 const AnalysisLog = require('./models/AnalysisLog');
+const TelegramUser = require('./models/TelegramUser');
 const { getLatestNews } = require('./services/newsService');
 const { getStockPrice, searchSymbol } = require('./services/stockService');
 const { analyzePortfolio, getStockAnalysis } = require('./services/aiService');
@@ -28,6 +29,37 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+
+// Helper to register Telegram users automatically
+async function registerTelegramUser(msg) {
+    if (!msg || !msg.chat || !msg.chat.id) return;
+    try {
+        const chatId = msg.chat.id.toString();
+        await TelegramUser.findOneAndUpdate(
+            { chatId },
+            {
+                chatId,
+                username: msg.from?.username || '',
+                firstName: msg.from?.first_name || '',
+                lastName: msg.from?.last_name || '',
+                lastActive: Date.now()
+            },
+            { upsert: true, new: true }
+        );
+    } catch (e) {}
+}
+
+// Helper to retrieve all active Telegram recipient chat IDs
+async function getActiveTelegramChatIds() {
+    try {
+        const regUsers = await TelegramUser.find().distinct('chatId');
+        const portUsers = await Portfolio.distinct('chatId');
+        const merged = Array.from(new Set([...regUsers, ...portUsers])).filter(id => id && id !== 'UI_USER');
+        return merged;
+    } catch (e) {
+        return [];
+    }
+}
 
 // Anti-Spam Memory: Prevents the bot from spamming the same alert every 15 minutes
 const sentAlertsMemory = new Set();
@@ -77,7 +109,13 @@ let bot;
 if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
     bot = new TelegramBot(TELEGRAM_TOKEN, {polling: true});
     
-    bot.onText(/\/start/, (msg) => {
+    // Automatically register any user who sends a message to the bot
+    bot.on('message', (msg) => {
+        registerTelegramUser(msg);
+    });
+
+    bot.onText(/\/start/, async (msg) => {
+        await registerTelegramUser(msg);
         const chatId = msg.chat.id;
         bot.sendMessage(chatId, 'Welcome to AI Portfolio Guardian! 📈\n\n**Commands:**\n`/best` - 🔥 Master Combined Super-Picks\n`/intraday` - Intraday Confluence\n`/fno` - ⚡ Nifty 50 Options Trade (High Risk)\n`/bought <SYMBOL> <INVESTED_VALUE>` - Track a stock automatically\n`/price <SYMBOL>` - Check live price\n`/tip <SYMBOL>` - Get AI swing-trade recommendation\n`/profit` - View portfolio profit', {parse_mode: 'Markdown'});
     });
@@ -1455,8 +1493,7 @@ const runDailyAnalysis = async () => {
                             if (owner.chatId !== 'UI_USER') {
                                 bot.sendMessage(owner.chatId, alertMsg, {parse_mode: 'HTML'});
                             } else {
-                                const allUsers = await Portfolio.distinct('chatId');
-                                const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
+                                const telegramUsers = await getActiveTelegramChatIds();
                                 for (let tId of telegramUsers) {
                                     bot.sendMessage(tId, alertMsg, {parse_mode: 'HTML'});
                                 }
@@ -1513,7 +1550,7 @@ cron.schedule('*/15 * * * *', async () => {
                                          `${timingLine}`;
                         const sendFn = (cId) => bot.sendMessage(cId, alertMsg, {parse_mode: 'HTML'});
                         if (item.chatId !== 'UI_USER') { sendFn(item.chatId); } else {
-                            const telegramUsers = (await Portfolio.distinct('chatId')).filter(id => id !== 'UI_USER');
+                            const telegramUsers = await getActiveTelegramChatIds();
                             for (let tId of telegramUsers) sendFn(tId);
                         }
                         sentAlertsMemory.add(tpKey);
@@ -1531,7 +1568,7 @@ cron.schedule('*/15 * * * *', async () => {
                                          `${timingLine}`;
                         const sendFn = (cId) => bot.sendMessage(cId, alertMsg, {parse_mode: 'HTML'});
                         if (item.chatId !== 'UI_USER') { sendFn(item.chatId); } else {
-                            const telegramUsers = (await Portfolio.distinct('chatId')).filter(id => id !== 'UI_USER');
+                            const telegramUsers = await getActiveTelegramChatIds();
                             for (let tId of telegramUsers) sendFn(tId);
                         }
                         sentAlertsMemory.add(slKey);
@@ -1552,7 +1589,7 @@ cron.schedule('*/15 * * * *', async () => {
                                         `${timingLine}`;
                         const sendFn = (cId) => bot.sendMessage(cId, newsMsg, {parse_mode: 'HTML'});
                         if (item.chatId !== 'UI_USER') { sendFn(item.chatId); } else {
-                            const telegramUsers = (await Portfolio.distinct('chatId')).filter(id => id !== 'UI_USER');
+                            const telegramUsers = await getActiveTelegramChatIds();
                             for (let tId of telegramUsers) sendFn(tId);
                         }
                         sentAlertsMemory.add(newsKey);
@@ -1573,7 +1610,7 @@ cron.schedule('*/15 * * * *', async () => {
                                         `${timingLine}`;
                         const sendFn = (cId) => bot.sendMessage(cId, newsMsg, {parse_mode: 'HTML'});
                         if (item.chatId !== 'UI_USER') { sendFn(item.chatId); } else {
-                            const telegramUsers = (await Portfolio.distinct('chatId')).filter(id => id !== 'UI_USER');
+                            const telegramUsers = await getActiveTelegramChatIds();
                             for (let tId of telegramUsers) sendFn(tId);
                         }
                         sentAlertsMemory.add(goodNewsKey);
@@ -1592,8 +1629,7 @@ cron.schedule('*/15 * * * *', async () => {
 cron.schedule('25 13 * * 1-5', async () => {
     if (!bot || isWeekend()) return;
     try {
-        const allUsers = await Portfolio.distinct('chatId');
-        const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
+        const telegramUsers = await getActiveTelegramChatIds();
         if (telegramUsers.length === 0) return;
 
         const warningMsg = `🗽 <b>PRE-SPIKE WARNING: NEW YORK OPENING BELL</b> 🗽\n\n` +
@@ -1619,7 +1655,7 @@ cron.schedule('*/2 * * * *', async () => {
     if (!bot || isWeekend()) return;
     try {
         console.log('Scanning for Instant Intraday & F&O Auto-Notifications...');
-        const allUsers = await Portfolio.distinct('chatId');
+        const allUsers = await getActiveTelegramChatIds();
         if (!allUsers || allUsers.length === 0) return;
 
         // 1. Check Intraday Setups (Will naturally fail if market is closed/stale)
@@ -1656,9 +1692,9 @@ cron.schedule('*/2 * * * *', async () => {
             }
         }
 
-        // 2. Check F&O Setups (24/7 scanning)
+        // 2. Check F&O Setups (24/7 scanning for Crude, Nifty, Gold)
         const { getFNOTrade } = require('./services/fnoService');
-        for (const asset of ['crude', 'nifty']) {
+        for (const asset of ['crude', 'nifty', 'gold']) {
             const fnoResult = await getFNOTrade(asset);
             await new Promise(r => setTimeout(r, 2000)); // Prevent Angle One rate limit
             if (fnoResult.status !== 'NO_TRADE' && fnoResult.status !== 'ERROR') {
@@ -1829,28 +1865,26 @@ cron.schedule('0 */2 * * *', async () => {
             }
 
             const bestTip = top5[0];
-            const allUsers = await Portfolio.distinct('chatId');
+            const allUsers = await getActiveTelegramChatIds();
             
             for (let chatId of allUsers) {
-                if (chatId !== 'UI_USER') {
-                    const proactiveKey = `${chatId}_PROACTIVE_${bestTip.symbol}`;
-                    if (!sentAlertsMemory.has(proactiveKey)) {
-                        const liveEntryPrice = typeof bestTip.currentPrice === 'number'
-                            ? `₹${bestTip.currentPrice.toFixed(2)}`
-                            : bestTip.currentPrice || 'N/A';
-                        const tipMsg = `🌟 <b>NEW AI OPPORTUNITY FOUND!</b>\n\n` +
-                                       `Based on live market data right now:\n\n` +
-                                       `📈 <b>${bestTip.symbol}</b> — ${bestTip.companyName || ''}\n` +
-                                       `💰 <b>Buy At (LIVE Entry):</b> ${liveEntryPrice}\n` +
-                                       `🟢 <b>Action:</b> ${bestTip.action}\n` +
-                                       `🎯 <b>Target:</b> ${bestTip.target} | 🛡️ <b>SL:</b> ${bestTip.stopLoss}\n\n` +
-                                       `🧠 <b>Why?</b> ${bestTip.rationale}\n\n` +
-                                       `⏰ Market is <b>OPEN</b> — Act NOW!\n` +
-                                       `<i>Use /bought ${bestTip.symbol} to start tracking.</i>`;
-                        
-                        bot.sendMessage(chatId, tipMsg, {parse_mode: 'HTML'});
-                        sentAlertsMemory.add(proactiveKey);
-                    }
+                const proactiveKey = `${chatId}_PROACTIVE_${bestTip.symbol}`;
+                if (!sentAlertsMemory.has(proactiveKey)) {
+                    const liveEntryPrice = typeof bestTip.currentPrice === 'number'
+                        ? `₹${bestTip.currentPrice.toFixed(2)}`
+                        : bestTip.currentPrice || 'N/A';
+                    const tipMsg = `🌟 <b>NEW AI OPPORTUNITY FOUND!</b>\n\n` +
+                                   `Based on live market data right now:\n\n` +
+                                   `📈 <b>${bestTip.symbol}</b> — ${bestTip.companyName || ''}\n` +
+                                   `💰 <b>Buy At (LIVE Entry):</b> ${liveEntryPrice}\n` +
+                                   `🟢 <b>Action:</b> ${bestTip.action}\n` +
+                                   `🎯 <b>Target:</b> ${bestTip.target} | 🛡️ <b>SL:</b> ${bestTip.stopLoss}\n\n` +
+                                   `🧠 <b>Why?</b> ${bestTip.rationale}\n\n` +
+                                   `⏰ Market is <b>OPEN</b> — Act NOW!\n` +
+                                   `<i>Use /bought ${bestTip.symbol} to start tracking.</i>`;
+                    
+                    bot.sendMessage(chatId, tipMsg, {parse_mode: 'HTML'});
+                    sentAlertsMemory.add(proactiveKey);
                 }
             }
         }
@@ -1859,11 +1893,41 @@ cron.schedule('0 */2 * * *', async () => {
     }
 });
 
+// ─── 🌅 MORNING PRE-MARKET OPENING RADAR (8:30 AM IST, Mon–Fri) ─────────────
+// Scans top algorithmic momentum candidates 45 mins before market open
+cron.schedule('30 8 * * 1-5', async () => {
+    if (!bot || isWeekend()) return;
+    try {
+        console.log('[Morning Radar CRON] Running 8:30 AM Pre-Market Predictor...');
+        const telegramUsers = await getActiveTelegramChatIds();
+        if (telegramUsers.length === 0) return;
+
+        const { generateTomorrowPredictions } = require('./services/predictionService');
+        const predictions = await generateTomorrowPredictions();
+        
+        if (predictions && predictions.length > 0) {
+            let reply = `🌅 <b>PRE-MARKET OPENING RADAR — 8:30 AM IST</b> 🌅\n\n` +
+                        `Here are the Top Algorithmic Breakout Candidates for today's 9:15 AM Open:\n\n`;
+            predictions.forEach((p, idx) => {
+                reply += `<b>${idx + 1}. ${p.symbol}</b> (Score: ${p.score}/100)\n` +
+                         `   💰 Last Close: ₹${p.close}\n` +
+                         `   ⚡ Catalysts: ${p.reasons}\n\n`;
+            });
+            reply += `<i>💡 Get ready! The /intraday scanner will track these stocks right at the 9:15 AM market opening bell!</i>`;
+            
+            for (let chatId of telegramUsers) {
+                bot.sendMessage(chatId, reply, {parse_mode: 'HTML'});
+            }
+        }
+    } catch (err) {
+        console.error('[Morning Radar CRON] Error:', err);
+    }
+}, { scheduled: true, timezone: 'Asia/Kolkata' });
+
 // ─── MORNING MARKET OPEN BELL (9:15 AM IST, Mon–Fri) ─────────────────────────
 // Resets the spam-guard and sends a morning portfolio summary with what to do today
-cron.schedule('15 3 * * 1-5', async () => {
-    // 9:15 AM IST = 3:15 AM UTC
-    if (!bot) return;
+cron.schedule('15 9 * * 1-5', async () => {
+    if (!bot || isWeekend()) return;
     // Reset sentAlertsMemory so today's fresh alerts can fire
     sentAlertsMemory.clear();
     console.log('[Morning Bell] sentAlertsMemory reset. Market is now OPEN.');
@@ -1873,8 +1937,7 @@ cron.schedule('15 3 * * 1-5', async () => {
         if (!holdings || holdings.length === 0) return;
 
         // Build a morning portfolio snapshot
-        const allUsers = await Portfolio.distinct('chatId');
-        const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
+        const telegramUsers = await getActiveTelegramChatIds();
         if (telegramUsers.length === 0) return;
 
         let summaryLines = [];
@@ -1901,23 +1964,21 @@ cron.schedule('15 3 * * 1-5', async () => {
     } catch (err) {
         console.error('[Morning Bell] Error:', err);
     }
-}, { timezone: 'UTC' });
-// ─────────────────────────────────────────────────────────────────────────────
-// 🔮 EVENING PREDICTION SCORE (Runs every day at 8:30 PM IST)
-// Cron time in UTC: 20:30 IST is 15:00 UTC
-cron.schedule('0 15 * * 1-5', async () => {
-    if (!bot) return;
+}, { scheduled: true, timezone: 'Asia/Kolkata' });
+
+// ─── 🔮 EVENING PREDICTION SCORE (8:30 PM IST, Mon–Fri) ──────────────────────
+cron.schedule('30 20 * * 1-5', async () => {
+    if (!bot || isWeekend()) return;
     try {
-        console.log('[Prediction CRON] Running Evening Predictor...');
-        const allUsers = await Portfolio.distinct('chatId');
-        const telegramUsers = allUsers.filter(id => id !== 'UI_USER');
+        console.log('[Prediction CRON] Running Evening Predictor (8:30 PM IST)...');
+        const telegramUsers = await getActiveTelegramChatIds();
         if (telegramUsers.length === 0) return;
 
         const { generateTomorrowPredictions } = require('./services/predictionService');
         const predictions = await generateTomorrowPredictions();
         
         if (predictions && predictions.length > 0) {
-            let reply = `🔮 <b>TOMORROW'S TOP ${predictions.length} PREDICTED MOVERS</b> 🔮\n\n`;
+            let reply = `🔮 <b>TOMORROW'S TOP ${predictions.length} PREDICTED MOVERS (8:30 PM IST)</b> 🔮\n\n`;
             predictions.forEach((p, idx) => {
                 reply += `<b>${idx + 1}. ${p.symbol}</b> (Score: ${p.score}/100)\n` +
                          `   💰 Close: ₹${p.close}\n` +
@@ -1932,7 +1993,7 @@ cron.schedule('0 15 * * 1-5', async () => {
     } catch (err) {
         console.error('[Prediction CRON] Error:', err);
     }
-}, { timezone: 'UTC' });
+}, { scheduled: true, timezone: 'Asia/Kolkata' });
 // ─────────────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, async () => {
