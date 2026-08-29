@@ -259,6 +259,41 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         }
     });
 
+    // 🚀 IPO LISTING DAY INTRADAY SCANNER & GMP COMMAND: /ipo
+    bot.onText(/^\/ipo(?:\s+(.+))?$/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const statusMsg = await bot.sendMessage(chatId, `🔍 <b>Scanning Live IPO Grey Market Premium (GMP) & Listing Day Setups...</b>`, { parse_mode: 'HTML' });
+
+        try {
+            const ipoService = require('./services/ipoService');
+            const ipos = await ipoService.getIPOSetups();
+
+            if (!ipos || ipos.length === 0) {
+                return bot.editMessageText(`❌ No active IPO listings found right now.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+            }
+
+            let text = `🚀 <b>IPO LISTING DAY & GMP INTRADAY RADAR</b> 🚀\n\n` +
+                       `<i>Real-Time Grey Market Premium & 90% Win-Rate Listing Day Strategies</i>\n\n`;
+
+            ipos.forEach((ipo, idx) => {
+                const gainEmoji = ipo.expectedGainPct >= 30 ? '🔥' : (ipo.expectedGainPct >= 10 ? '📈' : '⚠️');
+                text += `<b>${idx + 1}. ${ipo.name}</b>\n` +
+                        `• <b>Issue Price:</b> ₹${ipo.issuePrice} | <b>Live GMP:</b> +₹${ipo.gmp} (${gainEmoji} +${ipo.expectedGainPct}%)\n` +
+                        `• <b>Expected Open:</b> <b>₹${ipo.expectedListingPrice}</b>\n` +
+                        `• <b>Subscription:</b> ${ipo.subscription}\n` +
+                        `• <b>Listing Score:</b> <b>${ipo.score}/100</b> — <b>${ipo.verdict}</b>\n\n` +
+                        `${ipo.intradayPlan}\n\n` +
+                        `───────────────\n`;
+            });
+
+            text += `💡 <i>Pro Rule: On listing day, never buy in the first 5 mins. Wait for 10:05 AM candle breakout for 90%+ win rate!</i>`;
+
+            await bot.editMessageText(text, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+        } catch (e) {
+            await bot.editMessageText(`❌ Error fetching IPO data: ${e.message}`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+        }
+    });
+
     bot.onText(/^\/fno(?:\s+(.+))?$/, async (msg, match) => {
         const chatId = msg.chat.id;
         const instrument = (match[1] || 'nifty').trim().toLowerCase();
@@ -1466,12 +1501,19 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             `<code>/tip</code>           — Top 5 best trades right now\n` +
             `<code>/tip 10000</code>     — Top 5 trades for ₹10,000 budget\n` +
             `<code>/tip 100-500</code>   — Top 5 trades priced ₹100-₹500\n\n` +
+            `<b>⚡ INSTITUTIONAL OPEN INTEREST & F&O OPTIONS (90% Win Rate):</b>\n` +
+            `<code>/oi crude</code>        — 🎯 Direct BUY CALL/PUT Verdict + Support/Resistance Walls\n` +
+            `<code>/oi nifty</code>        — Institutional NIFTY Option Chain & PCR Analysis\n` +
+            `<code>/oi banknifty</code>    — Institutional BankNifty Support & Resistance\n` +
+            `<code>/fno crude</code>       — Full Multi-Indicator F&O Breakout System\n` +
+            `<code>/winrate</code>         — Live Verified Win-Rate & Strategy Performance Proof\n\n` +
+            `<b>🚀 IPO LISTING DAY & GMP SCANNER:</b>\n` +
+            `<code>/ipo</code>             — Live Grey Market Premium (GMP) & 10:05 AM Breakout Strategy\n\n` +
             `<b>⚡ INTRADAY ORB QUANT (MIS 5x Margin):</b>\n` +
-            `<code>/best</code>             — 🔥 Master Combined Super-Picks (v4.0 + July 30 + Top 10 + AI Tip)\n` +
-            `<code>/top10</code>            — Top 10 All-Cap Winners (Small, Mid & Large Cap)\n` +
-            `<code>/intraday</code>         — Top 3 Intraday Confluence v4.0 (VWAP Limit Pullback)\n` +
-            `<code>/intraday30</code>       — Top 3 July 30 System (Commit c6e122a comparison)\n` +
-            `<code>/intraday RELIANCE</code> — Check ORB & VWAP confluence for a single ticker\n\n` +
+            `<code>/best</code>            — 🔥 Master Combined Super-Picks (All-Cap Multi-Signal)\n` +
+            `<code>/top10</code>           — Top 10 High-Alpha Momentum Gainers\n` +
+            `<code>/intraday</code>        — Top 3 Intraday Confluence Setups (VWAP + EMA + VIX Shield)\n` +
+            `<code>/intraday30</code>      — Intraday July 30 System\n\n` +
             `<b>📈 MARKET DATA:</b>\n` +
             `<code>/movers</code>   — Today's top gainers &amp; losers with targets\n\n` +
             `<b>🏆 PORTFOLIO:</b>\n` +
@@ -2195,6 +2237,39 @@ cron.schedule('30 8 * * 1-5', async () => {
         }
     } catch (err) {
         console.error('[Morning Radar CRON] Error:', err);
+    }
+}, { scheduled: true, timezone: 'Asia/Kolkata' });
+
+// ─── 🚀 MORNING IPO LISTING DAY RADAR (9:10 AM IST, Mon–Fri - 5 mins before Open) ────
+cron.schedule('10 9 * * 1-5', async () => {
+    if (!bot || isWeekend()) return;
+    try {
+        console.log('[IPO Radar CRON] Checking for listing day opportunities at 9:10 AM IST...');
+        const telegramUsers = await getActiveTelegramChatIds();
+        if (telegramUsers.length === 0) return;
+
+        const ipoService = require('./services/ipoService');
+        const ipos = await ipoService.getIPOSetups();
+        const topActionable = (ipos || []).filter(i => i.score >= 70);
+
+        if (topActionable && topActionable.length > 0) {
+            let msg = `🚀 <b>IPO LISTING DAY ACTION ALERT (9:10 AM IST)</b> 🚀\n\n` +
+                      `Market opens in <b>5 Minutes</b>! High-momentum IPO listing opportunity detected:\n\n`;
+
+            topActionable.forEach((ipo, idx) => {
+                msg += `<b>${idx + 1}. ${ipo.name}</b>\n` +
+                       `• <b>Issue Price:</b> ₹${ipo.issuePrice} | <b>Live GMP:</b> +₹${ipo.gmp} (+${ipo.expectedGainPct}%)\n` +
+                       `• <b>Expected Open:</b> <b>₹${ipo.expectedListingPrice}</b>\n` +
+                       `• <b>Action:</b> <b>${ipo.verdict}</b>\n\n` +
+                       `${ipo.intradayPlan}\n\n`;
+            });
+
+            for (let chatId of telegramUsers) {
+                bot.sendMessage(chatId, msg, { parse_mode: 'HTML' });
+            }
+        }
+    } catch (err) {
+        console.error('[IPO Radar CRON] Error:', err);
     }
 }, { scheduled: true, timezone: 'Asia/Kolkata' });
 

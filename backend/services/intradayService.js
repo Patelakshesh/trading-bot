@@ -392,23 +392,42 @@ async function getGlobalMarketSentiment() {
         }
     } catch (e) {}
 
+    // Check India VIX (^INDIAVIX) Volatility Shield
+    let vixValue = 14.0;
+    let vixChange = 0;
+    try {
+        const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/%5EINDIAVIX?interval=1d&range=2d`);
+        const data = await res.json();
+        const quotes = data.chart.result[0].indicators.quote[0];
+        const closes = quotes.close.filter(c => c !== null);
+        if (closes.length >= 2) {
+            vixValue = closes[closes.length - 1];
+            vixChange = ((closes[closes.length - 1] - closes[closes.length - 2]) / closes[closes.length - 2]) * 100;
+            signals.push(`🛡️ India VIX: ${vixValue.toFixed(2)} (${vixChange >= 0 ? '+' : ''}${vixChange.toFixed(1)}%)`);
+        }
+    } catch (e) {}
+
     const details = signals.join(' | ');
     let sentiment = 'YELLOW';
 
+    // RED: India VIX spike (>19.5 or >+8% jump) -> High danger of sudden market whipsaw
+    if (vixValue > 19.5 || vixChange > 8) {
+        sentiment = 'RED';
+    }
     // RED: US crashed AND Nifty is negative
-    if (usChange < -0.5 && niftyChange < -0.3) {
+    else if (usChange < -0.5 && niftyChange < -0.3) {
         sentiment = 'RED';
     }
     // RED: Nifty itself is crashing hard
     else if (niftyChange < -0.5) {
         sentiment = 'RED';
     }
-    // GREEN: US was green AND Nifty is positive
-    else if (usChange > 0 && niftyChange > 0.1) {
+    // GREEN: US was green AND Nifty is positive AND VIX is calm (< 16)
+    else if (usChange > 0 && niftyChange > 0.1 && vixValue < 17) {
         sentiment = 'GREEN';
     }
     // GREEN: Nifty is strongly positive on its own
-    else if (niftyChange > 0.3) {
+    else if (niftyChange > 0.3 && vixValue < 17) {
         sentiment = 'GREEN';
     }
 
@@ -416,6 +435,7 @@ async function getGlobalMarketSentiment() {
     globalSentimentCache.sentiment = sentiment;
     globalSentimentCache.details = details;
     globalSentimentCache.niftyChange = niftyChange;
+    globalSentimentCache.vix = vixValue;
 
     console.log(`🌍 [SIGNAL 2 COMPLETE] Global Sentiment: ${sentiment} | ${details}`);
     return globalSentimentCache;
