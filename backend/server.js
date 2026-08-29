@@ -2097,6 +2097,8 @@ cron.schedule('30 20 * * 1-5', async () => {
     } catch (err) {
         console.error('[Prediction CRON] Error:', err);
     }
+}, { scheduled: true, timezone: 'Asia/Kolkata' });
+
 // ─── 🏆 DAILY PERFORMANCE & ACCURACY SUMMARY (9:00 PM IST, Mon–Fri) ─────────
 cron.schedule('0 21 * * 1-5', async () => {
     if (!bot || isWeekend()) return;
