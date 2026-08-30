@@ -407,12 +407,122 @@ async function getFNOTrade(instrumentType = 'nifty') {
             };
         }
 
+        // ═══════════════════════════════════════════════════════════════════
+        // 🆕 PHASE 2: PROFESSIONAL CONFLUENCE FILTERS (Win-Rate Maximizer)
+        // Each filter independently confirms the signal. ALL must pass.
+        // ═══════════════════════════════════════════════════════════════════
+
+        // FILTER 1: Session VWAP Position
+        // CALL signals only valid when price > VWAP (bulls in control)
+        // PUT signals only valid when price < VWAP (bears in control)
+        let sessionVWAP = currentPrice; // Default to current if can't calculate
+        try {
+            let cumulativeTPV = 0; // Total Price × Volume
+            let cumulativeVol = 0;
+            // Use last 40 candles as approximate session data
+            const sessionCandles = quotes.slice(-Math.min(40, quotes.length));
+            for (const c of sessionCandles) {
+                const typicalPrice = (c.high + c.low + c.close) / 3;
+                const vol = c.volume || 1;
+                cumulativeTPV += typicalPrice * vol;
+                cumulativeVol += vol;
+            }
+            if (cumulativeVol > 0) {
+                sessionVWAP = cumulativeTPV / cumulativeVol;
+            }
+        } catch(e) {}
+
+        const priceAboveVWAP = currentPrice > sessionVWAP;
+        const priceBelowVWAP = currentPrice < sessionVWAP;
+
+        // FILTER 2: Volume Confirmation (≥1.5x average on current candle)
+        const hasVolumeConfirmation = volumeSpikeMultiplier >= 1.5;
+
+        // FILTER 3: Minimum Candle Body Size (reject doji/indecision candles)
+        const candleBodyPct = Math.abs(lastCandle.close - lastCandle.open) / lastCandle.open * 100;
+        const hasStrongBody = candleBodyPct >= 0.10; // At least 0.10% body
+
+        // FILTER 4: 15-Min Higher Timeframe Trend Agreement
+        // Check last 3 groups of 3 candles (each group ≈ 15 min if using 5-min candles)
+        let higherTFBullish = true;
+        let higherTFBearish = true;
+        try {
+            if (quotes.length >= 12) {
+                const recent9 = quotes.slice(-9);
+                const group1Avg = (recent9[0].close + recent9[1].close + recent9[2].close) / 3;
+                const group2Avg = (recent9[3].close + recent9[4].close + recent9[5].close) / 3;
+                const group3Avg = (recent9[6].close + recent9[7].close + recent9[8].close) / 3;
+                higherTFBullish = group3Avg > group2Avg && group2Avg > group1Avg; // Rising 15-min trend
+                higherTFBearish = group3Avg < group2Avg && group2Avg < group1Avg; // Falling 15-min trend
+            }
+        } catch(e) {}
+
+        // FILTER 5: OI Bias Confluence (if available from option chain)
+        let oiBias = 'NEUTRAL';
+        try {
+            const oiData = await optionChainService.getOptionChainAnalysis(instrumentType, currentPrice);
+            if (oiData && oiData.bias) {
+                oiBias = oiData.bias;
+            }
+        } catch(e) {}
+
+        const oiConfirmsCall = oiBias === 'BULLISH' || oiBias === 'MILDLY_BULLISH' || oiBias === 'NEUTRAL';
+        const oiConfirmsPut = oiBias === 'BEARISH' || oiBias === 'MILDLY_BEARISH' || oiBias === 'NEUTRAL';
+
+        // ═══════════════════════════════════════════════════════════════════
+        // COUNT CONFLUENCES for confidence scoring
+        // ═══════════════════════════════════════════════════════════════════
+        let callConfluences = 0;
+        let putConfluences = 0;
+        let callReasons = [];
+        let putReasons = [];
+
+        // EMA Crossover (Primary Signal)
+        if (ema5 > ema20 && prevEma5 <= prevEma20) { callConfluences++; callReasons.push('✅ 5/20 EMA Golden Cross'); }
+        if (ema5 < ema20 && prevEma5 >= prevEma20) { putConfluences++; putReasons.push('✅ 5/20 EMA Death Cross'); }
+
+        // ADX Momentum
+        if (currentADX >= 25) { callConfluences++; putConfluences++; callReasons.push(`✅ ADX Strong (${currentADX.toFixed(1)})`); putReasons.push(`✅ ADX Strong (${currentADX.toFixed(1)})`); }
+        else if (currentADX >= 22) { callConfluences += 0.5; putConfluences += 0.5; }
+
+        // VWAP Position
+        if (priceAboveVWAP) { callConfluences++; callReasons.push(`✅ Price > VWAP (₹${sessionVWAP.toFixed(2)})`); }
+        if (priceBelowVWAP) { putConfluences++; putReasons.push(`✅ Price < VWAP (₹${sessionVWAP.toFixed(2)})`); }
+
+        // Volume Spike
+        if (hasVolumeConfirmation) { callConfluences++; putConfluences++; callReasons.push(`✅ Volume ${volumeSpikeMultiplier.toFixed(1)}x Spike`); putReasons.push(`✅ Volume ${volumeSpikeMultiplier.toFixed(1)}x Spike`); }
+
+        // Strong Candle Body
+        if (hasStrongBody && candleGain > 0) { callConfluences++; callReasons.push(`✅ Strong Bullish Body (${candleBodyPct.toFixed(2)}%)`); }
+        if (hasStrongBody && candleGain < 0) { putConfluences++; putReasons.push(`✅ Strong Bearish Body (${candleBodyPct.toFixed(2)}%)`); }
+
+        // 15-Min Trend
+        if (higherTFBullish) { callConfluences++; callReasons.push('✅ 15-Min Uptrend Confirmed'); }
+        if (higherTFBearish) { putConfluences++; putReasons.push('✅ 15-Min Downtrend Confirmed'); }
+
+        // OI Bias
+        if (oiConfirmsCall && oiBias !== 'NEUTRAL') { callConfluences++; callReasons.push(`✅ OI Bias: ${oiBias}`); }
+        if (oiConfirmsPut && oiBias !== 'NEUTRAL') { putConfluences++; putReasons.push(`✅ OI Bias: ${oiBias}`); }
+
+        // RSI Sweet Spot
+        if (currentRSI >= 45 && currentRSI <= 68) { callConfluences++; callReasons.push(`✅ RSI in Bullish Zone (${currentRSI.toFixed(1)})`); }
+        if (currentRSI >= 32 && currentRSI <= 55) { putConfluences++; putReasons.push(`✅ RSI in Bearish Zone (${currentRSI.toFixed(1)})`); }
+
+        // 200 EMA Macro
+        if (ema200 && currentPrice >= ema200) { callConfluences++; callReasons.push('✅ Above 200 EMA (Macro Bullish)'); }
+        if (ema200 && currentPrice <= ema200) { putConfluences++; putReasons.push('✅ Below 200 EMA (Macro Bearish)'); }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // MINIMUM CONFLUENCE THRESHOLD: Need 5+ confluences for A+ setup
+        // (Previously only needed 3-4, causing too many false signals)
+        // ═══════════════════════════════════════════════════════════════════
+        const MIN_CONFLUENCES = isUSVolumeBreakout ? 3 : 5;
         const emaGapPercent = (Math.abs(ema5 - ema20) / currentPrice) * 100;
         const validGap = emaGapPercent >= 0.05;
 
-        // CALL OPTION LOGIC
-        const standardCall = ema5 > ema20 && prevEma5 <= prevEma20 && validGap && candleGain > 0 && currentRSI >= 45 && currentRSI <= 68 && currentADX >= 22 && (ema200 ? currentPrice >= ema200 : true);
-        const usVolumeCall = isUSVolumeBreakout && ema5 > ema20 && candleGain > 0.0005; // Bypass macro rules if US Volume is exploding upwards
+        // CALL OPTION LOGIC — Now requires 5+ independent confluences
+        const standardCall = ema5 > ema20 && prevEma5 <= prevEma20 && validGap && candleGain > 0 && currentRSI >= 45 && currentRSI <= 68 && currentADX >= 22 && (ema200 ? currentPrice >= ema200 : true) && priceAboveVWAP && hasStrongBody && callConfluences >= MIN_CONFLUENCES;
+        const usVolumeCall = isUSVolumeBreakout && ema5 > ema20 && candleGain > 0.0005 && callConfluences >= 3; // Bypass some filters if US Volume is exploding
 
         const isCallExhausted = candleGain >= 0.25; // If it pumped 0.25%+ in a single 5m candle, the spike is OVER.
 
@@ -439,13 +549,13 @@ async function getFNOTrade(instrumentType = 'nifty') {
             optionType = "CE (CALL)";
             logic = usVolumeCall 
                 ? `🗽 <b>US OPENING VOLUME BREAKOUT!</b>\nMassive ${volumeSpikeMultiplier.toFixed(1)}x Volume Spike detected! American Institutions are aggressively buying. Bypassing standard filters to catch the explosion!` 
-                : `🔥 FRESH EXPLOSIVE BREAKOUT: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed the 20-EMA on bullish volume in alignment with the macro trend. High-probability entry!`;
+                : `🔥 <b>A+ CONFLUENCE BREAKOUT (${Math.floor(callConfluences)}/9 Signals Aligned)</b>\n${callReasons.join('\n')}\n\n📊 VWAP: ₹${sessionVWAP.toFixed(2)} | ADX: ${currentADX.toFixed(1)} | RSI: ${currentRSI.toFixed(1)}`;
         } 
-        else if (ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true) || 
-                 (isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.0005)) {
+        else if (ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true) && priceBelowVWAP && hasStrongBody && putConfluences >= MIN_CONFLUENCES || 
+                 (isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.0005 && putConfluences >= 3)) {
             
-            const standardPut = ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true);
-            const usVolumePut = isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.0005;
+            const standardPut = ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true) && priceBelowVWAP && hasStrongBody && putConfluences >= MIN_CONFLUENCES;
+            const usVolumePut = isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.0005 && putConfluences >= 3;
             
             const isPutExhausted = candleGain <= -0.25; // If it dumped 0.25%+ in a single 5m candle, the crash is OVER.
 
@@ -472,7 +582,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
             optionType = "PE (PUT)";
             logic = usVolumePut 
                 ? `🗽 <b>US OPENING VOLUME BREAKDOWN!</b>\nMassive ${volumeSpikeMultiplier.toFixed(1)}x Volume Spike detected! American Institutions are aggressively dumping. Bypassing standard filters to catch the crash!` 
-                : `🩸 FRESH BEARISH BREAKDOWN: ${instrumentName} ADX is high (${currentADX.toFixed(1)}). The 5-EMA just crossed below 20-EMA on selling volume in alignment with the macro trend. Massive short trigger!`;
+                : `🩸 <b>A+ CONFLUENCE BREAKDOWN (${Math.floor(putConfluences)}/9 Signals Aligned)</b>\n${putReasons.join('\n')}\n\n📊 VWAP: ₹${sessionVWAP.toFixed(2)} | ADX: ${currentADX.toFixed(1)} | RSI: ${currentRSI.toFixed(1)}`;
         }
         else {
             // EARLY WARNING PREDICTIVE DETECTOR (RSI DIVERGENCE + BOLLINGER BAND SQUEEZE + REJECTION WICK + MTFA SUPPORT)
@@ -680,7 +790,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 recommendedEntry: currentPrice,
                 targetPrice: optionType.includes('CE') ? currentPrice * 1.015 : currentPrice * 0.985,
                 stopLossPrice: optionType.includes('CE') ? currentPrice * 0.993 : currentPrice * 1.007,
-                confidenceScore: currentADX >= 25 ? 88 : 75,
+                confidenceScore: Math.min(95, Math.round(50 + ((optionType.includes('CE') ? callConfluences : putConfluences) * 5))),
                 catalysts: [logic.substring(0, 100)],
                 metricsSnapshot: {
                     adx: currentADX,
@@ -714,7 +824,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 stopLossSpot: `₹${dynamicSLPrice.toFixed(2)} (-${slPoints} pts)`,
                 profitPerLot: instrumentType.toLowerCase() === 'crude' ? '₹700' : '₹1,200',
                 riskPerLot: instrumentType.toLowerCase() === 'crude' ? '₹300' : '₹500',
-                confidence: `${currentADX >= 25 ? 90 : 80}%`
+                confidence: `${Math.min(95, Math.round(50 + ((optionType.includes('CE') ? callConfluences : putConfluences) * 5)))}% (${Math.floor(optionType.includes('CE') ? callConfluences : putConfluences)}/9 Confluences)`
             },
             trade: {
                 type: optionType,

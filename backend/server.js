@@ -254,13 +254,18 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             const pcrEmoji = !mStatus.isOpen ? '⏸️ FROZEN (Market Closed)' : (pcr >= 1.20 ? '🟢 BULLISH (Heavy Put Floor)' : pcr <= 0.80 ? '🔴 BEARISH (Call Ceiling)' : '🟡 NEUTRAL');
             const priceLabel = mStatus.isOpen ? 'Live Spot Price' : 'Friday Closing Settlement';
 
+            const dataSourceLabel = data.dataSource === 'ANGEL_ONE_NFO_REAL' ? '🟢 Real Angel One NFO Data' : 
+                                     data.dataSource === 'ANGEL_ONE_MCX_REAL' ? '🟢 Real Angel One MCX Data' :
+                                     '⚠️ Calculated (Angel One Unavailable)';
+
             let oiText = `🏦 <b>INSTITUTIONAL OPEN INTEREST REPORT</b> 🏦\n\n` +
                          `📈 <b>Asset:</b> ${data.asset}\n` +
                          `🚦 <b>Market Status:</b> <b>${mStatus.statusLabel}</b>\n` +
                          `💰 <b>${priceLabel}:</b> <b>₹${data.spotPrice}</b>\n` +
                          `📊 <b>Put-Call Ratio (PCR):</b> <b>${pcr}</b> — ${pcrEmoji}\n` +
                          `🛡️ <b>Put OI Support Wall:</b> <b>₹${support}</b>\n` +
-                         `🧱 <b>Call OI Resistance Ceiling:</b> <b>₹${resistance}</b>\n\n` +
+                         `🧱 <b>Call OI Resistance Ceiling:</b> <b>₹${resistance}</b>\n` +
+                         `📡 <b>Data Source:</b> ${dataSourceLabel}\n\n` +
                          `${verdictBox}\n\n` +
                          `💡 <b>Live Order Flow:</b>\n<i>${data.reasoning}</i>`;
 
@@ -2263,6 +2268,123 @@ cron.schedule('0 */2 * * *', async () => {
         }
     } catch (err) {
         console.error('Error broadcasting tip:', err);
+    }
+});
+// ─── 🔄 SIGNAL AUTO-VERIFICATION ENGINE (Every 15 min, Mon–Fri) ──────────────
+// Checks all PENDING signals and auto-verifies their TARGET_HIT or STOPLOSS_HIT
+// outcome against real market price data from Angel One or Yahoo Finance.
+cron.schedule('*/15 * * * 1-5', async () => {
+    try {
+        const pendingSignals = await SignalLog.find({ outcome: 'PENDING' }).sort({ createdAt: -1 }).limit(50);
+        if (pendingSignals.length === 0) return;
+
+        console.log(`🔄 [Signal Verifier] Checking ${pendingSignals.length} pending signals...`);
+        let verified = 0;
+
+        for (const sig of pendingSignals) {
+            try {
+                // Skip signals older than 24 hours — auto-expire them
+                const ageMs = Date.now() - new Date(sig.createdAt).getTime();
+                if (ageMs > 24 * 60 * 60 * 1000) {
+                    sig.outcome = 'EXPIRED';
+                    sig.exitTime = new Date();
+                    await sig.save();
+                    verified++;
+                    continue;
+                }
+
+                // Get current live price for this asset
+                let currentPrice = 0;
+                if (sig.asset === 'CRUDE' || sig.asset === 'CRUDEOILM') {
+                    try {
+                        const angleOneMapping = require('./services/angleOneMapping');
+                        await angleOneMapping.init();
+                        const crudeToken = angleOneMapping.getCrudeOilMiniToken();
+                        if (crudeToken) {
+                            currentPrice = await angleOneService.getQuote('MCX', crudeToken.token) || 0;
+                        }
+                    } catch(e) {}
+                    if (!currentPrice) {
+                        const yf = await yahooFinance.quote('CL=F').catch(() => null);
+                        if (yf) currentPrice = yf.regularMarketPrice * 83;
+                    }
+                } else if (sig.asset === 'NIFTY') {
+                    currentPrice = await angleOneService.getQuote('NSE', '26000').catch(() => 0) || 0;
+                } else if (sig.asset === 'BANKNIFTY') {
+                    currentPrice = await angleOneService.getQuote('NSE', '26009').catch(() => 0) || 0;
+                }
+
+                if (!currentPrice || currentPrice <= 0) continue;
+
+                // Check if target or stop loss was hit
+                const entry = sig.spotPriceAtSignal || sig.recommendedEntry;
+                const target = sig.targetPrice;
+                const sl = sig.stopLossPrice;
+
+                if (!entry || !target || !sl) continue;
+
+                // Track highest/lowest reached
+                if (!sig.highestPriceReached || currentPrice > sig.highestPriceReached) {
+                    sig.highestPriceReached = currentPrice;
+                }
+                if (!sig.lowestPriceReached || currentPrice < sig.lowestPriceReached) {
+                    sig.lowestPriceReached = currentPrice;
+                }
+
+                // CE (CALL) — bullish: target above entry, SL below entry
+                if (sig.direction === 'BUY_CE') {
+                    if (currentPrice >= target || (sig.highestPriceReached && sig.highestPriceReached >= target)) {
+                        sig.outcome = 'TARGET_HIT';
+                        sig.exitPrice = target;
+                        sig.pnlPoints = target - entry;
+                        sig.pnlPercent = ((target - entry) / entry) * 100;
+                        sig.exitTime = new Date();
+                        await sig.save();
+                        verified++;
+                    } else if (currentPrice <= sl || (sig.lowestPriceReached && sig.lowestPriceReached <= sl)) {
+                        sig.outcome = 'STOPLOSS_HIT';
+                        sig.exitPrice = sl;
+                        sig.pnlPoints = sl - entry;
+                        sig.pnlPercent = ((sl - entry) / entry) * 100;
+                        sig.exitTime = new Date();
+                        await sig.save();
+                        verified++;
+                    }
+                }
+                // PE (PUT) — bearish: target below entry, SL above entry
+                else if (sig.direction === 'BUY_PE') {
+                    if (currentPrice <= target || (sig.lowestPriceReached && sig.lowestPriceReached <= target)) {
+                        sig.outcome = 'TARGET_HIT';
+                        sig.exitPrice = target;
+                        sig.pnlPoints = entry - target;
+                        sig.pnlPercent = ((entry - target) / entry) * 100;
+                        sig.exitTime = new Date();
+                        await sig.save();
+                        verified++;
+                    } else if (currentPrice >= sl || (sig.highestPriceReached && sig.highestPriceReached >= sl)) {
+                        sig.outcome = 'STOPLOSS_HIT';
+                        sig.exitPrice = sl;
+                        sig.pnlPoints = entry - sl;
+                        sig.pnlPercent = ((entry - sl) / entry) * 100;
+                        sig.exitTime = new Date();
+                        await sig.save();
+                        verified++;
+                    }
+                }
+                // Save tracking even if not yet resolved
+                else {
+                    await sig.save();
+                }
+            } catch (sigErr) {
+                console.error(`[Signal Verifier] Error checking signal ${sig.signalId}:`, sigErr.message);
+            }
+        }
+
+        if (verified > 0) {
+            console.log(`✅ [Signal Verifier] Auto-verified ${verified} signals.`);
+        }
+    } catch (e) {
+        console.error('[Signal Verifier] Error:', e.message);
     }
 });
 

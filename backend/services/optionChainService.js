@@ -27,7 +27,7 @@ class OptionChainService {
         try {
             let analysis = null;
             if (cleanAsset === 'nifty' || cleanAsset === 'banknifty') {
-                analysis = await this.fetchNSEIndexOptionChain(cleanAsset, spotPrice, marketStatus);
+                analysis = await this.fetchRealNFOOptionChain(cleanAsset, spotPrice, marketStatus);
             } else {
                 analysis = await this.fetchMCXCommodityOI(cleanAsset, spotPrice, marketStatus);
             }
@@ -47,12 +47,19 @@ class OptionChainService {
         return fallback;
     }
 
-    async fetchNSEIndexOptionChain(asset, spotPrice, marketStatus) {
+    /**
+     * 🆕 PHASE 1 FIX: Fetch REAL OI data from Angel One's NFO segment
+     * instead of generating fake Gaussian-curve numbers
+     */
+    async fetchRealNFOOptionChain(asset, spotPrice, marketStatus) {
         try {
+            await angleOneMapping.init();
+
             const isBankNifty = asset === 'banknifty';
             const step = isBankNifty ? 100 : 50;
             let currentSpot = spotPrice;
 
+            // Get live spot price from Angel One
             if (!currentSpot || currentSpot <= 0) {
                 try {
                     const token = isBankNifty ? '26009' : '26000';
@@ -64,14 +71,39 @@ class OptionChainService {
                 currentSpot = isBankNifty ? 51500 : 24200;
             }
 
-            const atmStrike = Math.round(currentSpot / step) * step;
+            const indexName = isBankNifty ? 'BANKNIFTY' : 'NIFTY';
+            
+            // Get real NFO option tokens from the instrument master
+            const optionTokens = angleOneMapping.getNFOOptionChainTokens(indexName, currentSpot, 5);
 
-            // Generate 10 strike prices around ATM (5 OTM Calls, 5 OTM Puts)
-            const strikes = [];
-            for (let i = -5; i <= 5; i++) {
-                strikes.push(atmStrike + (i * step));
+            if (optionTokens.length === 0) {
+                console.warn(`⚠️ [OI] No NFO tokens found for ${indexName}. Falling back to calculated OI.`);
+                return this.fetchCalculatedNSEOptionChain(asset, currentSpot, marketStatus);
             }
 
+            // Fetch real OI from Angel One using multi-quote API (batch request)
+            const tokenIds = optionTokens.map(o => o.token);
+            
+            // Angel One allows max ~50 tokens per request, we have ~22 (11 strikes × 2 CE/PE)
+            let fetchedQuotes = [];
+            try {
+                fetchedQuotes = await angleOneService.getMultiQuotes('NFO', tokenIds);
+            } catch (e) {
+                console.error(`❌ [OI] Angel One multi-quote failed for NFO:`, e.message);
+            }
+
+            if (fetchedQuotes.length === 0) {
+                console.warn(`⚠️ [OI] Angel One returned 0 quotes for NFO ${indexName}. Using calculated fallback.`);
+                return this.fetchCalculatedNSEOptionChain(asset, currentSpot, marketStatus);
+            }
+
+            // Map token -> quote data
+            const quoteMap = new Map();
+            fetchedQuotes.forEach(q => {
+                quoteMap.set(q.symbolToken, q);
+            });
+
+            const atmStrike = Math.round(currentSpot / step) * step;
             let totalCallOI = 0;
             let totalPutOI = 0;
             let maxCallOIStrike = atmStrike + (2 * step);
@@ -79,10 +111,22 @@ class OptionChainService {
             let maxCallOI = 0;
             let maxPutOI = 0;
 
-            const strikeDetails = strikes.map(strike => {
-                const diff = (strike - currentSpot);
-                const callOI = Math.max(10000, Math.round(150000 * Math.exp(-Math.pow(diff / (step * 4), 2))));
-                const putOI = Math.max(10000, Math.round(140000 * Math.exp(-Math.pow(-diff / (step * 4), 2))));
+            const strikeDetails = [];
+            const strikesSet = [...new Set(optionTokens.map(o => o.strike))].sort((a, b) => a - b);
+
+            for (const strike of strikesSet) {
+                const ceToken = optionTokens.find(o => o.strike === strike && o.optionType === 'CE');
+                const peToken = optionTokens.find(o => o.strike === strike && o.optionType === 'PE');
+
+                const ceQuote = ceToken ? quoteMap.get(ceToken.token) : null;
+                const peQuote = peToken ? quoteMap.get(peToken.token) : null;
+
+                const callOI = ceQuote ? ceQuote.opnInterest : 0;
+                const putOI = peQuote ? peQuote.opnInterest : 0;
+                const callLTP = ceQuote ? ceQuote.ltp : 0;
+                const putLTP = peQuote ? peQuote.ltp : 0;
+                const callVolume = ceQuote ? ceQuote.volume : 0;
+                const putVolume = peQuote ? peQuote.volume : 0;
 
                 totalCallOI += callOI;
                 totalPutOI += putOI;
@@ -90,13 +134,24 @@ class OptionChainService {
                 if (callOI > maxCallOI) { maxCallOI = callOI; maxCallOIStrike = strike; }
                 if (putOI > maxPutOI) { maxPutOI = putOI; maxPutOIStrike = strike; }
 
-                return {
+                strikeDetails.push({
                     strike,
                     callOI,
                     putOI,
-                    isATM: strike === atmStrike
-                };
-            });
+                    callLTP,
+                    putLTP,
+                    callVolume,
+                    putVolume,
+                    isATM: strike === atmStrike,
+                    isRealData: true // Flag that this is REAL Angel One data
+                });
+            }
+
+            // If total OI is 0 (market closed, no data returned), use calculated fallback
+            if (totalCallOI === 0 && totalPutOI === 0) {
+                console.warn(`⚠️ [OI] All OI values are 0 for ${indexName}. Market may be closed. Using calculated fallback.`);
+                return this.fetchCalculatedNSEOptionChain(asset, currentSpot, marketStatus);
+            }
 
             const pcr = totalCallOI > 0 ? parseFloat((totalPutOI / totalCallOI).toFixed(2)) : 1.05;
 
@@ -105,20 +160,22 @@ class OptionChainService {
 
             if (!marketStatus.isOpen) {
                 bias = 'MARKET_CLOSED';
-                reasoning = `Market is currently closed (${marketStatus.statusLabel}). Showing Friday's final settlement levels. No live orders are active.`;
+                reasoning = `Market is currently closed (${marketStatus.statusLabel}). Showing last session's OI levels. No live orders are active.`;
             } else if (pcr >= 1.25) {
                 bias = 'BULLISH';
-                reasoning = `High PCR (${pcr}) indicates massive Put Writing by institutions. Strong support at ${maxPutOIStrike}.`;
+                reasoning = `🟢 REAL OI Data: High PCR (${pcr}) = Massive Put Writing by FIIs/Institutions at ₹${maxPutOIStrike}. Strong support floor. BUY CALL favored.`;
             } else if (pcr <= 0.70) {
                 bias = 'BEARISH';
-                reasoning = `Low PCR (${pcr}) indicates heavy Call Writing (Ceiling) by institutions at ${maxCallOIStrike}.`;
+                reasoning = `🔴 REAL OI Data: Low PCR (${pcr}) = Heavy Call Writing (Ceiling) by institutions at ₹${maxCallOIStrike}. BUY PUT favored.`;
             } else if (pcr > 1.0) {
                 bias = 'MILDLY_BULLISH';
-                reasoning = `PCR is healthy (${pcr}). Buyers have mild edge over sellers.`;
+                reasoning = `🟡 REAL OI Data: PCR is healthy (${pcr}). Put writers are dominant = mild bullish undertone. Max Put OI wall at ₹${maxPutOIStrike}.`;
             } else {
                 bias = 'MILDLY_BEARISH';
-                reasoning = `PCR is slightly soft (${pcr}). Cautious consolidation.`;
+                reasoning = `🟡 REAL OI Data: PCR is slightly soft (${pcr}). Call writers are dominant = mild bearish pressure. Max Call OI ceiling at ₹${maxCallOIStrike}.`;
             }
+
+            console.log(`✅ [OI] REAL Angel One NFO data for ${indexName}: PCR=${pcr}, Bias=${bias}, TotalCallOI=${totalCallOI}, TotalPutOI=${totalPutOI}`);
 
             return {
                 asset: asset.toUpperCase(),
@@ -132,11 +189,95 @@ class OptionChainService {
                 resistanceCeiling: maxCallOIStrike,
                 totalCallOI,
                 totalPutOI,
-                strikeDetails
+                strikeDetails,
+                dataSource: 'ANGEL_ONE_NFO_REAL' // 🆕 Proves data is real
             };
         } catch (e) {
-            return this.getFallbackOIStructure(asset, spotPrice, marketStatus);
+            console.error(`❌ [OI] Real NFO chain fetch failed for ${asset}:`, e.message);
+            return this.fetchCalculatedNSEOptionChain(asset, spotPrice, marketStatus);
         }
+    }
+
+    /**
+     * Fallback: When Angel One NFO fails, use calculated OI based on
+     * mathematical modeling (still better than pure random, but marked as calculated)
+     */
+    fetchCalculatedNSEOptionChain(asset, spotPrice, marketStatus) {
+        const isBankNifty = asset === 'banknifty';
+        const step = isBankNifty ? 100 : 50;
+        let currentSpot = spotPrice || (isBankNifty ? 51500 : 24200);
+
+        const atmStrike = Math.round(currentSpot / step) * step;
+
+        const strikes = [];
+        for (let i = -5; i <= 5; i++) {
+            strikes.push(atmStrike + (i * step));
+        }
+
+        let totalCallOI = 0;
+        let totalPutOI = 0;
+        let maxCallOIStrike = atmStrike + (2 * step);
+        let maxPutOIStrike = atmStrike - (2 * step);
+        let maxCallOI = 0;
+        let maxPutOI = 0;
+
+        const strikeDetails = strikes.map(strike => {
+            const diff = (strike - currentSpot);
+            const callOI = Math.max(10000, Math.round(150000 * Math.exp(-Math.pow(diff / (step * 4), 2))));
+            const putOI = Math.max(10000, Math.round(140000 * Math.exp(-Math.pow(-diff / (step * 4), 2))));
+
+            totalCallOI += callOI;
+            totalPutOI += putOI;
+
+            if (callOI > maxCallOI) { maxCallOI = callOI; maxCallOIStrike = strike; }
+            if (putOI > maxPutOI) { maxPutOI = putOI; maxPutOIStrike = strike; }
+
+            return {
+                strike,
+                callOI,
+                putOI,
+                isATM: strike === atmStrike,
+                isRealData: false // Calculated, not real
+            };
+        });
+
+        const pcr = totalCallOI > 0 ? parseFloat((totalPutOI / totalCallOI).toFixed(2)) : 1.05;
+
+        let bias = 'NEUTRAL';
+        let reasoning = '';
+
+        if (!marketStatus.isOpen) {
+            bias = 'MARKET_CLOSED';
+            reasoning = `Market is currently closed (${marketStatus.statusLabel}). Showing Friday's final settlement levels. No live orders are active.`;
+        } else if (pcr >= 1.25) {
+            bias = 'BULLISH';
+            reasoning = `⚠️ Calculated OI (Angel One API unavailable): High PCR (${pcr}) indicates Put Writing at ${maxPutOIStrike}.`;
+        } else if (pcr <= 0.70) {
+            bias = 'BEARISH';
+            reasoning = `⚠️ Calculated OI (Angel One API unavailable): Low PCR (${pcr}) indicates Call Writing at ${maxCallOIStrike}.`;
+        } else if (pcr > 1.0) {
+            bias = 'MILDLY_BULLISH';
+            reasoning = `⚠️ Calculated OI: PCR is healthy (${pcr}). Buyers have mild edge.`;
+        } else {
+            bias = 'MILDLY_BEARISH';
+            reasoning = `⚠️ Calculated OI: PCR is slightly soft (${pcr}). Cautious consolidation.`;
+        }
+
+        return {
+            asset: asset.toUpperCase(),
+            spotPrice: currentSpot,
+            atmStrike,
+            pcr,
+            bias,
+            reasoning,
+            maxPainStrike: atmStrike,
+            supportWall: maxPutOIStrike,
+            resistanceCeiling: maxCallOIStrike,
+            totalCallOI,
+            totalPutOI,
+            strikeDetails,
+            dataSource: 'CALCULATED_FALLBACK'
+        };
     }
 
     async fetchMCXCommodityOI(asset, spotPrice, marketStatus) {
@@ -217,7 +358,8 @@ class OptionChainService {
                 maxPainStrike: atmStrike,
                 supportWall,
                 resistanceCeiling,
-                reasoning
+                reasoning,
+                dataSource: 'ANGEL_ONE_MCX_REAL'
             };
         } catch (e) {
             return this.getFallbackOIStructure(asset, spotPrice, marketStatus);
@@ -239,7 +381,8 @@ class OptionChainService {
                 ? `Market is CLOSED (${marketStatus.statusLabel}). Friday settlement price is ₹${spot}.`
                 : 'Balanced Open Interest structure across major strikes.',
             supportWall: atmStrike - (2 * step),
-            resistanceCeiling: atmStrike + (2 * step)
+            resistanceCeiling: atmStrike + (2 * step),
+            dataSource: 'HARDCODED_FALLBACK'
         };
     }
 }
