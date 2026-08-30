@@ -96,7 +96,7 @@ async function runGoldenFormulaBacktest() {
         table.push({
             asset: '🛢️ MCX Crude Oil Mini',
             command: '/fno crude & /oi crude',
-            primeTime: '6:30 PM – 10:30 PM IST (US Session)',
+            primeTime: '7:00 PM – 11:00 PM IST (US Session Open at 7:00 PM IST)',
             trades: trades,
             wins: wins,
             losses: losses,
