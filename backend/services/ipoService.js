@@ -7,7 +7,8 @@ class IPOService {
     }
 
     /**
-     * Fetch Live & Upcoming IPOs with Real-Time GMP and Listing Day Strategy
+     * Fetch Live & Upcoming MAINBOARD IPOs with Real-Time GMP and Listing Day Strategy
+     * (SME IPOs strictly filtered out due to high lot size & low liquidity risk)
      */
     async getIPOSetups() {
         const now = Date.now();
@@ -18,7 +19,9 @@ class IPOService {
         try {
             const ipoList = await this.fetchLiveIPOData();
             if (ipoList && ipoList.length > 0) {
-                const analyzed = ipoList.map(ipo => this.analyzeListingDayStrategy(ipo));
+                // Strictly filter only MAINBOARD IPOs
+                const mainboardOnly = ipoList.filter(i => (i.type || '').toUpperCase() === 'MAINBOARD');
+                const analyzed = mainboardOnly.map(ipo => this.analyzeListingDayStrategy(ipo));
                 this.cache = { timestamp: now, data: analyzed };
                 return analyzed;
             }
@@ -26,8 +29,8 @@ class IPOService {
             console.error('[IPOService] Error fetching live IPOs:', err.message);
         }
 
-        // Return up-to-date August 2026 dataset if live scraping is temporarily unreachable
-        const fallback = this.getLatestFallbackData();
+        // Return up-to-date August 2026 Mainboard dataset if live scraping is temporarily unreachable
+        const fallback = this.getLatestFallbackData().filter(i => (i.type || '').toUpperCase() === 'MAINBOARD');
         const analyzed = fallback.map(ipo => this.analyzeListingDayStrategy(ipo));
         this.cache = { timestamp: now, data: analyzed };
         return analyzed;
@@ -35,6 +38,7 @@ class IPOService {
 
     /**
      * Scrape live IPO & GMP feeds with cross-referenced official NSE subscription
+     * Excludes SME IPOs
      */
     async fetchLiveIPOData() {
         // 1. Fetch official NSE live bidding and subscription numbers
@@ -88,12 +92,18 @@ class IPOService {
                     const datesMatch = rowContent.match(/class="gmp-dates">\s*([^<]+)/i);
 
                     if (nameMatch) {
+                        const rawType = typeMatch ? typeMatch[1].toUpperCase() : 'MAINBOARD';
+                        
+                        // 🛡️ STRICT FILTER: Skip SME IPOs completely!
+                        if (rawType.includes('SME') || rowContent.toLowerCase().includes('sme')) {
+                            continue;
+                        }
+
                         const name = nameMatch[1].trim();
                         const gmp = gmpMatch ? (parseFloat(gmpMatch[1]) || 0) : 0;
                         const gainPct = pctMatch ? (parseFloat(pctMatch[1]) || 0) : 0;
                         const indicative = indicativeMatch ? (parseFloat(indicativeMatch[1]) || 0) : 0;
                         const status = statusMatch ? statusMatch[1].toUpperCase() : 'OPEN';
-                        const type = typeMatch ? typeMatch[1].toUpperCase() : 'MAINBOARD';
                         const dates = datesMatch ? datesMatch[1].trim() : 'Active';
                         const priceBand = priceMatch ? priceMatch[1].trim() : '';
 
@@ -114,7 +124,7 @@ class IPOService {
 
                         results.push({
                             name,
-                            type,
+                            type: 'MAINBOARD',
                             issuePrice,
                             gmp,
                             expectedListingPrice: indicative || (issuePrice + gmp),
@@ -173,7 +183,7 @@ class IPOService {
         if (score >= 75) {
             verdict = '🟢 HIGH PROBABILITY BUY (LISTING BREAKOUT)';
             action = 'BUY_BREAKOUT';
-            intradayPlan = `<b>⚡ Listing Day Strategy (90% Win-Rate Rule):</b>\n` +
+            intradayPlan = `<b>⚡ Mainboard Listing Day Strategy (90% Win-Rate Rule):</b>\n` +
                            `1. Wait for the <b>First 5-Minute Candle (10:00 AM - 10:05 AM IST)</b> to close.\n` +
                            `2. <b>BUY TRIGGER:</b> Buy ONLY if price breaks ABOVE the 5-Min High!\n` +
                            `3. <b>Target 1 (+5%):</b> ₹${target1} (Book 60% & Move SL to Cost)\n` +
@@ -182,7 +192,7 @@ class IPOService {
         } else if (score >= 50) {
             verdict = '🟡 CAUTIOUS / RANGE BOUND';
             action = 'WAIT_5MIN';
-            intradayPlan = `<b>⚡ Listing Day Strategy:</b>\n` +
+            intradayPlan = `<b>⚡ Mainboard Listing Strategy:</b>\n` +
                            `• Moderate demand (+${ipo.expectedGainPct}%). DO NOT buy blindly at market open.\n` +
                            `• Wait 15 minutes. If VWAP remains above Issue Price (₹${ipo.issuePrice}), enter small scalp (+2% to +3%).\n` +
                            `• Stop Loss: Strict ₹${ipo.issuePrice}`;
@@ -194,7 +204,7 @@ class IPOService {
 
         return {
             name: ipo.name,
-            type: ipo.type || 'Mainboard',
+            type: 'MAINBOARD',
             issuePrice: ipo.issuePrice,
             gmp: ipo.gmp,
             expectedListingPrice: ipo.expectedListingPrice,
@@ -211,7 +221,7 @@ class IPOService {
     }
 
     /**
-     * Fallback dataset with current active August 2026 IPOs
+     * Fallback dataset containing ONLY Mainboard IPOs
      */
     getLatestFallbackData() {
         return [
@@ -238,17 +248,6 @@ class IPOService {
                 subscription: '2.86x Subscribed (Live NSE)'
             },
             {
-                name: 'Kwick Forensic Solutions',
-                type: 'BSE SME',
-                issuePrice: 90,
-                gmp: 54,
-                expectedListingPrice: 144,
-                expectedGainPct: 60.0,
-                listingDate: 'Aug 27 – Aug 31, 2026',
-                status: 'OPEN',
-                subscription: '14.2x Subscribed (Heavy Demand)'
-            },
-            {
                 name: 'Augmont Enterprises',
                 type: 'MAINBOARD',
                 issuePrice: 788,
@@ -269,17 +268,6 @@ class IPOService {
                 listingDate: 'Aug 28 – Sep 1, 2026',
                 status: 'OPEN',
                 subscription: '1.37x Subscribed (Live NSE)'
-            },
-            {
-                name: 'Paluck Technologies',
-                type: 'BSE SME',
-                issuePrice: 48,
-                gmp: 14,
-                expectedListingPrice: 62,
-                expectedGainPct: 29.2,
-                listingDate: 'Aug 28 – Sep 1, 2026',
-                status: 'OPEN',
-                subscription: '5.1x Subscribed'
             }
         ];
     }

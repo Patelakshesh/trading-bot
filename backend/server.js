@@ -272,8 +272,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 return bot.editMessageText(`❌ No active IPO listings found right now.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             }
 
-            let text = `🚀 <b>LIVE IPO GREY MARKET PREMIUM (GMP) & LISTING RADAR</b> 🚀\n\n` +
-                       `<i>Real-Time Live GMP Tracker & 90% Win-Rate Listing Day Strategies</i>\n\n`;
+            let text = `🚀 <b>LIVE MAINBOARD IPO & GMP RADAR (High Liquidity)</b> 🚀\n\n` +
+                       `<i>Real-Time Mainboard GMP Tracker & 90% Win-Rate Listing Strategies (SME Excluded)</i>\n\n`;
 
             ipos.slice(0, 6).forEach((ipo, idx) => {
                 const gainEmoji = ipo.expectedGainPct >= 40 ? '🔥' : (ipo.expectedGainPct >= 15 ? '📈' : '⚠️');
