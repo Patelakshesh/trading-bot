@@ -272,15 +272,17 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 return bot.editMessageText(`❌ No active IPO listings found right now.`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             }
 
-            let text = `🚀 <b>IPO LISTING DAY & GMP INTRADAY RADAR</b> 🚀\n\n` +
-                       `<i>Real-Time Grey Market Premium & 90% Win-Rate Listing Day Strategies</i>\n\n`;
+            let text = `🚀 <b>LIVE IPO GREY MARKET PREMIUM (GMP) & LISTING RADAR</b> 🚀\n\n` +
+                       `<i>Real-Time Live GMP Tracker & 90% Win-Rate Listing Day Strategies</i>\n\n`;
 
-            ipos.forEach((ipo, idx) => {
-                const gainEmoji = ipo.expectedGainPct >= 30 ? '🔥' : (ipo.expectedGainPct >= 10 ? '📈' : '⚠️');
-                text += `<b>${idx + 1}. ${ipo.name}</b>\n` +
-                        `• <b>Issue Price:</b> ₹${ipo.issuePrice} | <b>Live GMP:</b> +₹${ipo.gmp} (${gainEmoji} +${ipo.expectedGainPct}%)\n` +
-                        `• <b>Expected Open:</b> <b>₹${ipo.expectedListingPrice}</b>\n` +
-                        `• <b>Subscription:</b> ${ipo.subscription}\n` +
+            ipos.slice(0, 6).forEach((ipo, idx) => {
+                const gainEmoji = ipo.expectedGainPct >= 40 ? '🔥' : (ipo.expectedGainPct >= 15 ? '📈' : '⚠️');
+                const statusEmoji = ipo.status === 'OPEN' ? '🟢 OPEN' : '🟡 ' + ipo.status;
+                text += `<b>${idx + 1}. ${ipo.name}</b> [${ipo.type || 'Mainboard'}]\n` +
+                        `• <b>Status:</b> ${statusEmoji} | <b>Dates:</b> ${ipo.listingDate}\n` +
+                        `• <b>Issue Price:</b> ₹${ipo.issuePrice} | <b>Live GMP:</b> +₹${ipo.gmp} (${gainEmoji} <b>+${ipo.expectedGainPct}%</b>)\n` +
+                        `• <b>Expected Listing:</b> <b>₹${ipo.expectedListingPrice}</b>\n` +
+                        `• <b>Subscription:</b> <b>${ipo.subscription}</b>\n` +
                         `• <b>Listing Score:</b> <b>${ipo.score}/100</b> — <b>${ipo.verdict}</b>\n\n` +
                         `${ipo.intradayPlan}\n\n` +
                         `───────────────\n`;
