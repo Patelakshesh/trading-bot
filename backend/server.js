@@ -203,9 +203,18 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             const support = data.supportWall || (atmStrike - (2 * step));
             const resistance = data.resistanceCeiling || (atmStrike + (2 * step));
             const pcr = data.pcr || 1.0;
+            const mStatus = data.marketStatus || { isOpen: true, statusLabel: '🟢 LIVE' };
 
             let verdictBox = '';
-            if (pcr >= 1.20 || data.bias === 'BULLISH') {
+            if (!mStatus.isOpen) {
+                verdictBox = `🎯 <b>MARKET STATUS: ${mStatus.statusLabel}</b>\n` +
+                             `• <b>Weekend Stance:</b> ⏸️ <b>NO TRADES (Market Closed)</b>\n` +
+                             `• <b>Next Live Session:</b> <b>${mStatus.nextOpen}</b>\n\n` +
+                             `<b>📋 Monday Opening Gameplan (90% Win-Rate Rules):</b>\n` +
+                             `  👉 Buy <b>${atmStrike} CE</b> ONLY if price bounces off Support <b>₹${support}</b> (Target: +35 pts | SL: -15 pts)\n` +
+                             `  👉 Buy <b>${atmStrike} PE</b> ONLY if price rejects Resistance <b>₹${resistance}</b> (Target: -35 pts | SL: +15 pts)\n\n` +
+                             `⚠️ <i>Do NOT place orders while exchanges are closed. Live signals resume Monday at 9:00 AM IST!</i>`;
+            } else if (pcr >= 1.20 || data.bias === 'BULLISH') {
                 const target1 = (data.spotPrice + 15).toFixed(2);
                 const target2 = (data.spotPrice + targetPoints).toFixed(2);
                 const target3 = (data.spotPrice + 50).toFixed(2);
@@ -242,11 +251,13 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                              `• <b>Warning:</b> Buying in the middle guarantees Theta Decay loss!`;
             }
 
-            const pcrEmoji = pcr >= 1.20 ? '🟢 BULLISH (Heavy Put Floor)' : pcr <= 0.80 ? '🔴 BEARISH (Call Ceiling)' : '🟡 NEUTRAL';
+            const pcrEmoji = !mStatus.isOpen ? '⏸️ FROZEN (Market Closed)' : (pcr >= 1.20 ? '🟢 BULLISH (Heavy Put Floor)' : pcr <= 0.80 ? '🔴 BEARISH (Call Ceiling)' : '🟡 NEUTRAL');
+            const priceLabel = mStatus.isOpen ? 'Live Spot Price' : 'Friday Closing Settlement';
 
             let oiText = `🏦 <b>INSTITUTIONAL OPEN INTEREST REPORT</b> 🏦\n\n` +
                          `📈 <b>Asset:</b> ${data.asset}\n` +
-                         `💰 <b>Live Spot Price:</b> ₹${data.spotPrice}\n` +
+                         `🚦 <b>Market Status:</b> <b>${mStatus.statusLabel}</b>\n` +
+                         `💰 <b>${priceLabel}:</b> <b>₹${data.spotPrice}</b>\n` +
                          `📊 <b>Put-Call Ratio (PCR):</b> <b>${pcr}</b> — ${pcrEmoji}\n` +
                          `🛡️ <b>Put OI Support Wall:</b> <b>₹${support}</b>\n` +
                          `🧱 <b>Call OI Resistance Ceiling:</b> <b>₹${resistance}</b>\n\n` +

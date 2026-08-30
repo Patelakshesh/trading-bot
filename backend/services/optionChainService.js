@@ -1,33 +1,39 @@
 const axios = require('axios');
 const angleOneService = require('./angleOneService');
 const angleOneMapping = require('./angleOneMapping');
+const { getMarketStatus } = require('./marketHours');
 
 class OptionChainService {
     constructor() {
         this.cache = new Map(); // asset -> { timestamp, data }
-        this.CACHE_TTL = 30 * 1000; // 30 seconds fresh cache
+        this.CACHE_TTL = 30 * 1000; // 30 seconds fresh cache during market hours
+        this.WEEKEND_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 hours cache on weekends
     }
 
     /**
      * Analyze Option Chain & Open Interest for Nifty, BankNifty, or MCX Commodities
      */
-    async getOptionChainAnalysis(asset = 'nifty', spotPrice = 0) {
+    async getOptionChainAnalysis(asset = 'crude', spotPrice = 0) {
         const cleanAsset = asset.toLowerCase();
         const now = Date.now();
+        const marketStatus = getMarketStatus(cleanAsset);
+
+        const ttl = marketStatus.isOpen ? this.CACHE_TTL : this.WEEKEND_CACHE_TTL;
         const cached = this.cache.get(cleanAsset);
-        if (cached && (now - cached.timestamp < this.CACHE_TTL)) {
+        if (cached && (now - cached.timestamp < ttl)) {
             return cached.data;
         }
 
         try {
             let analysis = null;
             if (cleanAsset === 'nifty' || cleanAsset === 'banknifty') {
-                analysis = await this.fetchNSEIndexOptionChain(cleanAsset, spotPrice);
+                analysis = await this.fetchNSEIndexOptionChain(cleanAsset, spotPrice, marketStatus);
             } else {
-                analysis = await this.fetchMCXCommodityOI(cleanAsset, spotPrice);
+                analysis = await this.fetchMCXCommodityOI(cleanAsset, spotPrice, marketStatus);
             }
 
             if (analysis) {
+                analysis.marketStatus = marketStatus;
                 this.cache.set(cleanAsset, { timestamp: now, data: analysis });
                 return analysis;
             }
@@ -35,11 +41,13 @@ class OptionChainService {
             console.error(`[OptionChainService] Error analyzing ${asset}:`, err.message);
         }
 
-        // Return fallback calculated structure if external API is restricted
-        return this.getFallbackOIStructure(cleanAsset, spotPrice);
+        // Return stable fallback calculated structure if external API is restricted
+        const fallback = this.getFallbackOIStructure(cleanAsset, spotPrice, marketStatus);
+        fallback.marketStatus = marketStatus;
+        return fallback;
     }
 
-    async fetchNSEIndexOptionChain(asset, spotPrice) {
+    async fetchNSEIndexOptionChain(asset, spotPrice, marketStatus) {
         try {
             const isBankNifty = asset === 'banknifty';
             const step = isBankNifty ? 100 : 50;
@@ -64,7 +72,6 @@ class OptionChainService {
                 strikes.push(atmStrike + (i * step));
             }
 
-            // Estimate / Query Open Interest Distribution
             let totalCallOI = 0;
             let totalPutOI = 0;
             let maxCallOIStrike = atmStrike + (2 * step);
@@ -91,26 +98,15 @@ class OptionChainService {
                 };
             });
 
-            const pcr = totalCallOI > 0 ? parseFloat((totalPutOI / totalCallOI).toFixed(2)) : 1.0;
-            
-            // Calculate Max Pain
-            let minLoss = Infinity;
-            let maxPainStrike = atmStrike;
-            for (const s of strikes) {
-                let totalLoss = 0;
-                for (const row of strikeDetails) {
-                    if (s > row.strike) totalLoss += (s - row.strike) * row.callOI;
-                    if (s < row.strike) totalLoss += (row.strike - s) * row.putOI;
-                }
-                if (totalLoss < minLoss) {
-                    minLoss = totalLoss;
-                    maxPainStrike = s;
-                }
-            }
+            const pcr = totalCallOI > 0 ? parseFloat((totalPutOI / totalCallOI).toFixed(2)) : 1.05;
 
             let bias = 'NEUTRAL';
             let reasoning = '';
-            if (pcr >= 1.25) {
+
+            if (!marketStatus.isOpen) {
+                bias = 'MARKET_CLOSED';
+                reasoning = `Market is currently closed (${marketStatus.statusLabel}). Showing Friday's final settlement levels. No live orders are active.`;
+            } else if (pcr >= 1.25) {
                 bias = 'BULLISH';
                 reasoning = `High PCR (${pcr}) indicates massive Put Writing by institutions. Strong support at ${maxPutOIStrike}.`;
             } else if (pcr <= 0.70) {
@@ -131,7 +127,7 @@ class OptionChainService {
                 pcr,
                 bias,
                 reasoning,
-                maxPainStrike,
+                maxPainStrike: atmStrike,
                 supportWall: maxPutOIStrike,
                 resistanceCeiling: maxCallOIStrike,
                 totalCallOI,
@@ -139,11 +135,11 @@ class OptionChainService {
                 strikeDetails
             };
         } catch (e) {
-            return this.getFallbackOIStructure(asset, spotPrice);
+            return this.getFallbackOIStructure(asset, spotPrice, marketStatus);
         }
     }
 
-    async fetchMCXCommodityOI(asset, spotPrice) {
+    async fetchMCXCommodityOI(asset, spotPrice, marketStatus) {
         try {
             await angleOneMapping.init();
             let token = null;
@@ -170,18 +166,43 @@ class OptionChainService {
                 }
             }
 
-            const total = buyQty + sellQty;
-            const buyerDominance = total > 0 ? Math.round((buyQty / total) * 100) : 52;
             const currentSpot = liveLtp > 0 ? liveLtp : 7983;
-
             const step = (asset.includes('crude')) ? 50 : (asset.includes('gold') ? 100 : (asset.includes('silver') ? 100 : 5));
             const atmStrike = Math.round(currentSpot / step) * step;
             const supportWall = atmStrike - (2 * step);
             const resistanceCeiling = atmStrike + (2 * step);
 
+            let buyerDominance = 50;
+            let pcr = 1.05;
             let bias = 'NEUTRAL';
-            if (buyerDominance >= 60) bias = 'BULLISH';
-            else if (buyerDominance <= 40) bias = 'BEARISH';
+            let reasoning = '';
+
+            if (!marketStatus.isOpen) {
+                // 🔒 When MCX Market is CLOSED on Weekends / Off-hours:
+                // Keep values 100% stable and frozen to prevent random flips
+                bias = 'MARKET_CLOSED';
+                pcr = 1.05;
+                buyerDominance = 50;
+                reasoning = `MCX Commodity Exchange is currently CLOSED (${marketStatus.statusLabel}). Friday's closing settlement is locked at ₹${currentSpot}. No trades are executed until market opens.`;
+            } else {
+                // 🟢 Live Market Hours Order Flow Analysis
+                const total = buyQty + sellQty;
+                buyerDominance = total > 0 ? Math.round((buyQty / total) * 100) : 50;
+                
+                if (buyerDominance >= 60) {
+                    bias = 'BULLISH';
+                    pcr = 1.25;
+                    reasoning = `MCX Live Order Flow: ${buyerDominance}% Buyer Dominance (${buyQty} contracts) with strong Put support at ₹${supportWall}.`;
+                } else if (buyerDominance <= 40) {
+                    bias = 'BEARISH';
+                    pcr = 0.75;
+                    reasoning = `MCX Live Order Flow: ${100 - buyerDominance}% Seller Dominance (${sellQty} contracts) with Call resistance at ₹${resistanceCeiling}.`;
+                } else {
+                    bias = 'NEUTRAL';
+                    pcr = 1.02;
+                    reasoning = `MCX Order Flow is balanced (${buyerDominance}% Buyers vs ${100 - buyerDominance}% Sellers). Trapped between ₹${supportWall} and ₹${resistanceCeiling}.`;
+                }
+            }
 
             return {
                 asset: instrumentName,
@@ -191,28 +212,34 @@ class OptionChainService {
                 buyerDominance: `${buyerDominance}%`,
                 buyVolume: buyQty,
                 sellVolume: sellQty,
-                pcr: buyerDominance >= 55 ? 1.25 : 0.78,
+                pcr,
                 bias,
                 maxPainStrike: atmStrike,
-                supportWall: supportWall,
-                resistanceCeiling: resistanceCeiling,
-                reasoning: `MCX Live Order Flow: ${buyerDominance}% Buyer Dominance with ${oiValue} active contracts.`
+                supportWall,
+                resistanceCeiling,
+                reasoning
             };
         } catch (e) {
-            return this.getFallbackOIStructure(asset, spotPrice);
+            return this.getFallbackOIStructure(asset, spotPrice, marketStatus);
         }
     }
 
-    getFallbackOIStructure(asset, spotPrice) {
-        const spot = spotPrice > 0 ? spotPrice : (asset.includes('crude') ? 7980 : 24200);
+    getFallbackOIStructure(asset, spotPrice, marketStatus) {
+        const spot = spotPrice > 0 ? spotPrice : (asset.includes('crude') ? 7983 : 24200);
+        const step = asset.includes('crude') ? 50 : 50;
+        const atmStrike = Math.round(spot / step) * step;
+
         return {
             asset: asset.toUpperCase(),
             spotPrice: spot,
+            atmStrike,
             pcr: 1.05,
-            bias: 'NEUTRAL',
-            reasoning: 'Balanced Open Interest structure across major strikes.',
-            supportWall: Math.round(spot * 0.99),
-            resistanceCeiling: Math.round(spot * 1.01)
+            bias: marketStatus && !marketStatus.isOpen ? 'MARKET_CLOSED' : 'NEUTRAL',
+            reasoning: marketStatus && !marketStatus.isOpen
+                ? `Market is CLOSED (${marketStatus.statusLabel}). Friday settlement price is ₹${spot}.`
+                : 'Balanced Open Interest structure across major strikes.',
+            supportWall: atmStrike - (2 * step),
+            resistanceCeiling: atmStrike + (2 * step)
         };
     }
 }
