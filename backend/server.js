@@ -1403,7 +1403,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
             }
 
             if (!result.setups || result.setups.length === 0) {
-                await bot.editMessageText(`⚠️ No verified Super-Confluence setups active right now. All 191 stocks failed the 7-layer intelligence filter. Re-check after 15 minutes!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+                await bot.editMessageText(`⚠️ No verified Super-Confluence setups active right now. All 1,200+ stocks failed the 7-layer intelligence filter. Re-check after 15 minutes!`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
                 return;
             }
 
@@ -1525,7 +1525,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
              return bot.sendMessage(chatId, `🚫 <b>/predict is locked until 3:15 PM.</b>\n\nPredictions made during market hours are highly inaccurate due to closing volatility. Wait until the final 15 minutes of the session to scan for tomorrow's movers!`, {parse_mode: 'HTML'});
         }
 
-        bot.sendMessage(chatId, `🔮 **PREDICTION ENGINE RUNNING...**\nScanning 191 stocks using RSI, MACD, Volume Spikes, and Bollinger Bands. This takes ~30 seconds...`, {parse_mode: 'Markdown'});
+        bot.sendMessage(chatId, `🔮 **PREDICTION ENGINE RUNNING...**\nScanning 1,200+ stocks using RSI, MACD, Volume Spikes, and Bollinger Bands. This takes ~30 seconds...`, {parse_mode: 'Markdown'});
         
         try {
             const { generateTomorrowPredictions } = require('./services/predictionService');
