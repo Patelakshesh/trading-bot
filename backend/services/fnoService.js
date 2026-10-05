@@ -402,7 +402,7 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 status: 'NO_TRADE',
                 spotPrice: spotDisplay,
                 instrumentName: instrumentName,
-                message: `⚠️ LOW MOMENTUM KILL SWITCH: ${instrumentName} ADX is ${currentADX.toFixed(1)}. \n\nThe market is sideways. Buying options now guarantees loss via Theta decay. Only trade when ADX > 22.`,
+                message: `⚠️ LOW MOMENTUM KILL SWITCH: ${instrumentName} ADX is ${currentADX.toFixed(1)}. \n\nThe market is sideways. Buying options now guarantees loss via Theta decay. Only trade when ADX &gt; 22.`,
                 pressureData: buildPressureData()
             };
         }
@@ -760,8 +760,8 @@ async function getFNOTrade(instrumentType = 'nifty') {
         let dynamicSL = "";
         
         if (instrumentType.toLowerCase() === 'crude') {
-            dynamicTarget = "🎯 TARGET: +35 Points (Sell at Entry Premium + 35) -> ₹700 Profit per lot";
-            dynamicSL = "🛑 STOP LOSS: -15 Points (Sell at Entry Premium - 15) -> Strict ₹300 Risk limit";
+            dynamicTarget = "🎯 TARGET: +35 Points (Sell at Entry Premium + 35) -&gt; ₹700 Profit per lot";
+            dynamicSL = "🛑 STOP LOSS: -15 Points (Sell at Entry Premium - 15) -&gt; Strict ₹300 Risk limit";
         } else {
             if (currentADX >= 30) {
                 dynamicTarget = "🎯 TARGET: +4% to +5% (MASSIVE MOMENTUM DETECTED! Let the profits run!)";
