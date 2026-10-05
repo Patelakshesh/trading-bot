@@ -971,11 +971,12 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                                 stk.rsi = tech.RSI;
                                 stk.sma200 = tech.sma200;
                                 stk.macdSignal = tech.MACD?.histogram;
+                                return stk;
                             }
                         } catch(e) {}
-                        return stk;
+                        return null; // Remove stock if technicals fail to load (Anti-Blind AI)
                     }));
-                    return enriched;
+                    return enriched.filter(s => s !== null);
                 };
                 
                 const movers = {
