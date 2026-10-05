@@ -615,7 +615,7 @@ async function checkPeerConfluence(symbol) {
 }
 
 // 4. INDIAN MARKET TIME CHECKER & TIME-OF-DAY INTELLIGENCE (Pillar 4)
-function checkIndianMarketTime() {
+function checkIndianMarketTime(allowLate = false) {
     const now = new Date();
     const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     const h = ist.getHours();
@@ -651,8 +651,8 @@ function checkIndianMarketTime() {
     if (totalMinutes >= deadZoneStart && totalMinutes < deadZoneEnd) {
         return { isOpen: false, reason: '😴 **DEAD ZONE:** Market is in the Midday Chop Zone (11:30 AM - 1:00 PM). Volume is dead. Avoid trading.' };
     }
-    if (totalMinutes >= cutoffTime) {
-        return { isOpen: false, reason: '🏁 **LATE DAY:** Market is nearing close (>2:30 PM). No new entries allowed. Manage existing positions only.' };
+    if (totalMinutes >= cutoffTime && !allowLate) {
+        return { isOpen: false, reason: '🏁 **LATE DAY:** Market is nearing close (>2:30 PM). No new MIS (Intraday) entries allowed. Manage existing positions only.' };
     }
     
     return {
@@ -663,9 +663,9 @@ function checkIndianMarketTime() {
 }
 
 // 5. PRIMARY QUANT SCREENING ENGINE
-async function getIntradaySetups(targetSymbol = null, capital = 20000) {
+async function getIntradaySetups(targetSymbol = null, capital = 20000, allowLate = false) {
     if (typeof targetSymbol !== 'string') targetSymbol = null;
-    const timeStatus = checkIndianMarketTime();
+    const timeStatus = checkIndianMarketTime(allowLate);
     const nowTs = Date.now();
 
     // SMART ROLLING BUFFER: Re-scan market cleanly every 2 minutes to catch evolving 9:45-10:15 AM breakouts!
@@ -829,9 +829,9 @@ async function getIntradaySetups(targetSymbol = null, capital = 20000) {
 const dailySetup30Cache = { timestamp: 0, setups: null };
 
 // 6. JULY 30 HISTORIC SYSTEM (Commit c6e122a Replication with intelligent afternoon pullback support)
-async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
+async function getIntraday30Setups(targetSymbol = null, capital = 20000, allowLate = false) {
     if (typeof targetSymbol !== 'string') targetSymbol = null;
-    const timeStatus = checkIndianMarketTime();
+    const timeStatus = checkIndianMarketTime(allowLate);
     const nowTs = Date.now();
 
     if (!targetSymbol && nowTs < dailySetup30Cache.timestamp + CACHE_TTL_MS && dailySetup30Cache.setups?.length > 0) {
@@ -925,8 +925,8 @@ async function getIntraday30Setups(targetSymbol = null, capital = 20000) {
 const dailyTop10Cache = { timestamp: 0, setups: null };
 
 // 7. ALL-CAP MARKET TOP 10 SCANNER (/top10 — Small, Mid & Large Cap Winners with News & Circuit Shield)
-async function getTop10MarketSetups(capital = 20000) {
-    const timeStatus = checkIndianMarketTime();
+async function getTop10MarketSetups(capital = 20000, allowLate = false) {
+    const timeStatus = checkIndianMarketTime(allowLate);
     const nowTs = Date.now();
 
     if (nowTs < dailyTop10Cache.timestamp + CACHE_TTL_MS && dailyTop10Cache.setups?.length > 0) {
@@ -1118,8 +1118,8 @@ async function getAbove4PercentSetups(capital = 20000) {
 }
 
 // 8. MASTER COMBINED QUANT ENGINE (/best or /master — Combines v4.0 Confluence + July 30 ORB + All-Cap Top 10 + AI Trend Evaluation)
-async function getCombinedMasterSetups(capital = 20000) {
-    const timeStatus = checkIndianMarketTime();
+async function getCombinedMasterSetups(capital = 20000, allowLate = false) {
+    const timeStatus = checkIndianMarketTime(allowLate);
     console.log("⚡ [SUPER-CONFLUENCE ENGINE] Intersecting v4.0, July 30 ORB & All-Cap Top 10 quant layers...");
 
     // 🧠 PREDICTIVE INTELLIGENCE: Load signals before ANY scanning
@@ -1139,9 +1139,9 @@ async function getCombinedMasterSetups(capital = 20000) {
     }
 
     const [v4Result, julResult, top10Result] = await Promise.all([
-        getIntradaySetups(null, capital),
-        getIntraday30Setups(null, capital),
-        getTop10MarketSetups(capital)
+        getIntradaySetups(null, capital, allowLate),
+        getIntraday30Setups(null, capital, allowLate),
+        getTop10MarketSetups(capital, allowLate)
     ]);
 
     const map = new Map();

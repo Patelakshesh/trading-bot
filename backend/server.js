@@ -1381,7 +1381,7 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
         const statusMsg = await bot.sendMessage(chatId, `🌟 <b>[MASTER SUPER-CONFLUENCE ENGINE]</b> 🌟\n\n⚡ Intersecting all three quantitative detection layers (<b>v4.0 Quant</b>, <b>July 30 ORB</b> & <b>All-Cap Top 10</b>)...\n🧠 Running institutional cross-verification & AI Trend Shield to find today's <b>Top 5 Super-Winners</b>!`, { parse_mode: 'HTML' });
 
         try {
-            const timeCheck = intradayService.checkIndianMarketTime();
+            const timeCheck = intradayService.checkIndianMarketTime(true); // Allow late day for Swing
             if (!timeCheck.isOpen) {
                 await bot.sendMessage(chatId, timeCheck.reason, { parse_mode: 'Markdown' });
                 return; // 🛡️ Pillar 4: Strictly block the system from returning setups during dangerous hours!
