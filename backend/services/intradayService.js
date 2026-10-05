@@ -634,9 +634,9 @@ function checkIndianMarketTime() {
         return { isOpen: false, reason: '🏖️ Indian Markets are currently CLOSED for the weekend.' };
     }
     // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
-    if (day === 1) { // 1 = Monday
-        return { isOpen: false, reason: '🚫 INTRADAY BLOCKED: Monday Trading is disabled. Weekend gaps cause artificial chart noise and false breakouts. Capital preservation mode active.' };
-    }
+    // if (day === 1) { // 1 = Monday
+    //     return { isOpen: false, reason: '🚫 INTRADAY BLOCKED: Monday Trading is disabled. Weekend gaps cause artificial chart noise and false breakouts. Capital preservation mode active.' };
+    // }
     if (totalMinutes < marketOpen) {
         return { isOpen: false, reason: `⏳ Indian Markets open at 9:15 AM IST. Current time: ${h}:${String(m).padStart(2,'0')}.` };
     }
