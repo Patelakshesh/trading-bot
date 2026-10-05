@@ -2576,7 +2576,7 @@ const getMarketMovers = async () => {
         
         let quoteResults = [];
         try {
-            // Fetch all 300 quotes in a SINGLE batched request to prevent Yahoo Finance 429 Rate Limiting
+            // Fetch all quotes in a SINGLE batched request to prevent Yahoo Finance 429 Rate Limiting
             quoteResults = await yahooFinance.quote(symbolsList);
         } catch(e) {
             console.error("Batched Yahoo Quote failed:", e.message);
@@ -2584,7 +2584,11 @@ const getMarketMovers = async () => {
 
         const simulatedMovers = [];
         
-        for (const item of randomMenu) {
+        // FIX: If batch failed, do NOT do 300 sequential API calls (this causes 50% freeze)
+        // Reduce fallback to 20 stocks if quoteResults is empty.
+        const processMenu = quoteResults.length === 0 ? randomMenu.slice(0, 20) : randomMenu;
+        
+        for (const item of processMenu) {
             const quote = quoteResults.find(q => q.symbol === item.symbol);
             if (quote && quote.regularMarketPrice) {
                 if (quote.regularMarketPrice >= 50) { // Global Penny Stock Filter
