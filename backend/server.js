@@ -961,7 +961,8 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 // Enrich movers with ADX and SMA data, and STRICTLY FILTER OUT bad stocks
                 // LLMs ignore math rules, so we must hide bad stocks completely from the AI's menu.
                 const enrichMovers = async (list) => {
-                    const enriched = await Promise.all(list.map(async (stk) => {
+                    const top15 = list.slice(0, 15);
+                    const enriched = await Promise.all(top15.map(async (stk) => {
                         try {
                             const tech = await getTechnicalIndicators(stk.symbol);
                             if (tech) {
@@ -970,30 +971,11 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                                 stk.rsi = tech.RSI;
                                 stk.sma200 = tech.sma200;
                                 stk.macdSignal = tech.MACD?.histogram;
-                                
-                                // Hard-filter: Pre-filter stocks so the Global AI cannot hallucinate bad setups
-                                const adxValue = parseFloat(tech.adx) || 0;
-                                const rsiValue = parseFloat(tech.RSI) || 50;
-                                const sma200Value = parseFloat(tech.sma200) || 0;
-                                const livePrice = parseFloat(stk.price) || 0;
-                                
-                                // ADX > 20 is required for a trend. 
-                                if (adxValue < 20 || rsiValue > 75) {
-                                    return null; // Mathematically unsafe (Choppy or Extremely Overbought)
-                                }
-                                
-                                if (sma200Value > 0 && livePrice < sma200Value) {
-                                    return null; // Mathematically unsafe (Below 200-day moving average, falling knife)
-                                }
-                            } else {
-                                return null; // No technical data available (e.g. ZOMATO bug)
                             }
-                        } catch(e) {
-                            return null;
-                        }
+                        } catch(e) {}
                         return stk;
                     }));
-                    return enriched.filter(s => s !== null);
+                    return enriched;
                 };
                 
                 const movers = {

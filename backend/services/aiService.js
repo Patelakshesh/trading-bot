@@ -348,7 +348,7 @@ GATE 7 (CATALYST OVERRIDE - HIGH RISK): Is there massive positive investor news 
 ⚠️ CRITICAL INSTRUCTION ABOUT THE 'MOVERS' LIST (ANTI-HALLUCINATION RULE):
 You MUST ONLY select your stocks from the 'TOP NSE GAINERS TODAY' or 'TOP NSE LOSERS' lists provided above.
 DO NOT use your own knowledge to invent or hallucinate stocks, because you do not have their live real-time ADX data.
-If only 2 or 3 stocks from the list pass the ADX > 20 gates, you MAY hallucinate the remaining stocks to reach 5, BUT you must confidently believe they have High-Beta momentum. 
+If only 2 or 3 stocks from the list pass the gates, then ONLY return 2 or 3 stocks! DO NOT HALLUCINATE STOCKS TO REACH 5.
 NEVER recommend slow, boring stocks like YESBANK or IDFCFIRSTB.
 ONLY recommend if it passes ALL applicable GATES.
 
@@ -359,7 +359,7 @@ Pricing rules (HIGH RISK, HIGH REWARD):
 ${budgetPrompt}
 ${rangePrompt}
 
-Return ONLY a valid JSON array of exactly 5 INDIAN NSE stocks. No markdown, no explanation.
+Return ONLY a valid JSON array of 1 to 5 INDIAN NSE stocks. No markdown, no explanation.
 [
   {
     "symbol": "TICKER.NS",
