@@ -32,9 +32,18 @@ function getSectorForSymbol(symbol) {
 // ==========================================
 // 🧠 PHASE 1, 3 & 5 MATH VERIFICATION ENGINE
 // ==========================================
+const mathEvalCache = new Map();
+
 async function validateIntradayMath(symbol, currentPrice, currentVolume) {
+    const cacheKey = `${symbol}_${currentPrice}_${currentVolume}`;
+    const nowTs = Date.now();
+    const cached = mathEvalCache.get(cacheKey);
+    if (cached && (nowTs - cached.timestamp < 60000)) {
+        return cached.data;
+    }
+
     try {
-        const now = Math.floor(Date.now() / 1000);
+        const now = Math.floor(nowTs / 1000);
         const p1_1d = now - (1 * 24 * 60 * 60);
         const p1_1mo = now - (30 * 24 * 60 * 60);
         const p1_5d = now - (5 * 24 * 60 * 60);
@@ -167,15 +176,21 @@ async function validateIntradayMath(symbol, currentPrice, currentVolume) {
             atrSL = currentPrice - ((atrTarget - currentPrice) / 2); // Maintain 1:2 RR
         }
 
-        return { 
+        const result = { 
             valid: true, 
-            reason: `Intraday EMA Trend Confirmed ✅ | Vol Ratio: ${volumeRatio.toFixed(2)}x${patternBonus}`, 
+            reason: `Intraday EMA Trend Confirmed ✅ | Vol Ratio: ${trueVolumeRatio.toFixed(2)}x${patternBonus}`, 
             targetP: parseFloat(atrTarget.toFixed(2)), 
             stopLossP: parseFloat(atrSL.toFixed(2)),
             trueVwap: parseFloat(trueVwap.toFixed(2))
         };
+        
+        mathEvalCache.set(cacheKey, { timestamp: nowTs, data: result });
+        return result;
     } catch (e) {
-        return { valid: false, reason: 'Rejected: Math Check Error / API Timeout. Safety block active.', targetP: 0, stopLossP: 0, trueVwap: currentPrice };
+        console.error(`[MATH VERIFICATION ERROR] ${symbol}:`, e.message);
+        const errResult = { valid: false, reason: 'Rejected: Math Check Error / API Timeout. Safety block active.', targetP: 0, stopLossP: 0, trueVwap: currentPrice };
+        mathEvalCache.set(cacheKey, { timestamp: nowTs, data: errResult });
+        return errResult;
     }
 }
 
@@ -1138,11 +1153,11 @@ async function getCombinedMasterSetups(capital = 20000, allowLate = false) {
         };
     }
 
-    const [v4Result, julResult, top10Result] = await Promise.all([
-        getIntradaySetups(null, capital, allowLate),
-        getIntraday30Setups(null, capital, allowLate),
-        getTop10MarketSetups(capital, allowLate)
-    ]);
+    // 🚀 FIX: Run sub-engines sequentially instead of Promise.all to prevent 3x concurrent Groww API spam!
+    // This allows the 15-second growwQuoteCache to actually work for the 2nd and 3rd scans.
+    const v4Result = await getIntradaySetups(null, capital, allowLate);
+    const julResult = await getIntraday30Setups(null, capital, allowLate);
+    const top10Result = await getTop10MarketSetups(capital, allowLate);
 
     const map = new Map();
 
