@@ -546,15 +546,15 @@ async function getFNOTrade(instrumentType = 'nifty') {
         if (ema200 && currentPrice <= ema200) { putConfluences++; putReasons.push('✅ Below 200 EMA (Macro Bearish)'); }
 
         // ═══════════════════════════════════════════════════════════════════
-        // MINIMUM CONFLUENCE THRESHOLD: Need 5+ confluences for A+ setup
-        // (Previously only needed 3-4, causing too many false signals)
+        // MINIMUM CONFLUENCE THRESHOLD: Need 4+ confluences for A+ setup
         // ═══════════════════════════════════════════════════════════════════
-        const MIN_CONFLUENCES = isUSVolumeBreakout ? 3 : 5;
+        const MIN_CONFLUENCES = isUSVolumeBreakout ? 3 : 4;
         const emaGapPercent = (Math.abs(ema5 - ema20) / currentPrice) * 100;
         const validGap = emaGapPercent >= 0.05;
 
-        // CALL OPTION LOGIC — Now requires 5+ independent confluences
-        const standardCall = ema5 > ema20 && prevEma5 <= prevEma20 && validGap && candleGain > 0 && currentRSI >= 45 && currentRSI <= 68 && currentADX >= 22 && (ema200 ? currentPrice >= ema200 : true) && priceAboveVWAP && hasStrongBody && callConfluences >= MIN_CONFLUENCES;
+        // CALL OPTION LOGIC
+        // Removed the strict 'prevEma5 <= prevEma20' requirement so we don't miss the trade if the user runs the command 10 minutes late!
+        const standardCall = ema5 > ema20 && validGap && candleGain > 0 && currentRSI >= 45 && currentRSI <= 75 && currentADX >= 22 && (ema200 ? currentPrice >= ema200 : true) && priceAboveVWAP && hasStrongBody && callConfluences >= MIN_CONFLUENCES;
         const usVolumeCall = isUSVolumeBreakout && ema5 > ema20 && candleGain > 0.0005 && callConfluences >= 3; // Bypass some filters if US Volume is exploding
 
         const isCallExhausted = candleGain >= 0.25; // If it pumped 0.25%+ in a single 5m candle, the spike is OVER.
@@ -584,10 +584,10 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 ? `🗽 <b>US OPENING VOLUME BREAKOUT!</b>\nMassive ${volumeSpikeMultiplier.toFixed(1)}x Volume Spike detected! American Institutions are aggressively buying. Bypassing standard filters to catch the explosion!` 
                 : `🔥 <b>A+ CONFLUENCE BREAKOUT (${Math.floor(callConfluences)}/9 Signals Aligned)</b>\n${callReasons.join('\n')}\n\n📊 VWAP: ₹${sessionVWAP.toFixed(2)} | ADX: ${currentADX.toFixed(1)} | RSI: ${currentRSI.toFixed(1)}`;
         } 
-        else if (ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true) && priceBelowVWAP && hasStrongBody && putConfluences >= MIN_CONFLUENCES || 
+        else if (ema5 < ema20 && validGap && candleGain < 0 && currentRSI >= 25 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true) && priceBelowVWAP && hasStrongBody && putConfluences >= MIN_CONFLUENCES || 
                  (isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.0005 && putConfluences >= 3)) {
             
-            const standardPut = ema5 < ema20 && prevEma5 >= prevEma20 && validGap && candleGain < 0 && currentRSI >= 32 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true) && priceBelowVWAP && hasStrongBody && putConfluences >= MIN_CONFLUENCES;
+            const standardPut = ema5 < ema20 && validGap && candleGain < 0 && currentRSI >= 25 && currentRSI <= 55 && currentADX >= 22 && (ema200 ? currentPrice <= ema200 : true) && priceBelowVWAP && hasStrongBody && putConfluences >= MIN_CONFLUENCES;
             const usVolumePut = isUSVolumeBreakout && ema5 < ema20 && candleGain < -0.0005 && putConfluences >= 3;
             
             const isPutExhausted = candleGain <= -0.25; // If it dumped 0.25%+ in a single 5m candle, the crash is OVER.
