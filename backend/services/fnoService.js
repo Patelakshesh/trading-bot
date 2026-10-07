@@ -369,14 +369,38 @@ async function getFNOTrade(instrumentType = 'nifty') {
             }
         } catch(e) {}
 
-        const buildPressureData = () => ({
-            spotDisplay: spotDisplay,
-            rsi: currentRSI.toFixed(1),
-            bbUpper: bbData ? bbData.upper.toFixed(2) : "N/A",
-            bbLower: bbData ? bbData.lower.toFixed(2) : "N/A",
-            support: supportZone.toFixed(2),
-            resistance: resistanceZone.toFixed(2)
-        });
+        const buildPressureData = () => {
+            let htFBullish = false;
+            let htFBearish = false;
+            if (quotes.length >= 12) {
+                const r9 = quotes.slice(-9);
+                const g1 = (r9[0].close + r9[1].close + r9[2].close) / 3;
+                const g2 = (r9[3].close + r9[4].close + r9[5].close) / 3;
+                const g3 = (r9[6].close + r9[7].close + r9[8].close) / 3;
+                htFBullish = g3 > g2 && g2 > g1;
+                htFBearish = g3 < g2 && g2 < g1;
+            }
+            
+            let biasText = "SIDEWAYS (Wait)";
+            if (ema5 > ema20) {
+                biasText = "BULLISH (CALL Bias)";
+                if (htFBullish) biasText += " [15m Confirmed UP]";
+            } else if (ema5 < ema20) {
+                biasText = "BEARISH (PUT Bias)";
+                if (htFBearish) biasText += " [15m Confirmed DOWN]";
+            }
+            
+            return {
+                spotDisplay: spotDisplay,
+                rsi: currentRSI.toFixed(1),
+                bbUpper: bbData ? bbData.upper.toFixed(2) : "N/A",
+                bbLower: bbData ? bbData.lower.toFixed(2) : "N/A",
+                support: supportZone.toFixed(2),
+                resistance: resistanceZone.toFixed(2),
+                bias: biasText,
+                news: newsSpikeWarning
+            };
+        };
 
         // --- NEW QUANT FILTER FROM WIN_RATE_MAXIMIZE.md ---
         if (instrumentType.toLowerCase() === 'nifty') {

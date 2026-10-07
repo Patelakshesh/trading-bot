@@ -415,10 +415,12 @@ if(TELEGRAM_TOKEN && TELEGRAM_TOKEN !== 'your_telegram_bot_token_here') {
                 let pressureInfo = '';
                 if (result.pressureData) {
                     const p = result.pressureData;
+                    const biasLine = p.bias ? `\n🧭 <b>Directional Bias:</b> ${p.bias}\n` : '';
+                    const newsLine = p.news ? `\n📰 <b>Live News:</b> ${p.news}\n` : '';
                     pressureInfo = `\n<b>📊 Dynamic Live S/R:</b>\n` +
                                    `• Put Support Wall: ₹${p.support}\n` +
                                    `• Call Resistance Ceiling: ₹${p.resistance}\n` +
-                                   `• Live RSI: ${p.rsi}\n`;
+                                   `• Live RSI: ${p.rsi}\n` + biasLine + newsLine;
                 }
                 await bot.editMessageText(`⚖️ <b>NO TRADE ZONE: ${result.instrumentName || dispName}</b> ⚖️${spotLine}${pressureInfo}\n${result.message}`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
             } else {
