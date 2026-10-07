@@ -2483,8 +2483,8 @@ cron.schedule('15 9 * * 1-5', async () => {
     }
 }, { scheduled: true, timezone: 'Asia/Kolkata' });
 
-// ─── 🔮 EVENING PREDICTION SCORE (8:30 PM IST, Mon–Fri) ──────────────────────
-cron.schedule('30 20 * * 1-5', async () => {
+// ─── 🔮 EVENING PREDICTION SCORE (Testing Mode: 1:32 PM IST) ──────────────────────
+cron.schedule('32 13 * * *', async () => {
     if (!bot || isWeekend()) return;
     try {
         console.log('[Prediction CRON] Running Evening Predictor (8:30 PM IST)...');
