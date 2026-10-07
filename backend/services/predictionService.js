@@ -92,7 +92,6 @@ async function calculatePredictionScore(symbol) {
         }
 
         // 4. 50-EMA Support Bounce (+15 points)
-        const ema50 = EMA.calculate({ period: 50, values: closes });
         if (ema50.length > 0) {
             const currentEma50 = ema50[ema50.length - 1];
             const currentClose = closes[closes.length - 1];

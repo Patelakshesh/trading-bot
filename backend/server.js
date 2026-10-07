@@ -1769,15 +1769,15 @@ const runDailyAnalysis = async () => {
     }
 };
 
-// Internal Cron Job (Will run every 15 minutes for near-instant AI analysis)
-cron.schedule('*/15 * * * *', runDailyAnalysis, {
+// Internal Cron Job (Staggered offset to avoid 9:15 AM crash: 2, 17, 32, 47 mins)
+cron.schedule('2,17,32,47 * * * *', runDailyAnalysis, {
     scheduled: true,
     timezone: "Asia/Kolkata"
 });
 
 
-// MATHEMATICAL STOP-LOSS, TAKE-PROFIT, AND NEWS ALERT CRON JOB (Runs every 15 minutes)
-cron.schedule('*/15 * * * *', async () => {
+// MATHEMATICAL STOP-LOSS, TAKE-PROFIT, AND NEWS ALERT CRON JOB (Staggered to 4, 19, 34, 49 mins)
+cron.schedule('4,19,34,49 * * * *', async () => {
     if (isWeekend()) return;
     console.log('Running Auto-Alert Check...');
     if(!bot) return;
@@ -2259,8 +2259,8 @@ cron.schedule('0 */2 * * *', async () => {
 });
 // ─── 🔄 SIGNAL AUTO-VERIFICATION ENGINE (Every 15 min, Mon–Fri) ──────────────
 // Checks all PENDING signals and auto-verifies their TARGET_HIT or STOPLOSS_HIT
-// outcome against real market price data from Angel One or Yahoo Finance.
-cron.schedule('*/15 * * * 1-5', async () => {
+// outcome against real market price data from Angel One or Yahoo Finance. (Staggered: 6, 21, 36, 51)
+cron.schedule('6,21,36,51 * * * 1-5', async () => {
     try {
         const pendingSignals = await SignalLog.find({ outcome: 'PENDING' }).sort({ createdAt: -1 }).limit(50);
         if (pendingSignals.length === 0) return;

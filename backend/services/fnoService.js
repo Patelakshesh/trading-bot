@@ -229,10 +229,19 @@ async function getFNOTrade(instrumentType = 'nifty') {
         } else {
             // For Yahoo Finance fallbacks
             try {
-                const stockService = require('./stockService');
-                const livePrice = await stockService.getStockPrice(symbol);
-                if (livePrice && livePrice > 0) {
-                    currentPrice = livePrice;
+                if (instrumentType.toLowerCase() === 'crude' || instrumentType.toLowerCase() === 'gold') {
+                    // MCX is not on Groww, and Yahoo chart is delayed 15 mins. Get 0-second live price from Yahoo Quote instead!
+                    const yhTick = instrumentType.toLowerCase() === 'crude' ? 'CL=F' : 'GC=F';
+                    const liveQuote = await yahooFinance.quote(yhTick).catch(() => null);
+                    if (liveQuote && liveQuote.regularMarketPrice > 0) {
+                        currentPrice = liveQuote.regularMarketPrice;
+                    }
+                } else {
+                    const stockService = require('./stockService');
+                    const livePrice = await stockService.getStockPrice(symbol);
+                    if (livePrice && livePrice > 0) {
+                        currentPrice = livePrice;
+                    }
                 }
             } catch (err) {
                 console.error("Live Price Override Failed:", err.message);
