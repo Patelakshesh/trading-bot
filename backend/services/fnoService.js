@@ -624,6 +624,44 @@ async function getFNOTrade(instrumentType = 'nifty') {
                 const nearSupport = currentPrice <= supportZone * 1.005;
                 const nearResistance = currentPrice >= resistanceZone * 0.995;
                 
+                // CUSTOM GRAPH ANALYSIS FOR CRUDE OIL (5-MIN PRE-BREAKOUT)
+                if (instrumentType.toLowerCase() === 'crude' || instrumentType.toLowerCase() === 'crudeoilm') {
+                    if (nearSupport && currentRSI < 50 && candleGain > 0) {
+                        return {
+                            status: 'EARLY_WARNING',
+                            spotPrice: spotDisplay,
+                            instrumentName: instrumentName,
+                            trade: {
+                                type: 'CE (CALL) [GRAPH ANALYSIS]',
+                                logic: `⚠️ <b>GRAPH ANALYSIS: SUPPORT BOUNCE</b> ⚠️\n\nThe AI detects price action bouncing directly off the major Support Zone (${supportZone.toFixed(2)})!\n📈 <b>Price Action:</b> Green Rejection Candle Detected.\n⏱️ <b>Prediction:</b> A momentum breakout is highly likely in the next 5-10 minutes!`,
+                                strikeGuide: `${strikePriceNum} CE (PREPARE)`,
+                                expiryGuide: `${expiryDateStr} Expiry`,
+                                rules: [
+                                    "🚨 DO NOT BUY YET. Open your broker app and prepare your Strike.",
+                                    "✅ This is a graph-based pre-signal (Catching the move BEFORE it happens)."
+                                ]
+                            }
+                        };
+                    }
+                    if (nearResistance && currentRSI > 50 && candleGain < 0) {
+                        return {
+                            status: 'EARLY_WARNING',
+                            spotPrice: spotDisplay,
+                            instrumentName: instrumentName,
+                            trade: {
+                                type: 'PE (PUT) [GRAPH ANALYSIS]',
+                                logic: `⚠️ <b>GRAPH ANALYSIS: RESISTANCE REJECTION</b> ⚠️\n\nThe AI detects price action rejecting the major Resistance Zone (${resistanceZone.toFixed(2)})!\n📉 <b>Price Action:</b> Red Rejection Candle Detected.\n⏱️ <b>Prediction:</b> A downward breakdown is highly likely in the next 5-10 minutes!`,
+                                strikeGuide: `${strikePriceNum} PE (PREPARE)`,
+                                expiryGuide: `${expiryDateStr} Expiry`,
+                                rules: [
+                                    "🚨 DO NOT BUY YET. Open your broker app and prepare your Strike.",
+                                    "✅ This is a graph-based pre-signal (Catching the move BEFORE it happens)."
+                                ]
+                            }
+                        };
+                    }
+                }
+                
                 // CALCUATE VOLATILITY SQUEEZE (Predicting the move 5 mins BEFORE the volume spikes)
                 const bbWidthPercent = ((bbData.upper - bbData.lower) / currentPrice) * 100;
                 const isSqueezed = bbWidthPercent <= 0.20; // 0.2% width is a massive, tight squeeze!
