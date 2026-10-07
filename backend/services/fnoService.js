@@ -349,13 +349,13 @@ async function getFNOTrade(instrumentType = 'nifty') {
             if (fetchedViaAngleOne) {
                 spotDisplay = `₹${currentPrice.toFixed(2)} (MCX Spot)`;
             } else {
-                spotDisplay = `$${currentPrice.toFixed(2)} / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
+                spotDisplay = `₹${(currentPrice * inrRate).toFixed(0)} (US WTI Converted)`;
             }
         } else if (instrumentType.toLowerCase() === 'gold') {
             if (fetchedViaAngleOne) {
                 spotDisplay = `₹${currentPrice.toFixed(2)} (MCX Spot)`;
             } else {
-                spotDisplay = `$${currentPrice.toFixed(2)} / ₹${(currentPrice * inrRate).toFixed(0)} (MCX Approx)`;
+                spotDisplay = `₹${(currentPrice * inrRate).toFixed(0)} (COMEX Converted)`;
             }
         }
 
